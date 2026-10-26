@@ -175,6 +175,7 @@ export function resolveSettings(record: UserSettings | null): EffectiveSettings 
 	return {
 		general: {
 			autoUpdate: record?.general?.autoUpdate ?? FACTORY_SETTINGS.general.autoUpdate,
+			dailyGoalMinutes: record?.general?.dailyGoalMinutes ?? FACTORY_SETTINGS.general.dailyGoalMinutes,
 		},
 		agent: {
 			models,
