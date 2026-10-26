@@ -6,7 +6,7 @@
  * chips, one key field, Connect. Six featured choices (owner pick):
  * OpenAI, OpenRouter, Anthropic, DeepSeek, the Z.AI Coding Plan, and any
  * OpenAI-compatible endpoint (a base URL of the learner's own); every
- * other provider the engine knows sits behind "30+ more".
+ * other provider the engine knows sits behind "N more".
  *
  * Saving a key dispatches the "keys" settings signal — the setup dialog
  * re-reads the catalog on it and moves on to the model pickers by itself.
@@ -16,6 +16,8 @@ import { useEffect, useMemo, useState } from "react";
 import { notifySettingsSaved } from "@/components/settings-signal";
 import { ProviderMenuList } from "@/components/settings/model-menu";
 import type { ProviderKeyInfo } from "@/components/settings/keys-section";
+import { ProviderMark } from "@/components/settings/connection-controls";
+import { Icon } from "@/components/ui/icon";
 
 /** Opens setup on the connect screen from anywhere (the ⌘K command,
  *  Settings → Keys). The AppShell's CommandPalette listens. */
@@ -130,80 +132,102 @@ export function ConnectProviderBody({
 		notifySettingsSaved("keys");
 	};
 
-	const chip = (id: string, label: string, on: boolean, onClick: () => void) => (
-		<button key={id} type="button" className={`chipbtn ${on ? "on" : ""}`} onClick={onClick} data-testid={`connect-chip-${id}`}>
-			{label}
-			{connected.includes(id) && <span style={{ marginLeft: 6, color: "var(--good)" }}>✓</span>}
+	const chip = (id: string, label: string, on: boolean, onClick: () => void, mark?: React.ReactNode) => (
+		<button key={id} type="button" className={on ? "su-tile on" : "su-tile"} onClick={onClick} aria-pressed={on} data-testid={`connect-chip-${id}`}>
+			{mark ?? <ProviderMark label={label} />}
+			<span>{label}</span>
+			{connected.includes(id) && (
+				<span className="ok" title="Connected">
+					<Icon name="check" size="xs" />
+				</span>
+			)}
 		</button>
 	);
+	const otherPicked = choice?.kind === "key" && !featuredIds.has(choice.provider.id);
 
 	return (
-		<div style={{ display: "flex", flexDirection: "column", gap: 18 }} data-testid="setup-stage-keys">
-			<div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+		<div className="su-stage" data-testid="setup-stage-keys">
+			<div className="su-field">
 				<span className="flabel">Where should your models run?</span>
-				<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+				<div className="su-tiles">
 					{FEATURED_PROVIDERS.map((f) => {
 						const p = byId.get(f.id);
 						if (!p) return null;
 						return chip(f.id, f.label, choice?.kind === "key" && choice.provider.id === f.id, () => setChoice({ kind: "key", provider: { ...p, label: f.label }, keyUrl: f.keyUrl }));
 					})}
-					{chip("custom", "OpenAI-compatible", choice?.kind === "custom", () => setChoice({ kind: "custom" }))}
-					{more.length > 0 && chip("more", `${more.length}+ more`, choice?.kind === "more" || (choice?.kind === "key" && !featuredIds.has(choice.provider.id)), () => setChoice({ kind: "more" }))}
+					{chip("custom", "OpenAI-compatible", choice?.kind === "custom", () => setChoice({ kind: "custom" }), (
+						<span aria-hidden className="st-avatar">
+							<Icon name="link" size="sm" />
+						</span>
+					))}
+					{more.length > 0 &&
+						chip("more", otherPicked && choice?.kind === "key" ? choice.provider.label : `${more.length} more`, choice?.kind === "more" || otherPicked, () => setChoice({ kind: "more" }), (
+							<span aria-hidden className="st-avatar">
+								<Icon name="more" size="sm" />
+							</span>
+						))}
 				</div>
-				<span className="fhint">One key is enough to start. It stays on this Mac and goes only to your provider.</span>
+				<span className="fhint">One key is enough to start. It stays on this device and goes only to your provider.</span>
 			</div>
 
 			{choice?.kind === "more" && (
-				<div className="pop" style={{ borderRadius: 14, padding: 8, maxHeight: 280, overflow: "auto", fontSize: 12.5 }}>
+				<div className="pop lh-menu su-more settle">
 					<ProviderMenuList providers={more} onPick={(p) => setChoice({ kind: "key", provider: p, keyUrl: null })} />
 				</div>
 			)}
 
 			{choice?.kind === "key" && (
 				<form
-					style={{ display: "flex", flexDirection: "column", gap: 8 }}
+					className="su-form"
 					onSubmit={(e) => {
 						e.preventDefault();
 						void saveKey();
 					}}
 				>
-					<label className="flabel" htmlFor="connect-key" style={{ display: "flex", justifyContent: "space-between" }}>
-						<span>{choice.provider.label} API key</span>
-						{choice.keyUrl && (
-							<a href={choice.keyUrl} target="_blank" rel="noreferrer" style={{ fontWeight: 500, color: "var(--v-accent)" }}>
-								Get a key ↗
-							</a>
-						)}
-					</label>
-					<input
-						id="connect-key"
-						className="finput mono"
-						type="password"
-						autoFocus
-						autoComplete="off"
-						spellCheck={false}
-						value={key}
-						onChange={(e) => setKey(e.target.value)}
-						placeholder="Paste your key"
-						data-testid="setup-key-input"
-						disabled={busy}
-					/>
-					<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-						<button type="submit" className="btn tall" disabled={busy || !key.trim()} data-testid="setup-key-save" style={{ borderRadius: 999 }}>
-							{busy ? "Connecting…" : "Connect"}
-						</button>
-						{error && (
-							<span role="alert" data-testid="setup-key-error" style={{ fontSize: 12.5, color: "#b3261e" }}>
+					<div className="su-field">
+						<label className="flabel" htmlFor="connect-key">
+							<span>{choice.provider.label} API key</span>
+							{choice.keyUrl && (
+								<a href={choice.keyUrl} target="_blank" rel="noreferrer" className="link">
+									Get a key
+									<Icon name="external" size="xs" />
+								</a>
+							)}
+						</label>
+						<input
+							id="connect-key"
+							className="finput mono"
+							type="password"
+							autoFocus
+							autoComplete="off"
+							spellCheck={false}
+							value={key}
+							onChange={(e) => setKey(e.target.value)}
+							placeholder="Paste your key"
+							data-testid="setup-key-input"
+							disabled={busy}
+							aria-invalid={error ? true : undefined}
+							aria-describedby={error ? "connect-key-error" : undefined}
+						/>
+						{error ? (
+							<span role="alert" id="connect-key-error" data-testid="setup-key-error" className="ferror">
 								{error}
 							</span>
+						) : (
+							<span className="fhint">Saved on this device. Your models appear as soon as it connects.</span>
 						)}
+					</div>
+					<div className="su-form-actions">
+						<button type="submit" className="btn brand" disabled={busy || !key.trim()} data-testid="setup-key-save">
+							{busy ? "Connecting…" : "Connect"}
+						</button>
 					</div>
 				</form>
 			)}
 
 			{choice?.kind === "custom" && (
 				<form
-					style={{ display: "flex", flexDirection: "column", gap: 12 }}
+					className="su-form"
 					onSubmit={(e) => {
 						e.preventDefault();
 						void saveCustom();
@@ -213,62 +237,67 @@ export function ConnectProviderBody({
 					<span className="fhint">
 						Any server that speaks the OpenAI chat API: a gateway, vLLM, LM Studio, or Ollama’s <span className="mono">/v1</span>.
 					</span>
-					<div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 10 }}>
-						<label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+					<div className="su-grid">
+						<label className="su-field">
 							<span className="flabel">Name</span>
 							<input className="finput" value={name} onChange={(e) => setName(e.target.value)} placeholder="My server" autoFocus />
 						</label>
-						<label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+						<label className="su-field">
 							<span className="flabel">Base URL</span>
 							<input className="finput mono" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.example.com/v1" spellCheck={false} />
 						</label>
 					</div>
-					<label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+					<label className="su-field">
 						<span className="flabel">
-							API key <span style={{ fontWeight: 400, color: "var(--v-muted)" }}>(leave empty for a local server)</span>
+							<span>
+								API key <span className="fopt">· optional for a local server</span>
+							</span>
 						</span>
 						<input className="finput mono" type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="Paste your key" autoComplete="off" spellCheck={false} />
 					</label>
-					<label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-						<span className="flabel" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-							<span>Models</span>
-							<button type="button" className="ghost" style={{ height: 26, fontSize: 12 }} disabled={!baseUrl.trim() || probing} onClick={() => void probe()}>
+					<div className="su-field">
+						<span className="flabel">
+							<label htmlFor="connect-models">Models</label>
+							<button type="button" className="ghost sm" disabled={!baseUrl.trim() || probing} onClick={() => void probe()}>
+								<Icon name={probing ? "loading" : "search"} size="sm" />
 								{probing ? "Looking…" : "Find models"}
 							</button>
 						</span>
-						<input className="finput mono" value={modelText} onChange={(e) => setModelText(e.target.value)} placeholder="model-id, another-model" spellCheck={false} />
+						<input id="connect-models" className="finput mono" value={modelText} onChange={(e) => setModelText(e.target.value)} placeholder="model-id, another-model" spellCheck={false} />
 						{found && found.length > 0 && (
-							<span style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+							<span className="su-chips">
 								{found.slice(0, 24).map((m) => {
 									const on = parseModelIds(modelText).includes(m);
 									return (
 										<button
 											key={m}
 											type="button"
-											className={`chipbtn ${on ? "on" : ""}`}
-											style={{ height: 28, fontSize: 12, padding: "0 10px" }}
+											className={on ? "chip on" : "chip"}
+											aria-pressed={on}
 											onClick={() => {
 												const ids = parseModelIds(modelText);
 												setModelText((on ? ids.filter((x) => x !== m) : [...ids, m]).join(", "));
 											}}
 										>
+											{on && <Icon name="check" size="xs" />}
 											{m}
 										</button>
 									);
 								})}
 							</span>
 						)}
-						{found && found.length === 0 && <span className="fhint">The server answered but listed no models — type their ids above.</span>}
-					</label>
-					<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-						<button type="submit" className="btn tall" style={{ borderRadius: 999 }} disabled={busy || !name.trim() || !baseUrl.trim() || parseModelIds(modelText).length === 0}>
+						{found && found.length === 0 && <span className="fhint">The server answered but listed no models. Type their ids above.</span>}
+						{!found && <span className="fhint">Separate ids with commas, or let “Find models” ask the server.</span>}
+					</div>
+					{error && (
+						<span role="alert" className="ferror">
+							{error}
+						</span>
+					)}
+					<div className="su-form-actions">
+						<button type="submit" className="btn brand" disabled={busy || !name.trim() || !baseUrl.trim() || parseModelIds(modelText).length === 0}>
 							{busy ? "Adding…" : "Add provider"}
 						</button>
-						{error && (
-							<span role="alert" style={{ fontSize: 12.5, color: "#b3261e" }}>
-								{error}
-							</span>
-						)}
 					</div>
 				</form>
 			)}

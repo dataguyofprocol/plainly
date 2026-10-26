@@ -2,7 +2,7 @@
  * The app's ONE mermaid renderer (the chrome-melt wave, 2026-09-19): both the
  * in-chat block (components/md-blocks.tsx) and the session-scoped focus
  * overlay (components/session-overlay.tsx) render charts through this module
- * — one dark-theme config, one plugin instance, unique render ids. This
+ * — one light-theme config, one plugin instance, unique render ids. This
  * REPLACES streamdown's internal mermaid path entirely: its fullscreen portal
  * was hard-wired `fixed inset-0` (covering the window-drag bar, X landing in
  * drag territory) with no styling hook, which is what drove the custom
@@ -20,14 +20,35 @@ import type { MermaidConfig } from "mermaid";
  *  never render larger than the session's own text). */
 export const MERMAID_FONT_SIZE = 16;
 
-// The app is dark-only (html.dark in the root layout) — diagrams render in
-// mermaid's dark theme. (Moved from ai-elements/message.tsx when the
-// renderer became app-owned; the old `mermaid` prop wiring is retired.)
+// v4 is light: diagrams render in mermaid's "base" theme, recoloured to the
+// app's tokens (app/globals.css). Mermaid derives tints from these values in
+// JS, so they are literals, not var() — keep them in step with the tokens.
 export const mermaidTheme: MermaidConfig = {
 	fontFamily: "ui-sans-serif, system-ui, sans-serif",
 	fontSize: MERMAID_FONT_SIZE,
 	securityLevel: "strict",
-	theme: "dark",
+	theme: "base",
+	themeVariables: {
+		background: "#ffffff",
+		primaryColor: "#ffffff",
+		primaryTextColor: "#191c1a",
+		primaryBorderColor: "#c9ccc7",
+		secondaryColor: "#eef5f3",
+		tertiaryColor: "#f4f5f2",
+		lineColor: "#a3a8a3",
+		textColor: "#191c1a",
+		mainBkg: "#ffffff",
+		nodeBorder: "#c9ccc7",
+		clusterBkg: "#f7f8f6",
+		clusterBorder: "#dcded9",
+		edgeLabelBackground: "#f4f5f2",
+		noteBkgColor: "#fbf3e6",
+		noteBorderColor: "#e6cfa8",
+		actorBkg: "#ffffff",
+		actorBorder: "#c9ccc7",
+		signalColor: "#565c57",
+		labelBoxBkgColor: "#ffffff",
+	},
 };
 
 const plugin = createMermaidPlugin();

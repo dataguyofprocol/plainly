@@ -16,7 +16,7 @@ import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
 import { createMathPlugin } from "@streamdown/math";
 
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
 import type { LhViewMessage } from "@/src/core";
 import {
@@ -43,8 +43,8 @@ export type MessageProps = HTMLAttributes<HTMLDivElement> & {
 export const Message = ({ className, from, ...props }: MessageProps) => (
   <div
     className={cn(
-      "group flex w-full max-w-[95%] flex-col gap-2",
-      from === "user" ? "is-user ml-auto justify-end" : "is-assistant",
+      "group w-full min-w-0",
+      from === "user" ? "is-user" : "is-assistant",
       className
     )}
     {...props}
@@ -58,15 +58,8 @@ export const MessageContent = ({
   className,
   ...props
 }: MessageContentProps) => (
-  <div
-    className={cn(
-      "is-user:dark flex w-fit min-w-0 max-w-full flex-col gap-2 overflow-hidden text-sm",
-      "group-[.is-user]:ml-auto group-[.is-user]:rounded-lg group-[.is-user]:bg-secondary group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground",
-      "group-[.is-assistant]:text-foreground",
-      className
-    )}
-    {...props}
-  >
+  // Layout + rhythm live in the caller's class (the lesson's .ls-turn).
+  <div className={cn("min-w-0", className)} {...props}>
     {children}
   </div>
 );
@@ -276,7 +269,7 @@ export const MessageBranchPrevious = ({
       variant="ghost"
       {...props}
     >
-      {children ?? <ChevronLeftIcon size={14} />}
+      {children ?? <Icon name="chevron-left" size="sm" />}
     </Button>
   );
 };
@@ -299,7 +292,7 @@ export const MessageBranchNext = ({
       variant="ghost"
       {...props}
     >
-      {children ?? <ChevronRightIcon size={14} />}
+      {children ?? <Icon name="chevron-right" size="sm" />}
     </Button>
   );
 };

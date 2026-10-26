@@ -51,10 +51,10 @@ describe("Composer", () => {
 		assert.ok(idleStop.includes('aria-label="Stop"'), "empty composer: stop replaces send while streaming");
 	});
 
-	it("Lesson4's steer row: one glass row with a text button", () => {
+	it("the composer: one field with a round send button (finesse pass, 2026-10-26)", () => {
 		const html = render();
-		assert.ok(html.includes('class="glass"'), "Lesson4's glass steer row");
-		assert.ok(html.includes(">Send<"), "a text button");
+		assert.ok(html.includes('class="ls-composer"'), "the one polished field");
+		assert.ok(/aria-label="Send"[^>]*class="ls-send"/.test(html), "the round icon send");
 	});
 
 	it("disabled when nothing to send", () => {
@@ -66,7 +66,7 @@ describe("Composer", () => {
 		const html = render({ canSend: false, nextProblem: true });
 		assert.ok(html.includes('data-testid="next-problem-button"'), "the morphed button");
 		assert.match(html, /Next problem/, "the label");
-		assert.ok(html.includes("var(--good)"), "green — the correct-answer register");
+		assert.ok(html.includes("btn brand"), "the brand action (finesse pass: controls stay teal)");
 		assert.ok(!html.includes('aria-label="Send"'), "the square send is gone in the pause");
 	});
 

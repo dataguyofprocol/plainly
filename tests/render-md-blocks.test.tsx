@@ -27,7 +27,7 @@ describe("md-blocks — code", () => {
 	it("inline code passes through with the house inline styling", () => {
 		const html = render("a `term` b");
 		assert.ok(html.includes('data-streamdown="inline-code"'), "inline code keeps the inline-code path");
-		assert.match(html, /bg-muted/);
+		assert.match(html, /lh-icode/, "the quiet inline-code tint (finesse pass)");
 	});
 
 	it("code fences delegate to streamdown's CodeBlock with a hover copy corner", () => {
@@ -176,18 +176,18 @@ describe("mermaid expand — the context seam", () => {
 });
 
 describe("md-blocks — key-idea callouts (GitHub alerts, owner round 2026-10-07)", () => {
-	it("an [!IMPORTANT] callout renders as the sharp white-outline box, marker never leaks", () => {
+	it("an [!IMPORTANT] callout renders as the teal-rule callout, marker never leaks", () => {
 		const html = render("> [!IMPORTANT]\n> ALL X is done through Y.");
 		assert.ok(html.includes('data-testid="md-callout"'), "the callout box mounts");
 		assert.ok(html.includes('data-alert-kind="important"'), "the kind is recorded");
 		assert.match(html, /ALL X is done through Y\./, "the prose survives");
 		assert.ok(!html.includes("[!IMPORTANT]"), "the marker line never leaks as text");
-		// The owner's minimal law: sharp corners (no rounded), white stroke,
-		// no background, no label, no icon — and the box hugs its text.
-		assert.match(html, /border-foreground/, "white stroke");
+		// The light theme's callout (owner, finesse pass 2026-10-26): the
+		// teal-rule class, no label, no icon — and the box still hugs its text.
+		assert.match(html, /lh-callout/, "the teal-rule callout class");
 		assert.match(html, /w-fit/, "width: fit-content — the hug");
-		assert.ok(!html.includes("rounded"), "sharp corners — no rounding anywhere");
-		assert.ok(!html.includes("bg-card") && !html.includes("bg-background"), "transparent — no background");
+		assert.ok(!html.includes("<svg"), "no icon");
+		assert.ok(!html.includes("bg-card") && !html.includes("bg-background"), "no card surface");
 	});
 
 	it("all five GitHub markers box identically — one device, one meaning", () => {
@@ -243,13 +243,10 @@ describe("md-blocks — the restored plain blockquote (owner round, 2026-10-07)"
 });
 
 describe("ThinkingBlock — the document band + ⌘T sync (owner rounds, 2026-10-07)", () => {
-	it("the row is the document band — round four geometry (owner, 2026-10-07)", () => {
+	it("the row is the quiet disclosure + tint well (finesse pass, 2026-10-26)", () => {
 		const html = renderToStaticMarkup(<ThinkingBlock text="banded" defaultOpen />);
-		assert.ok(html.includes("bg-card"), "the card-color band");
-		assert.ok(html.includes("border-l-[calc(3ch-14px)]"), "narrow rail — 14px gap inside the 3ch inset");
-		assert.ok(html.includes("py-1") && html.includes("pl-[14px]"), "4px band padding");
-		assert.ok(html.includes("pr-4"), "the text wraps early — air at the band's right edge");
-		assert.ok(html.includes("w-full"), "full width — no chat side");
+		assert.ok(html.includes("ls-uthink"), "the user-thinking row");
+		assert.ok(html.includes("ls-well mine"), "the expanded text sits in the inner-voice well");
 		assert.match(html, /aria-expanded="true"/);
 		assert.ok(html.includes("banded"), "text visible on arrival");
 	});
@@ -257,7 +254,7 @@ describe("ThinkingBlock — the document band + ⌘T sync (owner rounds, 2026-10
 	it("in-card rows take no band — the accent step read too light (owner round five)", () => {
 		const html = renderToStaticMarkup(<ThinkingBlock text="in card" inCard />);
 		assert.ok(!html.includes("bg-accent") && !html.includes("bg-card"), "transparent on the card");
-		assert.ok(html.includes("border-l-[calc(3ch-14px)]"), "rail only, same geometry");
+		assert.ok(html.includes("ls-uthink in-card"), "the same row, marked in-card");
 	});
 
 	it("⌘T sets every row — explicit sets stomp individual state, late mounts honor the last set", () => {

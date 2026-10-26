@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
+import { Icon, type IconName } from "@/components/ui/icon";
 
 /**
  * The ESC-abort guard (owner, 2026-10-02): the global Esc → abort chain
@@ -26,6 +27,8 @@ import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 
 /** What Esc is aborting — drives copy and the confirm action. */
 export type AbortMode = "turn" | "question" | "problem";
+
+const ICON: Record<AbortMode, IconName> = { turn: "stop", question: "ask", problem: "practice" };
 
 const COPY: Record<AbortMode, { title: string; line: string; action: string }> = {
 	turn: {
@@ -63,44 +66,46 @@ export function AbortTurnBody({
 	const backdropDismiss = useBackdropDismiss(onClose);
 	const copy = COPY[mode];
 	return (
-		<div
-			role="dialog"
-			aria-modal="true"
-			aria-label={copy.title}
-			data-testid="abort-turn-dialog"
-			className="fixed inset-0 z-50 flex items-center justify-center lh-scrim"
-			// A genuine click on the scrim cancels — the cautious default, like Esc.
-			{...backdropDismiss}
-		>
+		<div className="v4 scope">
 			<div
-				className="mx-4 w-full max-w-sm rounded-xl border bg-card p-5 shadow-lg"
-				onClick={(e) => e.stopPropagation()}
+				role="dialog"
+				aria-modal="true"
+				aria-label={copy.title}
+				data-testid="abort-turn-dialog"
+				className="overlay"
+				// A genuine click on the scrim cancels — the cautious default, like Esc.
+				{...backdropDismiss}
 			>
-				<h2 className="text-sm font-semibold text-card-foreground" data-testid="abort-turn-title">
-					{copy.title}
-				</h2>
-				<p className="mt-1.5 text-xs text-muted-foreground" data-testid="abort-turn-line">
-					{copy.line}
-					{busy && mode !== "turn" ? " The working turn stops too." : ""}
-				</p>
-				<div className="mt-4 flex justify-end gap-2">
-					<button
-						type="button"
-						data-testid="abort-turn-cancel"
-						onClick={onClose}
-						className="rounded-sm px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-					>
-						Cancel
-					</button>
-					<button
-						type="button"
-						data-testid="abort-turn-confirm"
-						onClick={onConfirm}
-						// Destructive red — the app's established destructive pair.
-						className="rounded-sm border border-destructive/50 bg-destructive/10 px-3 py-1.5 text-xs text-destructive transition-colors hover:bg-destructive/20"
-					>
-						{copy.action}
-					</button>
+				<div className="dialog pad cd sm" onClick={(e) => e.stopPropagation()}>
+					<div className="dlg-head">
+						<span className="well danger" aria-hidden>
+							<Icon name={ICON[mode]} size="lg" />
+						</span>
+						<div>
+							<h2 className="dlg-title" data-testid="abort-turn-title">
+								{copy.title}
+							</h2>
+							<p className="dlg-body" data-testid="abort-turn-line">
+								{copy.line}
+								{busy && mode !== "turn" ? " The working turn stops too." : ""}
+							</p>
+						</div>
+					</div>
+					<div className="dlg-actions">
+						<button type="button" data-testid="abort-turn-cancel" onClick={onClose} className="btn secondary">
+							Cancel
+						</button>
+						<button
+							type="button"
+							data-testid="abort-turn-confirm"
+							// The destructive pair (render pin: the confirm is the destructive one).
+							data-tone="destructive"
+							onClick={onConfirm}
+							className="btn danger"
+						>
+							{copy.action}
+						</button>
+					</div>
 				</div>
 			</div>
 		</div>

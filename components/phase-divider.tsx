@@ -1,4 +1,5 @@
 import type { Phase3 } from "@/src/core";
+import { Icon } from "@/components/ui/icon";
 
 /**
  * The in-session phase presentation (owner, minimal-color round —
@@ -66,12 +67,13 @@ export function PhaseDivider({ phase, nodeCount }: { phase: Phase3; nodeCount?: 
 			? `Plan · ${nodeCount} node${nodeCount === 1 ? "" : "s"}`
 			: CHIP_LABEL[phase];
 	return (
-		<div className="my-4 flex w-full items-center gap-3" data-testid={`phase-divider-${phase}`}>
-			<span className="h-0 flex-1 border-t-2 border-dotted border-border/50" aria-hidden />
-			<span className="rounded-full border border-border/80 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+		<div className="ls-divider" data-testid={`phase-divider-${phase}`}>
+			<i aria-hidden />
+			<span>
+				<Icon name={phase === "plan" ? "plan" : "learn"} size="xs" />
 				{label}
 			</span>
-			<span className="h-0 flex-1 border-t-2 border-dotted border-border/50" aria-hidden />
+			<i aria-hidden />
 		</div>
 	);
 }

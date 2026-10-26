@@ -1,6 +1,7 @@
 "use client";
 
 import { MessageResponse } from "@/components/ai-elements/message";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { repairMathForDisplay, type ArtifactPartProps } from "@/src/core";
 
@@ -63,9 +64,11 @@ export function ProblemCard({ part }: ArtifactPartProps) {
 	const input = (part.input ?? {}) as { statement?: string };
 	const statement = typeof input.statement === "string" ? input.statement : "";
 	return (
-		<div data-testid="problem-card" className="lh-card-enter my-1 rounded-xl border bg-card p-4">
-			<div className="mb-1 text-xs font-medium text-muted-foreground">Problem</div>
-			<div className="lh-prose text-[15px]">
+		<div data-testid="problem-card" className="pcard lh-card-enter">
+			<div className="pcard-h">
+				<span className="pcard-o">Problem</span>
+			</div>
+			<div className="pcard-read">
 				<MessageResponse>{repairMathForDisplay(statement)}</MessageResponse>
 			</div>
 		</div>
@@ -80,17 +83,17 @@ export const OUTCOME_LABEL: Record<string, string> = {
 	dismissed: "Dismissed",
 };
 
-/* The outcome chips (owner round 3, 2026-10-05): the EXACT register of the
- * quiz cards' correct/incorrect bubbles. Colors per outcome — solved reads
- * green (the "correct" twin), solved-with-hints amber (succeeded with
- * cost), surrendered red (the problem beat the learner), moved on muted
- * (the agent's call, not a verdict against him). */
+/* The outcome pills (owner round 3, 2026-10-05; v4 pills in the finesse
+ * pass): the same register as the answered cards' verdicts. Solved reads
+ * green (the "correct" twin), solved-with-hints wears Practice's warm mark
+ * (succeeded with cost), surrendered red (the problem beat the learner),
+ * moved on muted (the agent's call, not a verdict against him). */
 export const OUTCOME_CHIP: Record<string, string> = {
-	solved: "bg-good/15 text-good",
-	solvedWithHints: "bg-warn/15 text-warn",
-	movedOn: "bg-muted text-muted-foreground",
-	surrendered: "bg-danger/15 text-danger",
-	dismissed: "bg-muted text-muted-foreground",
+	solved: "pill good",
+	solvedWithHints: "pill practice",
+	movedOn: "pill muted",
+	surrendered: "pill danger",
+	dismissed: "pill muted",
 };
 
 export function ConcludeCard({ part }: ArtifactPartProps) {
@@ -110,44 +113,37 @@ export function ConcludeCard({ part }: ArtifactPartProps) {
 	// learner clicked; the record needs only the fact).
 	if (outcome === "dismissed") {
 		return (
-			<div data-testid="conclude-card" className="my-1 px-1 text-sm text-muted-foreground/70">
+			<div data-testid="conclude-card" className="pcard-dismissed">
+				<Icon name="minus" size="sm" />
 				Problem dismissed.
 			</div>
 		);
 	}
 
 	return (
-		<div data-testid="conclude-card" className="lh-card-enter relative my-1 rounded-xl border bg-card p-4">
-			{/* The heading row (owner round 3, 2026-10-05): plain 'Concluded'
-			    eyebrow + the outcome in the quiz cards' EXACT chip register —
-			    no more two same-weight headings stacked. */}
-			<div className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-				Concluded
-				{(OUTCOME_LABEL[outcome] ?? "") !== "" && outcome !== "dismissed" && (
-					<span className={cn("rounded px-1.5 py-0.5", OUTCOME_CHIP[outcome] ?? OUTCOME_CHIP.movedOn)}>
-						{OUTCOME_LABEL[outcome]}
-					</span>
-				)}
+		<div data-testid="conclude-card" className="pcard lh-card-enter">
+			{/* The heading row: the plain 'Concluded' overline + the outcome
+			    pill — never two same-weight headings stacked. */}
+			<div className="pcard-h">
+				<span className="pcard-o">Concluded</span>
+				{(OUTCOME_LABEL[outcome] ?? "") !== "" && <span className={OUTCOME_CHIP[outcome] ?? OUTCOME_CHIP.movedOn}>{OUTCOME_LABEL[outcome]}</span>}
 			</div>
-			{/* The verdict — plain prose under the heading, no 'Verdict:' label
-			    (owner round 3): the same quiet 50% register as quiz explanations. */}
+			{/* The verdict — plain prose under the heading, no 'Verdict:'
+			    label: the quiet register of quiz explanations. */}
 			{verdict.length > 0 && (
-				<div className="text-sm text-foreground/50">
+				<div className="pcard-verdict">
 					<MessageResponse>{repairMathForDisplay(verdict)}</MessageResponse>
 				</div>
 			)}
-			{/* Then the divider, then the labeled model solution (Slice G: the
+			{/* Then a hairline, then the labeled model solution (Slice G: the
 			    hero is the pose's commitment, verbatim). */}
 			{reveal.length > 0 && (
-				<>
-					<div className="my-3 border-t" />
-					<div>
-						<div className="mb-0.5 text-xs font-medium text-muted-foreground">Model solution</div>
-						<div className="lh-prose text-[15px]">
-							<MessageResponse>{repairMathForDisplay(reveal)}</MessageResponse>
-						</div>
+				<div className="pcard-sec">
+					<span className="pcard-o">Model solution</span>
+					<div className="pcard-read">
+						<MessageResponse>{repairMathForDisplay(reveal)}</MessageResponse>
 					</div>
-				</>
+				</div>
 			)}
 			<MetadataPopover
 				concludeInput={input}
@@ -218,7 +214,7 @@ function MetadataPopover({
 	if (!mode && targets.length === 0 && !rung && !miss && retest === undefined) return null;
 
 	return (
-		<div ref={rootRef} className="relative mt-3">
+		<div ref={rootRef} className="pcard-meta">
 			<button
 				type="button"
 				data-testid="metadata-toggle"
@@ -237,13 +233,15 @@ function MetadataPopover({
 					});
 				}}
 				aria-expanded={open}
-				className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+				className={cn("mini pcard-mt", open && "on")}
 			>
+				<Icon name="info" size="sm" />
 				Metadata
 			</button>
 			{open &&
 				anchor &&
 				createPortal(
+					<div className="v4 scope">
 					<div
 						data-testid="metadata-box"
 						// PORTALED TO BODY (owner fix, 2026-10-06): the transcript's
@@ -252,36 +250,45 @@ function MetadataPopover({
 						// cut-off bug). A fixed-position portal sits on top of
 						// EVERYTHING, the dialogs' law. Node-card info-box register;
 						// opening BELOW the trigger — always.
-						style={{ position: "fixed", top: anchor.top, left: anchor.left }}
-						className="z-50 w-80 max-w-[calc(100vw-1rem)] rounded-xl border bg-card p-4 text-left shadow-lg"
+						style={{ top: anchor.top, left: anchor.left }}
+						className="pmeta pop"
 					>
-				<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
-						<dt className="text-muted-foreground">Mode</dt>
-						<dd className="font-mono">{mode || "—"}</dd>
-						<dt className="text-muted-foreground">Targets</dt>
-						<dd className="font-mono">
-							{targets.length === 0 ? (
-								"untagged"
-							) : (
-								<span>
-									{targets.map((t, i) => (
-										<span key={t}>
-											{i > 0 && ", "}
-											{names?.[t] ?? t}
-										</span>
-									))}
-								</span>
-							)}
-						</dd>
-						<dt className="text-muted-foreground">Outcome</dt>
-						<dd className="font-mono">{outcome || "—"}</dd>
-						<dt className="text-muted-foreground">Hint rung</dt>
-						<dd className="font-mono">{rung || "none"}</dd>
-						<dt className="text-muted-foreground">Miss class</dt>
-						<dd className="font-mono">{miss || "none"}</dd>
-						<dt className="text-muted-foreground">Retest</dt>
-						<dd className="font-mono">{retest === undefined ? "—" : retest ? "yes" : "no"}</dd>
-					</dl>
+						<dl className="stat">
+							<div>
+								<dt>Mode</dt>
+								<dd className="mono">{mode || "—"}</dd>
+							</div>
+							<div>
+								<dt>Targets</dt>
+								<dd className="mono">
+									{targets.length === 0
+										? "untagged"
+										: targets.map((t, i) => (
+												<span key={t}>
+													{i > 0 && ", "}
+													{names?.[t] ?? t}
+												</span>
+											))}
+								</dd>
+							</div>
+							<div>
+								<dt>Outcome</dt>
+								<dd className="mono">{outcome || "—"}</dd>
+							</div>
+							<div>
+								<dt>Hint rung</dt>
+								<dd className="mono">{rung || "none"}</dd>
+							</div>
+							<div>
+								<dt>Miss class</dt>
+								<dd className="mono">{miss || "none"}</dd>
+							</div>
+							<div>
+								<dt>Retest</dt>
+								<dd className="mono">{retest === undefined ? "—" : retest ? "yes" : "no"}</dd>
+							</div>
+						</dl>
+					</div>
 					</div>,
 					document.body,
 				)}

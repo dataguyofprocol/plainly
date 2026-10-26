@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownIcon, ChevronRightIcon, PlayIcon } from "lucide-react";
 import { finishDictation, isDictationActive, joinDictation, useDictationTarget } from "@/components/dictation";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { MessageResponse } from "@/components/ai-elements/message";
-import { CONFIDENCE_LEVEL_COLORS } from "@/components/confidence-colors";
+import { ConfidenceLadder } from "@/components/confidence-rail";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import {
 	buildAnswer,
@@ -124,7 +124,8 @@ export function QuestionDock({
 		canonical === "quiz" ? parseQuizInput(input) : canonical === "explain" ? parseExplainInput(input) : parseAskInput(input);
 	if (!parsed) {
 		return (
-			<div data-testid="malformed-question" className="rounded-xl border border-dashed bg-card/60 p-3 text-sm text-muted-foreground">
+			<div data-testid="malformed-question" className="qmalformed">
+				<Icon name="status-warn" size="sm" />
 				This question arrived malformed — the transcript keeps the retry.
 			</div>
 		);
@@ -177,7 +178,7 @@ function teaserText(q: string): string {
 }
 
 /** The collapsed strip. Two species (W5): "collapsed" is the scroll minimization
- *  (kind chip + one-liner + Answer ↓); "reveal" is the teach-check invitation —
+ *  (kind chip + one-liner + Answer); "reveal" is the teach-check invitation —
  *  a distinct, more inviting affordance, because it asks the learner to start
  *  something, not to resume something. */
 export function QuestionDockBar({
@@ -202,40 +203,28 @@ export function QuestionDockBar({
 }) {
 	if (variant === "reveal") {
 		return (
-			<button
-				type="button"
-				data-testid="teach-check-reveal"
-				onClick={onExpand}
-				className="dock-variant flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/40"
-			>
-				<span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-					<PlayIcon className="size-3.5" />
+			<button type="button" data-testid="teach-check-reveal" onClick={onExpand} className="qreveal dock-variant">
+				<span className="qreveal-ic" aria-hidden="true">
+					<Icon name="ask" size="md" />
 				</span>
-				<span className="min-w-0 flex-1">
-					<span className="block text-sm font-medium">Check your understanding</span>
-					<span className="block truncate text-xs text-muted-foreground">{teaserText(question)}</span>
+				<span className="qreveal-tx">
+					<span className="qreveal-t">Check your understanding</span>
+					<span className="qreveal-d">{teaserText(question)}</span>
 				</span>
-				<span className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary">
-					Open <ChevronRightIcon className="size-3.5" />
+				<span className="qreveal-go">
+					Open
+					<Icon name="chevron-right" size="sm" />
 				</span>
 			</button>
 		);
 	}
 	return (
-		<button
-			type="button"
-			data-testid="question-dock-bar"
-			onClick={onExpand}
-			className="dock-variant flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm transition-colors hover:bg-accent/40"
-		>
-			<span className="shrink-0 text-xs font-medium text-muted-foreground">
-				{label ??
-							toolLabel ??
-							(toolName === "quiz" ? "Check" : toolName === "explain" ? "Explain" : "Question")}
-			</span>
-			<span className="min-w-0 flex-1 truncate text-muted-foreground">{teaserText(question)}</span>
-			<span className="flex shrink-0 items-center gap-1 text-xs font-medium">
-				Answer <ArrowDownIcon className="size-3.5" />
+		<button type="button" data-testid="question-dock-bar" onClick={onExpand} className="qbar dock-variant">
+			<span className="qbar-k">{label ?? toolLabel ?? (toolName === "quiz" ? "Check" : toolName === "explain" ? "Explain" : "Question")}</span>
+			<span className="qbar-q">{teaserText(question)}</span>
+			<span className="qbar-go">
+				Answer
+				<Icon name="arrow-down" size="sm" />
 			</span>
 		</button>
 	);
@@ -549,44 +538,47 @@ function QuestionDockForm({
 			?.scrollIntoView({ block: "nearest" });
 	}, [kbdIdx]);
 
-	// Lesson4's question: the eyebrow, the serif question, numbered option
-	// rows, how sure, the thinking field with its mic, the keys and submit.
+	// Lesson4's question: the kind, the serif question, numbered choice
+	// cards, how sure, the thinking field with its mic, then submit.
 	const toggleDictation = () => window.dispatchEvent(new CustomEvent(kbdEventForAction("toggle-dictation")));
 	const keyBadge = (i: number) => (
 		<span className="k" aria-hidden="true">
 			{i + 1}
 		</span>
 	);
+	const kindLabel =
+		toolName === "probe"
+			? "Probe"
+			: toolName === "recall"
+				? "Recall"
+				: kind === "quiz"
+					? qd.questionType === "predict"
+						? "Predict before you read on"
+						: "Check"
+					: kind === "explain"
+						? "Explain"
+						: "Question";
+	const fieldId = `${toolCallId}-field`;
 	return (
-		<div ref={rootRef} data-testid="question-dock" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-			<div data-session-find-root="" style={{ maxHeight: "var(--dock-max-h, 55dvh)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
-				<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-					<span style={{ fontSize: 11.5, fontWeight: 700, color: qd.questionType === "predict" ? "var(--warn)" : "var(--v-accent)" }}>
-						{toolName === "probe"
-						? "Probe"
-						: toolName === "recall"
-							? "Recall"
-							: kind === "quiz"
-								? qd.questionType === "predict"
-									? "Predict before you read on"
-									: "Check"
-								: kind === "explain"
-									? "Explain"
-									: "Question"}
-						{qd.mode === "multi-select" && " · select all that apply"}
+		<div ref={rootRef} data-testid="question-dock" className="qform">
+			<div data-session-find-root="" className="qbody">
+				<div className="qhead">
+					<span className="qkind">
+						{kindLabel}
+						{qd.mode === "multi-select" && <span className="qkind-note"> · select all that apply</span>}
 					</span>
-					<div className="serif" style={{ fontSize: 17, lineHeight: "24px", fontWeight: 500 }}>
+					<div className="qtext">
 						<MessageResponse>{qd.question}</MessageResponse>
 					</div>
 				</div>
 				{qd.context && (
-					<div className="serif" style={{ fontSize: 14, lineHeight: "21px", color: "var(--v-muted)" }}>
+					<div className="qctx">
 						<MessageResponse>{qd.context}</MessageResponse>
 					</div>
 				)}
 
 				{qd.mode !== "text" && (
-					<div style={{ display: "flex", flexDirection: "column", gap: 6 }} role={qd.mode === "multi-select" ? "group" : "radiogroup"}>
+					<div className="opts" role={qd.mode === "multi-select" ? "group" : "radiogroup"}>
 						{qd.options.map((opt, i) => {
 							const isSel = sel.selected.has(i);
 							const dim = !isSel && (sel.selected.size > 0 || sel.dontKnow) && qd.mode !== "multi-select";
@@ -598,17 +590,16 @@ function QuestionDockForm({
 									aria-checked={isSel}
 									data-kbdrow={i}
 									onClick={() => toggle(i)}
-									className={cn("opt", isSel && "sel", dim && "dim")}
-									style={i === kbdIdx && !isSel ? { borderColor: "var(--line2)", background: "#fff" } : undefined}
+									className={cn("opt", isSel && "sel", dim && "dim", i === kbdIdx && !isSel && "at")}
 								>
 									{keyBadge(i)}
-									<span style={{ minWidth: 0 }}>
+									<span className="opt-tx">
 										<MessageResponse>{opt.label}</MessageResponse>
 										{kind !== "quiz" && opt.description && (
 											// QUIZ options render NO description (owner ruling
 											// 2026-09-26): the model used them to telegraph
 											// correctness. Descriptions are full markdown.
-											<MessageResponse className="lh-prose block text-xs text-muted-foreground">{opt.description}</MessageResponse>
+											<MessageResponse className="lh-prose opt-desc">{opt.description}</MessageResponse>
 										)}
 									</span>
 								</button>
@@ -621,10 +612,10 @@ function QuestionDockForm({
 								onClick={() => setSel((prev) => ({ ...prev, selected: new Set(), otherSelected: false, dontKnow: !prev.dontKnow }))}
 								data-kbdrow={optionCount}
 								aria-pressed={sel.dontKnow}
-								className={cn("opt idk", sel.dontKnow && "sel")}
+								className={cn("opt idk", sel.dontKnow && "sel", optionCount === kbdIdx && !sel.dontKnow && "at")}
 							>
 								{keyBadge(optionCount)}
-								<span>I don’t know yet</span>
+								<span className="opt-tx">I don’t know yet</span>
 							</button>
 						)}
 
@@ -635,8 +626,7 @@ function QuestionDockForm({
 								data-testid="other-option"
 								data-kbdrow={optionCount}
 								onClick={selectOther}
-								className={cn("opt", sel.otherSelected ? "sel" : "idk")}
-								style={{ cursor: "text" }}
+								className={cn("opt other", sel.otherSelected ? "sel" : "idk", optionCount === kbdIdx && !sel.otherSelected && "at")}
 							>
 								{keyBadge(optionCount)}
 								<input
@@ -663,7 +653,7 @@ function QuestionDockForm({
 										}
 									}}
 									placeholder="Type your own answer…"
-									style={{ flex: 1, minWidth: 0, border: 0, background: "transparent", outline: "none" }}
+									className="opt-in"
 									onClick={(e) => e.stopPropagation()}
 								/>
 							</div>
@@ -674,37 +664,21 @@ function QuestionDockForm({
 
 			{/* How sure (owner, 2026-10-01; v4 four levels): the learner's stated
 			    probability that the selected answer is correct. Global ←/→ move
-			    it; "I don't know" grays it out and nothing is sent. */}
+			    it; "I don't know" greys it out and nothing is sent. */}
 			{kind === "quiz" && (
-				<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-					<span id={`${toolCallId}-confidence`} style={{ fontSize: 12, fontWeight: 600, opacity: sel.dontKnow ? 0.5 : 1 }}>
+				<div className="qfield">
+					<span id={`${toolCallId}-confidence`} className={cn("flabel", sel.dontKnow && "off")}>
 						How sure?
 					</span>
-					<div
-						className="seg conf"
-						role="radiogroup"
-						aria-labelledby={`${toolCallId}-confidence`}
-						aria-disabled={sel.dontKnow}
+					<ConfidenceLadder
+						value={CONFIDENCE_LEVELS[confIdx]!.value}
+						onChange={(v) => setConfIdx(CONFIDENCE_LEVELS.findIndex((l) => l.value === v))}
+						disabled={sel.dontKnow}
+						labelledBy={`${toolCallId}-confidence`}
 						title="How likely your answer is right. Adjust with ←/→."
-						data-testid="confidence-control"
-						style={sel.dontKnow ? { opacity: 0.4 } : undefined}
-					>
-						{CONFIDENCE_LEVELS.map((level, i) => (
-							<button
-								key={level.value}
-								type="button"
-								role="radio"
-								aria-checked={!sel.dontKnow && i === confIdx}
-								disabled={sel.dontKnow}
-								onClick={() => setConfIdx(i)}
-								data-testid={`confidence-stop-${level.value}`}
-								className={!sel.dontKnow && i === confIdx ? "on" : ""}
-								style={{ "--lvl": CONFIDENCE_LEVEL_COLORS[level.value]!.ink, "--lvl-soft": CONFIDENCE_LEVEL_COLORS[level.value]!.soft } as React.CSSProperties}
-							>
-								{level.label}
-							</button>
-						))}
-					</div>
+						testid="confidence-control"
+						stopTestids
+					/>
 				</div>
 			)}
 
@@ -715,98 +689,86 @@ function QuestionDockForm({
 					e.preventDefault();
 					submit();
 				}}
-				style={{ display: "flex", flexDirection: "column", gap: 8 }}
+				className="qanswer"
 			>
-				<div style={{ position: "relative" }} data-testid={qd.mode === "text" ? "answer-field" : "thinking-field"}>
-					<label className="sr" htmlFor={`${toolCallId}-field`}>
+				<div className="qfield" data-testid={qd.mode === "text" ? "answer-field" : "thinking-field"}>
+					<label className="flabel" htmlFor={fieldId}>
 						{qd.mode === "text" ? "Your answer" : "Your thinking"}
 					</label>
-					{qd.mode === "text" ? (
-						<textarea
-							id={`${toolCallId}-field`}
-							value={text}
-							onChange={(e) => {
-								answerTextRef.current = e.target.value;
-								setText(e.target.value);
-							}}
-							onKeyDown={(e) => {
-								if (e.key === "Escape" && onEscape) {
-									e.preventDefault();
-									e.stopPropagation();
-									onEscape();
-									return;
-								}
-								if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
-									e.preventDefault();
-									submit();
-								}
-							}}
-							placeholder="Your answer, in your own words…"
-							rows={4}
-							className="serif"
-							style={{ width: "100%", display: "block", padding: "9px 44px 9px 11px", borderRadius: 11, border: "1px solid var(--line)", background: "var(--v-input)", resize: "vertical", fontSize: 14, lineHeight: "21px", outline: "none" }}
-						/>
-					) : (
-						<textarea
-							id={`${toolCallId}-field`}
-							ref={thinkingRef}
-							value={thinking}
-							onChange={(e) => {
-								thinkingTextRef.current = e.target.value;
-								setThinking(e.target.value);
-							}}
-							onKeyDown={(e) => {
-								if (e.key === "Escape" && onEscape) {
-									e.preventDefault();
-									e.stopPropagation();
-									onEscape();
-									return;
-								}
-								// THE STANDARD CHORD: Enter submits, Shift+Enter is a newline.
-								if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
-									e.preventDefault();
-									submit();
-								}
-							}}
-							placeholder="Why this answer? Whatever comes to mind."
-							rows={phase === "teach" ? 3 : 2}
-							className="serif"
-							style={{ width: "100%", display: "block", padding: "9px 44px 9px 11px", borderRadius: 11, border: "1px solid var(--line)", background: "var(--v-input)", resize: "vertical", fontSize: 14, lineHeight: "21px", outline: "none" }}
-						/>
-					)}
-					<button
-						type="button"
-						className={cn("ib", isDictationActive() && "on")}
-						aria-label="Dictate"
-						onClick={toggleDictation}
-						style={{ position: "absolute", right: 6, bottom: 6 }}
-					>
-						<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-							<rect x="9" y="3" width="6" height="11" rx="3" />
-							<path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
-						</svg>
-					</button>
-				</div>
-				<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-					<span style={{ fontSize: 11.5, color: "var(--faint)" }}>
-						{compactionRunning ? (
-							"compacting session…"
-						) : qd.mode === "text" ? (
-							<>
-								{"↵ submits · ⇧↵ newline"}
-							</>
+					<div className="fwrap">
+						{qd.mode === "text" ? (
+							<textarea
+								id={fieldId}
+								value={text}
+								onChange={(e) => {
+									answerTextRef.current = e.target.value;
+									setText(e.target.value);
+								}}
+								onKeyDown={(e) => {
+									if (e.key === "Escape" && onEscape) {
+										e.preventDefault();
+										e.stopPropagation();
+										onEscape();
+										return;
+									}
+									if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
+										e.preventDefault();
+										submit();
+									}
+								}}
+								placeholder="Your answer, in your own words…"
+								rows={4}
+								className="ftext"
+							/>
 						) : (
-							<>
-								<span className="kbd">1</span>–<span className="kbd">{rowCount}</span> pick · {"↵ submits · ⇧↵ newline"}
-							</>
+							<textarea
+								id={fieldId}
+								ref={thinkingRef}
+								value={thinking}
+								onChange={(e) => {
+									thinkingTextRef.current = e.target.value;
+									setThinking(e.target.value);
+								}}
+								onKeyDown={(e) => {
+									if (e.key === "Escape" && onEscape) {
+										e.preventDefault();
+										e.stopPropagation();
+										onEscape();
+										return;
+									}
+									// THE STANDARD CHORD: Enter submits, Shift+Enter is a newline.
+									if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
+										e.preventDefault();
+										submit();
+									}
+								}}
+								placeholder="Why this answer? Whatever comes to mind."
+								rows={phase === "teach" ? 3 : 2}
+								className={cn("ftext", phase === "teach" ? "tall" : "short")}
+							/>
 						)}
-					</span>
-					<button type="submit" className="btn tall" style={{ marginLeft: "auto" }} disabled={!canSubmit || compactionRunning}>
-						Submit
-					</button>
+						<button type="button" className={cn("ib sm fmic", isDictationActive() && "on")} aria-label="Dictate" onClick={toggleDictation}>
+							<Icon name="mic" size="sm" />
+						</button>
+					</div>
 				</div>
 			</form>
+			<div className="qfoot">
+				<button type="button" className="btn brand lg qsubmit" onClick={submit} disabled={!canSubmit || compactionRunning}>
+					Submit
+				</button>
+				<span className="qkeys">
+					{compactionRunning ? (
+						"Compacting the session…"
+					) : qd.mode === "text" ? (
+						"↵ submits · ⇧↵ newline"
+					) : (
+						<>
+							<span className="kbd">1</span>–<span className="kbd">{rowCount}</span> pick · {"↵ submits · ⇧↵ newline"}
+						</>
+					)}
+				</span>
+			</div>
 		</div>
 	);
-
 }

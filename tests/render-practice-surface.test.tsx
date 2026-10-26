@@ -174,8 +174,9 @@ describe("the practice transcript cards", () => {
 		// all-in — owner round two, 2026-10-07).
 		assert.match(trace, /aria-expanded="true"/);
 		assert.ok(trace.includes("stuck at step two"), "the text is visible on arrival");
-		assert.ok(trace.includes("bg-card"), "the card-color band");
-		assert.ok(trace.includes("border-l-[calc(3ch-14px)]"), "narrow rail inside the 3ch inset");
+		// Finesse pass (2026-10-26): the quiet disclosure + inner-voice well.
+		assert.ok(trace.includes("ls-uthink"), "the user-thinking row");
+		assert.ok(trace.includes("ls-well mine"), "the expanded well");
 		const legacy = renderToStaticMarkup(<ThinkingCard data={{ problemCallId: "c", commit: true, text: "It is 42." }} />);
 		assert.match(legacy, /Your thinking/);
 		assert.doesNotMatch(legacy, /Your solution/);
@@ -230,7 +231,7 @@ describe("GraphContextCard", () => {
 			], chains: ["Modus ponens → Soundness"] }} />,
 		);
 		assert.ok(html.includes('data-testid="graph-context-card"'));
-		assert.ok(html.includes("2 propositions"));
+		assert.ok(html.includes("2 ideas")); // v4 copy: "ideas", the graph's word everywhere
 		assert.ok(html.includes("1 chain"));
 		// minimal: the collapsed bar carries NO statement text
 		assert.ok(!html.includes("If P implies Q"));
@@ -241,7 +242,7 @@ describe("GraphContextCard", () => {
 		const html = renderToStaticMarkup(
 			<GraphContextCard data={{ propositions: [{ id: "n1", name: "A", statement: "S." }], chains: [] }} />,
 		);
-		assert.ok(html.includes("1 proposition</span>"));
+		assert.ok(html.includes("1 idea</span>"));
 		assert.ok(!html.includes("chain"));
 	});
 

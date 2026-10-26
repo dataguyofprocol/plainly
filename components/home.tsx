@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * HOME — Home4 of the v4 canvas, built to the artboard (rebuild,
- * 2026-10-26): the greeting and the omnibar, "Next from your graph", the
- * learning strip (week / month), Continue with the sessions waiting on
- * you, minutes learning this week against the daily goal, Ready to
- * practice (pick topics to mix), and what was just added to the graph.
- * Every number on the page is the server's (components/v4/data.ts).
+ * HOME (Home4 of the v4 canvas; finesse pass): the greeting and the
+ * omnibar, "Next from your graph", the learning strip (week / month),
+ * Continue with the sessions waiting on you, this week's minutes against
+ * the daily goal, Ready to practice (pick topics to mix), and what was
+ * just added to the graph. Every number on the page is the server's
+ * (components/v4/data.ts). Styles: app/ui/home.css.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -21,11 +21,15 @@ import { SetupDialog } from "@/components/setup-dialog";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { OPEN_CONNECT_EVENT } from "@/components/connect-provider";
 import { createSession, useStartReadiness, type StartPick } from "@/components/start-session";
+import { EmptyState } from "@/components/ui/empty-state";
+import { displayTitle, displayTopic } from "@/components/ui/format";
+import { Icon, type IconName } from "@/components/ui/icon";
 import {
 	ago,
 	fmtDuration,
 	fmtTokens,
 	isPractice,
+	sessionLine,
 	sessionState,
 	topicColor,
 	useChats,
@@ -33,14 +37,14 @@ import {
 	useStats,
 	useSuggestions,
 	useTopics,
+	type SessionState,
 	type StatsPeriod,
 	type V4Chat,
 	type V4Daily,
 	type V4Stats,
 	type V4Topic,
 } from "@/components/v4/data";
-import { AttachIcon, CheckIcon, MicIcon } from "@/components/v4/icons";
-import { Field, SessionGroups, SidebarCard } from "@/components/v4/shell";
+import { Field, SidebarCard } from "@/components/v4/shell";
 
 type Mode = "teach" | "practice";
 
@@ -62,7 +66,9 @@ export function continueModel(chats: readonly V4Chat[]): { hero: V4Chat | null; 
 	return { hero, waiting: waiting.filter((c) => c !== hero).slice(0, 3) };
 }
 
-/** Pure: the five strip cells (Home4's KPI strip). Exported for tests. */
+/** Pure: the five strip cells (Home4's KPI strip). Exported for tests.
+ *  The strip shows the first four as learner stats; the fifth (tokens)
+ *  becomes the quiet cost footnote under the period switch. */
 export function kpiCells(s: V4Stats): Array<{ label: string; value: string; delta: string; up: boolean; sub: string }> {
 	const deltaSec = s.time.seconds - s.time.prevSeconds;
 	const prev = s.period === "week" ? "vs last week" : "vs last month";
@@ -103,35 +109,36 @@ export function Home({ initialConfigured, initialMode = "teach" }: { initialConf
 	const [setupOpen, setSetupOpen] = useState(false);
 	const [now, setNow] = useState<Date | null>(null);
 	useEffect(() => setNow(new Date()), []);
+	const needSetup = useCallback(() => setSetupOpen(true), []);
 
 	return (
 		<div className="v4">
 			<Field />
 			<div className="shell">
-				<SidebarCard knowledgeCount={ideas?.length ?? null}>
-					<SessionGroups chats={chats} />
-				</SidebarCard>
+				<SidebarCard knowledgeCount={ideas?.length ?? null} />
 				<main className="main">
-					<div style={{ maxWidth: 1120, margin: "0 auto", display: "flex", flexDirection: "column", gap: 14 }}>
-						<HomeOmni now={now} initialMode={initialMode} ready={readiness.ready} onNeedSetup={() => setSetupOpen(true)} />
+					<div className="home">
+						<HomeOmni chats={chats} now={now} initialMode={initialMode} ready={readiness.ready} onNeedSetup={needSetup} />
 						{readiness.configured !== null && !readiness.ready && (
-							<section className="glass card rise" style={{ display: "flex", alignItems: "center", gap: 16, animationDelay: "40ms" }} data-testid="home-setup">
-								<div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+							<section className="home-setup glass rise" data-testid="home-setup">
+								<span className="home-setup-ic" aria-hidden="true">
+									<Icon name="provider" size="lg" />
+								</span>
+								<span className="home-setup-t">
 									<b>{readiness.zeroKeys ? "Connect a provider to start" : "Choose your models to start"}</b>
-									<span style={{ color: "var(--v-muted)", fontSize: 12.5 }}>
-										LearnHarness runs on your own key: you pay the provider directly, and the key stays on this Mac.
-									</span>
-								</div>
-								<button type="button" className="btn" data-testid="setup-cta" onClick={() => setSetupOpen(true)}>
+									<span>LearnHarness runs on your own key: you pay the provider directly, and the key stays on this Mac.</span>
+								</span>
+								<button type="button" className="btn" data-testid="setup-cta" onClick={needSetup}>
 									{readiness.zeroKeys ? "Add a provider key" : "Set up models"}
+									<Icon name="arrow-right" size="sm" />
 								</button>
 							</section>
 						)}
 						<StatsStrip />
-						<div className="g" style={{ display: "grid", gridTemplateColumns: "repeat(12, minmax(0, 1fr))", gap: 14 }}>
+						<div className="home-grid">
 							<ContinueCard chats={chats} now={now} />
-							<MinutesCard />
-							<ReadyToPractice ideas={ideas ?? []} ready={readiness.ready} onNeedSetup={() => setSetupOpen(true)} now={now} />
+							<WeekCard />
+							<ReadyToPractice ideas={ideas} ready={readiness.ready} onNeedSetup={needSetup} now={now} />
 							<JustAdded ideas={ideas} now={now} />
 						</div>
 					</div>
@@ -149,12 +156,36 @@ export function Home({ initialConfigured, initialMode = "teach" }: { initialConf
 	);
 }
 
+/** Focus the omnibar from anywhere on Home (empty states point at it). */
+const focusOmnibar = () => window.dispatchEvent(new CustomEvent("lh:focus-omnibar"));
+
 // ─── The omnibar ──────────────────────────────────────────────────────────
 
-function HomeOmni({ now, initialMode, ready, onNeedSetup }: { now: Date | null; initialMode: Mode; ready: boolean; onNeedSetup: () => void }) {
+const ROW_ICON: Record<PaletteRow["icon"], IconName> = {
+	learn: "learn",
+	practice: "practice",
+	session: "lesson",
+	idea: "idea",
+	graph: "knowledge",
+	settings: "settings",
+	connect: "provider",
+};
+
+function HomeOmni({
+	chats,
+	now,
+	initialMode,
+	ready,
+	onNeedSetup,
+}: {
+	chats: V4Chat[] | null;
+	now: Date | null;
+	initialMode: Mode;
+	ready: boolean;
+	onNeedSetup: () => void;
+}) {
 	const router = useRouter();
 	const { open: openSettings } = useSettingsDialog();
-	const chats = useChats();
 	const ideas = useGraphIndex();
 	const suggestions = useSuggestions();
 	const [q, setQ] = useState("");
@@ -217,9 +248,9 @@ function HomeOmni({ now, initialMode, ready, onNeedSetup }: { now: Date | null; 
 
 	let index = -1;
 	return (
-		<section className="rise" aria-labelledby="greet" style={{ display: "flex", flexDirection: "column", gap: 10, position: "relative", zIndex: 10 }}>
-			<h1 id="greet" className="serif" style={{ margin: "0 0 0 4px", fontSize: 22, lineHeight: "28px", fontWeight: 500 }} suppressHydrationWarning>
-				{now ? greeting(now) : " "} <span style={{ color: "var(--v-muted)" }}>What shall we learn?</span>
+		<section className="home-omni rise" aria-labelledby="greet">
+			<h1 id="greet" className="home-greet serif" suppressHydrationWarning>
+				{now ? greeting(now) : " "} <span>What shall we learn?</span>
 			</h1>
 			<form
 				className="omni"
@@ -235,7 +266,7 @@ function HomeOmni({ now, initialMode, ready, onNeedSetup }: { now: Date | null; 
 					ref={inputRef}
 					id="omni"
 					type="text"
-					className="serif"
+					className="omni-input serif"
 					autoComplete="off"
 					spellCheck={false}
 					value={q}
@@ -256,16 +287,17 @@ function HomeOmni({ now, initialMode, ready, onNeedSetup }: { now: Date | null; 
 						}
 					}}
 					placeholder={mode === "teach" ? "Learn anything, or search your sessions and ideas…" : "Practice a topic, or leave it blank for a mix…"}
-					style={{ width: "100%", height: 52, border: 0, background: "transparent", outline: "none", fontSize: 19 }}
 				/>
-				<div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+				<div className="omni-bar">
 					<div className="seg" role="radiogroup" aria-label="Mode">
 						{(["teach", "practice"] as const).map((m) => (
 							<button key={m} type="button" role="radio" aria-checked={mode === m} className={mode === m ? "on" : ""} onClick={() => setMode(m)} data-testid={`omnibar-mode-${m}`}>
+								<Icon name={m === "teach" ? "learn" : "practice"} size="sm" />
 								{m === "teach" ? "Learn" : "Practice"}
 							</button>
 						))}
 					</div>
+					<span className="omni-sep" aria-hidden="true" />
 					<input
 						ref={fileRef}
 						type="file"
@@ -277,71 +309,87 @@ function HomeOmni({ now, initialMode, ready, onNeedSetup }: { now: Date | null; 
 							e.target.value = "";
 						}}
 					/>
-					<button type="button" className="ib" aria-label="Import notes (Markdown or text)" title="Import notes (Markdown or text)" disabled={notesImport.importing} onClick={() => fileRef.current?.click()}>
-						<AttachIcon />
+					<button type="button" className="ib tipb" aria-label="Import notes (Markdown or text)" data-tip="Import notes" disabled={notesImport.importing} onClick={() => fileRef.current?.click()}>
+						<Icon name="attach" size="md" />
 					</button>
 					<button
 						type="button"
-						className={`ib ${dictation.active ? "on" : ""}`}
+						className={`ib tipb ${dictation.active ? "on" : ""}`}
 						aria-label={dictation.active ? "Stop dictation" : "Dictate"}
+						data-tip={dictation.active ? "Stop dictation" : "Dictate"}
 						aria-pressed={dictation.active}
 						onClick={() => (dictation.active ? void dictation.finish() : dictation.toggle())}
 					>
 						{dictation.active ? (
 							<span className="wave" aria-hidden="true"><i /><i /><i /><i /></span>
 						) : (
-							<MicIcon />
+							<Icon name="mic" size="md" />
 						)}
 					</button>
 					<span className="hide-sm">
 						<ModelControl variant="chip" className="mini" />
 					</span>
-					<span className="hide-sm" style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--faint)" }}>
+					<span className="omni-fill" aria-hidden="true" />
+					<span className="omni-hint hide-md">
 						<span className="kbd">⌘K</span> from anywhere
 					</span>
-					<button type="submit" className="btn" style={{ marginLeft: 8 }} disabled={busy}>
-						{mode === "teach" ? "Learn" : "Practice"} <span aria-hidden="true">→</span>
+					<button type="submit" className="btn omni-go" disabled={busy}>
+						{mode === "teach" ? "Learn" : "Practice"}
+						<Icon name="arrow-right" size="sm" />
 					</button>
 				</div>
 				{open && (
 					<div className="drop pop settle" role="listbox" aria-label="Suggestions">
 						{groups.map((g) => (
-							<div key={g.name}>
-								<div style={{ padding: "8px 16px 2px", fontSize: 11, fontWeight: 700, color: "var(--faint)" }}>{g.name}</div>
+							<div key={g.name} className="drop-g">
+								<div className="drop-h">{g.name}</div>
 								{g.rows.map((row) => {
 									index += 1;
 									const i = index;
+									const session = row.action.kind === "open-session";
 									return (
 										<button
 											key={row.key}
 											type="button"
 											role="option"
 											aria-selected={i === active}
-											className={`prow ${i === active ? "first" : ""}`}
+											className={`prow ${i === active ? "first" : ""} k-${row.icon}`}
 											onMouseDown={(e) => e.preventDefault()}
 											onMouseMove={() => setWalk(i)}
 											onClick={() => run(row)}
 										>
-											<span className="dot" style={{ background: rowDot(row) }} />
-											<span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.label}</span>
-											<span style={{ fontSize: 11.5, color: "var(--v-muted)" }}>{row.hint}</span>
+											<Icon name={ROW_ICON[row.icon]} size="md" />
+											<span className={`prow-l trunc ${row.icon === "idea" ? "serif" : ""}`}>{session ? displayTitle(row.label) : row.label}</span>
+											{row.hint === "waiting on you" ? (
+												<span className="pill warn">Waiting on you</span>
+											) : (
+												<span className="prow-h">{row.icon === "idea" ? displayTopic(row.hint) : row.hint}</span>
+											)}
 										</button>
 									);
 								})}
 							</div>
 						))}
+						<div className="drop-foot" aria-hidden="true">
+							<span><span className="kbd">↑</span><span className="kbd">↓</span> to move</span>
+							<span><span className="kbd">↵</span> to open</span>
+							<span><span className="kbd">esc</span> to clear</span>
+						</div>
 					</div>
 				)}
 			</form>
 			<NotesImportErrors errors={notesImport.errors} />
 			{suggestions.length > 0 && (
-				<div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", paddingLeft: 4 }}>
-					<span style={{ fontSize: 12, color: "var(--faint)" }}>Next from your graph</span>
+				<div className="home-next">
+					<span className="home-next-l">
+						<Icon name="hint" size="sm" />
+						Next from your graph
+					</span>
 					{suggestions.slice(0, 3).map((s, i) => (
 						<button
 							key={s.title}
 							type="button"
-							className={`sug ${i === 2 ? "hide-sm" : ""}`}
+							className={`chip ${i === 2 ? "hide-md" : ""}`}
 							title={s.reason}
 							onClick={() => {
 								setQuery(s.title);
@@ -358,42 +406,101 @@ function HomeOmni({ now, initialMode, ready, onNeedSetup }: { now: Date | null; 
 	);
 }
 
-function rowDot(row: PaletteRow): string {
-	if (row.icon === "learn") return "var(--ink)";
-	if (row.icon === "idea") return "#2f8f7f";
-	if (row.icon === "graph" || row.icon === "settings") return "var(--v-accent)";
-	if (row.hint === "waiting on you") return "var(--warn)";
-	return "var(--faint)";
+// ─── The learning strip ───────────────────────────────────────────────────
+
+interface StripCell {
+	icon: IconName;
+	label: string;
+	value: string;
+	delta: { up: boolean; text: string } | null;
+	sub: string;
 }
 
-// ─── The learning strip ───────────────────────────────────────────────────
+/** The four learner stats, from kpiCells' numbers with Home's copy: a zero
+ *  never headlines as "+0", it says what would move it. */
+function stripCells(s: V4Stats): StripCell[] {
+	const k = kpiCells(s);
+	const span = s.period === "week" ? "this week" : "this month";
+	const deltaSec = s.time.seconds - s.time.prevSeconds;
+	return [
+		{
+			icon: "time",
+			label: "Time learning",
+			value: k[0]!.value,
+			delta: deltaSec === 0 ? null : { up: deltaSec > 0, text: fmtDuration(Math.abs(deltaSec)) },
+			sub: deltaSec !== 0 ? k[0]!.sub : s.time.seconds > 0 ? `Same as last ${s.period}` : `Nothing yet ${span}`,
+		},
+		{
+			icon: "lesson",
+			label: "Lessons",
+			value: k[1]!.value,
+			delta: null,
+			sub: s.lessons.waiting > 0 ? `${s.lessons.waiting} waiting on you` : s.lessons.active > 0 ? "In progress" : "Start one above",
+		},
+		{
+			icon: "idea",
+			label: "Ideas learned",
+			value: String(s.ideas.added),
+			delta: null,
+			sub: s.ideas.total > 0 ? `${s.ideas.total} in your graph` : "Grows as you learn",
+		},
+		{
+			icon: "practice",
+			label: "Practice",
+			value: k[3]!.value,
+			delta: null,
+			sub: s.practice.problems > 0 ? `${s.practice.solid} solid` : "Mix topics below to start",
+		},
+	];
+}
 
 function StatsStrip() {
 	const [period, setPeriod] = useState<StatsPeriod>("week");
 	const stats = useStats(period);
-	const cells = stats ? kpiCells(stats) : null;
+	const cells = stats ? stripCells(stats) : null;
+	const tokens = stats ? kpiCells(stats)[4]! : null;
 	return (
-		<section className="glass rise" aria-labelledby="usage" style={{ borderRadius: 16, display: "flex", alignItems: "stretch", animationDelay: "60ms" }}>
+		<section className="strip glass rise" aria-labelledby="usage">
 			<h2 id="usage" className="sr">Your learning</h2>
-			<div className="strip" style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
-				{(cells ?? Array.from({ length: 5 }, () => null)).map((k, i) => (
-					<div key={`${period}-${i}`} className="kpi swap">
-						<span className="l">{k?.label ?? " "}</span>
-						<span className="v num">{k?.value ?? "—"}</span>
-						<span className="s">
-							{k?.delta && <span className={k.up ? "up" : ""}>{k.delta}</span>} {k?.sub ?? " "}
-						</span>
-					</div>
-				))}
+			<div className="strip-cells">
+				{cells
+					? cells.map((k) => (
+							<div key={`${period}-${k.label}`} className="kpi swap">
+								<span className="kpi-l">
+									<Icon name={k.icon} size="sm" />
+									{k.label}
+								</span>
+								<span className="kpi-v num">{k.value}</span>
+								<span className="kpi-s">
+									{k.delta && (
+										<span className={k.delta.up ? "kpi-up" : "kpi-down"}>
+											<Icon name={k.delta.up ? "arrow-up" : "arrow-down"} size="xs" />
+											{k.delta.text}
+										</span>
+									)}
+									<span className="trunc">{k.sub}</span>
+								</span>
+							</div>
+						))
+					: [0, 1, 2, 3].map((i) => (
+							<div key={i} className="kpi" aria-hidden="true">
+								<i className="skel kpi-sk-l" />
+								<i className="skel kpi-sk-v" />
+								<i className="skel kpi-sk-s" />
+							</div>
+						))}
 			</div>
-			<div style={{ display: "flex", alignItems: "center", padding: "0 12px", borderLeft: "1px solid var(--line)" }}>
-				<div className="seg" role="radiogroup" aria-label="Period" style={{ flexDirection: "column", width: 72 }}>
+			<div className="strip-side">
+				<div className="seg sm" role="radiogroup" aria-label="Period">
 					{(["week", "month"] as const).map((p) => (
 						<button key={p} type="button" role="radio" aria-checked={period === p} className={period === p ? "on" : ""} onClick={() => setPeriod(p)}>
 							{p === "week" ? "Week" : "Month"}
 						</button>
 					))}
 				</div>
+				<span className="strip-foot num" title="Model usage on your own provider key">
+					{tokens ? `${tokens.value} tokens · ${tokens.sub}` : " "}
+				</span>
 			</div>
 		</section>
 	);
@@ -411,73 +518,101 @@ function Ticks({ total, current, visited, size }: { total: number; current: numb
 	);
 }
 
+const STATE_PILL: Record<SessionState, { tone: string; label: string }> = {
+	waiting: { tone: "warn", label: "Waiting on you" },
+	working: { tone: "brand", label: "Working" },
+	paused: { tone: "muted", label: "Paused" },
+	finished: { tone: "good", label: "Finished" },
+};
+
+/** "Step 6 of 14" / "Problem 1 of 5", or null when the session has no map. */
+function position(c: V4Chat): string | null {
+	if (c.plan && c.plan.current !== null) return `Step ${c.plan.current} of ${c.plan.total}`;
+	if (c.practiceSet) return `Problem ${Math.min(c.practiceSet.done + 1, c.practiceSet.size)} of ${c.practiceSet.size}`;
+	return null;
+}
+
 function ContinueCard({ chats, now }: { chats: V4Chat[] | null; now: Date | null }) {
 	const { hero, waiting } = useMemo(() => continueModel(chats ?? []), [chats]);
-	const heroWaiting = hero ? sessionState(hero) === "waiting" : false;
+	const state = hero ? sessionState(hero) : null;
+	const pill = state ? STATE_PILL[state] : null;
+	const practice = hero ? isPractice(hero) : false;
+	const question = hero?.pendingQuestionText ?? null;
+	const where = hero ? position(hero) : null;
+	const stats = hero
+		? [
+				hero.minutes ? `${hero.minutes} min in` : null,
+				hero.answers && hero.answers.total > 0 ? `${hero.answers.firstTry} of ${hero.answers.total} right first time` : null,
+			].filter(Boolean)
+		: [];
 	return (
-		<section className="glass rise" aria-labelledby="cont" style={{ gridColumn: "span 7", borderRadius: 16, overflow: "hidden", animationDelay: "120ms" }}>
-			{!hero ? (
-				<div className="card" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-					<h2 id="cont" className="h">Continue</h2>
-					<span style={{ color: "var(--v-muted)" }}>{chats === null ? "Loading…" : "Your lessons appear here. Start one above."}</span>
+		<section className="cont glass rise" aria-labelledby="cont">
+			<h2 id="cont" className="sr">Continue</h2>
+			{chats === null ? (
+				<div className="cont-hero" aria-hidden="true">
+					<i className="skel cont-sk-a" />
+					<i className="skel cont-sk-b" />
+					<i className="skel cont-sk-c" />
+					<i className="skel cont-sk-d" />
 				</div>
+			) : !hero || !pill ? (
+				<EmptyState
+					icon="lesson"
+					title="Your first lesson starts above"
+					className="cont-empty"
+					action={
+						<button type="button" className="btn secondary" onClick={focusOmnibar}>
+							<Icon name="plus" size="sm" />
+							Start a lesson
+						</button>
+					}
+				>
+					Ask about anything you want to understand. Lessons wait here for you between visits.
+				</EmptyState>
 			) : (
 				<>
-					<Link className="hero" href={`/chat/${hero.id}`} style={{ padding: "14px 16px 12px" }} data-testid="home-continue">
-						<span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5 }}>
-							<span className="dot" style={{ background: heroWaiting ? "var(--warn)" : "var(--faint)" }} />
-							<b id="cont" style={{ color: heroWaiting ? "var(--warn)" : "var(--v-muted)", fontWeight: 700 }}>
-								{heroWaiting ? `Continue · waiting on your ${isPractice(hero) ? "working" : "answer"}` : "Pick up where you left off"}
-							</b>
-							<span style={{ marginLeft: "auto", color: "var(--v-muted)" }}>{now ? ago(hero.updatedAt, now) : ""}</span>
+					<Link className="cont-hero" href={`/chat/${hero.id}`} data-testid="home-continue">
+						<span className="cont-over">
+							<span className={`pill ${pill.tone}`}>
+								{state === "waiting" && <span className="ping" aria-hidden="true" />}
+								{pill.label}
+							</span>
+							<span className="cont-kind">
+								<Icon name={practice ? "practice" : "lesson"} size="xs" />
+								{practice ? "Practice" : "Lesson"}
+							</span>
+							<span className="cont-ago">{now ? ago(hero.updatedAt, now) : ""}</span>
 						</span>
-						<span style={{ display: "block", marginTop: 6, fontWeight: 700 }}>
-							{hero.title}
-							{hero.plan && hero.plan.current !== null && (
-								<span style={{ fontWeight: 500, color: "var(--v-muted)" }}>
-									{" "}
-									· step {hero.plan.current} of {hero.plan.total}
-								</span>
-							)}
-							{hero.practiceSet && (
-								<span style={{ fontWeight: 500, color: "var(--v-muted)" }}>
-									{" "}
-									· problem {Math.min(hero.practiceSet.done + 1, hero.practiceSet.size)} of {hero.practiceSet.size}
-								</span>
-							)}
-						</span>
-						{hero.pendingQuestionText && (
-							<span className="serif" style={{ display: "block", fontSize: 19, lineHeight: "26px" }}>
-								{hero.pendingQuestionText}
+						<span className="cont-q serif">{question ?? displayTitle(hero.title)}</span>
+						{(question || where) && (
+							<span className="cont-meta">
+								{question && <span className="trunc">{displayTitle(hero.title)}</span>}
+								{question && where && <span aria-hidden="true">·</span>}
+								{where && <span className="cont-where">{where}</span>}
 							</span>
 						)}
-						<span style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
-							{hero.plan && <Ticks total={hero.plan.total} current={hero.plan.current} visited={hero.plan.visited} />}
-							<span className="hide-sm" style={{ fontSize: 11.5, color: "var(--v-muted)" }}>
-								{[
-									hero.minutes ? `${hero.minutes} min in` : null,
-									hero.answers && hero.answers.total > 0 ? `${hero.answers.firstTry} of ${hero.answers.total} right first time` : null,
-								]
-									.filter(Boolean)
-									.join(" · ")}
-							</span>
-							<span className="btn" style={{ marginLeft: "auto" }}>
-								Continue <span className="go" aria-hidden="true">→</span>
+						<span className="cont-foot">
+							{hero.plan ? (
+								<Ticks total={hero.plan.total} current={hero.plan.current} visited={hero.plan.visited} />
+							) : hero.practiceSet ? (
+								<Ticks total={hero.practiceSet.size} current={Math.min(hero.practiceSet.done + 1, hero.practiceSet.size)} visited={hero.practiceSet.done} />
+							) : null}
+							{stats.length > 0 && <span className="cont-stats hide-sm">{stats.join(" · ")}</span>}
+							<span className="btn cont-go">
+								Continue
+								<Icon name="arrow-right" size="sm" />
 							</span>
 						</span>
 					</Link>
 					{waiting.length > 0 && (
-						<div style={{ padding: "2px 16px 8px", borderTop: "1px solid var(--line)" }}>
+						<div className="cont-more">
+							<span className="over">Also waiting on you</span>
 							{waiting.map((c) => (
 								<Link key={c.id} className="wrow" href={`/chat/${c.id}`}>
-									<span className="dot" style={{ background: "var(--warn)" }} />
-									<b style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{c.title}</b>
-									<span className="serif" style={{ flex: 1, minWidth: 0, color: "var(--v-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-										{c.pendingQuestionText ?? ""}
-									</span>
-									<span style={{ fontSize: 11.5, color: "var(--faint)", whiteSpace: "nowrap" }}>
-										{c.plan && c.plan.current !== null ? `${c.plan.current} of ${c.plan.total}` : isPractice(c) ? "practice" : "check-in"}
-									</span>
+									<Icon name={isPractice(c) ? "practice" : "lesson"} size="sm" />
+									<span className="wrow-t trunc">{displayTitle(c.title)}</span>
+									<span className="wrow-m">{sessionLine(c)}</span>
+									<Icon name="chevron-right" size="sm" className="wrow-go" />
 								</Link>
 							))}
 						</div>
@@ -488,7 +623,7 @@ function ContinueCard({ chats, now }: { chats: V4Chat[] | null; now: Date | null
 	);
 }
 
-// ─── Minutes this week ────────────────────────────────────────────────────
+// ─── This week ────────────────────────────────────────────────────────────
 
 /** Pure: bar heights as % of the week's busiest day (min 100 minutes or
  *  the goal, so a light week doesn't fill the chart). Exported for tests. */
@@ -497,47 +632,76 @@ export function barHeights(daily: V4Daily): number[] {
 	return daily.days.map((d) => Math.round((d.minutes / top) * 100));
 }
 
-function MinutesCard() {
+function fmtMinutes(m: number): string {
+	return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
+}
+
+function WeekCard() {
 	const daily = useDaily();
 	const heights = daily ? barHeights(daily) : null;
-	const goalPct = daily ? Math.round((daily.goalMinutes / Math.max(...daily.days.map((d) => d.minutes), daily.goalMinutes * 1.5, 1)) * 100) : 50;
+	const goalPct = daily ? Math.round((daily.goalMinutes / Math.max(...daily.days.map((d) => d.minutes), daily.goalMinutes * 1.5, 1)) * 100) : 0;
 	const todayIdx = daily?.days.findIndex((d) => d.today) ?? -1;
+	const soFar = todayIdx === -1 ? (daily?.days.length ?? 7) : todayIdx + 1;
+	const total = daily?.days.reduce((n, d) => n + d.minutes, 0) ?? 0;
 	const label = daily
 		? `Minutes learning per day this week: ${daily.days.map((d) => `${d.label} ${d.minutes}`).join(", ")}. Goal ${daily.goalMinutes} a day, met on ${daily.metDays} days.`
 		: "Minutes learning this week";
 	return (
-		<section className="glass card rise" aria-labelledby="mins" style={{ gridColumn: "span 5", display: "flex", flexDirection: "column", gap: 8, animationDelay: "160ms" }}>
-			<div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-				<h2 id="mins" className="h">Minutes learning, this week</h2>
+		<section className="week glass card rise" aria-labelledby="mins">
+			<div className="card-head">
+				<h2 id="mins" className="h">This week</h2>
 				{daily && (
-					<span style={{ fontSize: 11.5, color: "var(--v-muted)" }}>
-						goal {daily.goalMinutes} · met {daily.metDays} of {Math.max(1, todayIdx + 1)}
+					<span className="card-meta">
+						Goal {daily.goalMinutes} min a day · met {daily.metDays} of {soFar} {soFar === 1 ? "day" : "days"}
 					</span>
 				)}
 			</div>
-			<div className="bars" role="img" aria-label={label}>
-				<span aria-hidden="true" style={{ position: "absolute", left: 0, right: 0, bottom: `${goalPct}%`, borderTop: "1px dashed var(--line2)" }} />
-				{(daily?.days ?? Array.from({ length: 7 }, () => null)).map((d, i) => (
-					<div key={i} className={`bar ${d?.today ? "today" : ""}`}>
-						<b>{d && (i <= todayIdx || todayIdx === -1) ? d.minutes : ""}</b>
-						<i style={{ height: `${heights?.[i] ?? 0}%`, animationDelay: `${200 + i * 40}ms` }} />
+			{daily ? (
+				<>
+					<div className="week-sum">
+						<span className="num">{fmtMinutes(total)}</span>
+						<span>{total > 0 ? "learning so far" : "A few minutes a day adds up"}</span>
 					</div>
-				))}
-			</div>
-			<div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 8, textAlign: "center", fontSize: 11, color: "var(--faint)" }}>
-				{(daily?.days ?? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label) => ({ label, today: false }))).map((d) => (
-					<span key={d.label} style={d.today ? { color: "var(--v-accent)", fontWeight: 700 } : undefined}>
-						{d.today ? "Today" : d.label}
+					<div className="bars" role="img" aria-label={label}>
+						<span className="goal" aria-hidden="true" style={{ bottom: `${goalPct}%` }}>
+							<span>{daily.goalMinutes} min</span>
+						</span>
+						{daily.days.map((d, i) => {
+							const future = todayIdx !== -1 && i > todayIdx;
+							const h = future ? goalPct : Math.max(heights?.[i] ?? 0, d.minutes > 0 ? 4 : 2);
+							return (
+								<div key={d.date} className={`bar ${d.today ? "today" : ""} ${future ? "future" : ""} ${d.minutes === 0 ? "none" : ""}`}>
+									{!future && d.minutes > 0 && <b className="num">{d.minutes}</b>}
+									<i style={{ height: `${h}%`, animationDelay: `${200 + i * 40}ms` }} />
+								</div>
+							);
+						})}
+					</div>
+					<div className="days" aria-hidden="true">
+						{daily.days.map((d) => (
+							<span key={d.date} className={d.today ? "today" : ""}>
+								{d.today ? "Today" : d.label}
+							</span>
+						))}
+					</div>
+				</>
+			) : (
+				<div className="week-sk" aria-hidden="true">
+					<i className="skel" />
+					<span>
+						{[40, 64, 28, 52, 18, 46, 34].map((h, i) => (
+							<i key={i} className="skel" style={{ height: `${h}%` }} />
+						))}
 					</span>
-				))}
-			</div>
+				</div>
+			)}
 		</section>
 	);
 }
 
 // ─── Ready to practice ────────────────────────────────────────────────────
 
-function ReadyToPractice({ ideas, ready, onNeedSetup, now }: { ideas: IndexedIdea[]; ready: boolean; onNeedSetup: () => void; now: Date | null }) {
+function ReadyToPractice({ ideas, ready, onNeedSetup, now }: { ideas: IndexedIdea[] | null; ready: boolean; onNeedSetup: () => void; now: Date | null }) {
 	const router = useRouter();
 	const topics = useTopics();
 	const [picked, setPicked] = useState<string[]>([]);
@@ -551,10 +715,10 @@ function ReadyToPractice({ ideas, ready, onNeedSetup, now }: { ideas: IndexedIde
 				.slice(0, 4),
 		[topics],
 	);
-	const picks = useMemo(() => mixPicks(shown, picked, ideas), [shown, picked, ideas]);
+	const picks = useMemo(() => mixPicks(shown, picked, ideas ?? []), [shown, picked, ideas]);
 	const ideaCount = shown.filter((t) => picked.includes(t.id)).reduce((n, t) => n + t.ideaIds.length, 0);
 	const note =
-		picked.length === 0 ? "Nothing picked: a mix of everything" : `${picked.length} picked · ${ideaCount} ideas · about ${Math.max(10, Math.round(ideaCount * 0.8))} min`;
+		picked.length === 0 ? "Nothing picked: a mix of everything" : `${picked.length} picked · about ${Math.max(10, Math.round(ideaCount * 0.8))} min`;
 
 	const start = async () => {
 		if (busy) return;
@@ -570,51 +734,64 @@ function ReadyToPractice({ ideas, ready, onNeedSetup, now }: { ideas: IndexedIde
 	};
 
 	return (
-		<section className="glass card rise" aria-labelledby="ready" style={{ gridColumn: "span 7", display: "flex", flexDirection: "column", gap: 8, animationDelay: "200ms" }}>
-			<div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+		<section className="ready glass card rise" aria-labelledby="ready">
+			<div className="card-head">
 				<h2 id="ready" className="h">Ready to practice</h2>
-				<span style={{ fontSize: 11.5, color: "var(--faint)" }}>pick to mix</span>
+				{shown.length > 0 && <span className="card-meta">Pick topics to mix</span>}
 			</div>
-			{shown.length === 0 ? (
-				<span style={{ color: "var(--v-muted)", padding: "6px 0" }}>{topics === null ? "Loading…" : "Topics appear here once your lessons are saved to the graph."}</span>
-			) : (
-				<div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 }}>
-					{shown.map((t) => {
-						const on = picked.includes(t.id);
-						return (
-							<button
-								key={t.id}
-								type="button"
-								role="checkbox"
-								aria-checked={on}
-								className={`pick ${on ? "on" : ""}`}
-								onClick={() => setPicked((p) => (on ? p.filter((x) => x !== t.id) : [...p, t.id]))}
-							>
-								<span className="box" aria-hidden="true">
-									<CheckIcon size={10} />
-								</span>
-								<span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-									<b style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</b>
-									<span style={{ fontSize: 11.5, color: "var(--v-muted)" }}>
-										{t.ideaIds.length} ideas · {t.lastPracticedAt ? (now ? ago(t.lastPracticedAt, now) : "") : "never practiced"}
-									</span>
-								</span>
-							</button>
-						);
-					})}
+			{topics === null ? (
+				<div className="picks" aria-hidden="true">
+					{[0, 1, 2, 3].map((i) => (
+						<i key={i} className="skel pick-sk" />
+					))}
 				</div>
+			) : shown.length === 0 ? (
+				<EmptyState icon="practice" title="Nothing to practise yet" className="card-empty">
+					Topics land here once your lessons are saved to your graph.
+				</EmptyState>
+			) : (
+				<>
+					<div className="picks">
+						{shown.map((t) => {
+							const on = picked.includes(t.id);
+							return (
+								<button
+									key={t.id}
+									type="button"
+									role="checkbox"
+									aria-checked={on}
+									className={`pick ${on ? "on" : ""}`}
+									onClick={() => setPicked((p) => (on ? p.filter((x) => x !== t.id) : [...p, t.id]))}
+								>
+									<span className="box" aria-hidden="true">
+										<Icon name="check" size="xs" strokeWidth={3} />
+									</span>
+									<span className="pick-t">
+										<b className="trunc">{displayTopic(t.name)}</b>
+										<span className="trunc">
+											{t.ideaIds.length} ideas · {t.lastPracticedAt ? `practised ${now ? ago(t.lastPracticedAt, now) : ""}` : "never practised"}
+										</span>
+									</span>
+								</button>
+							);
+						})}
+					</div>
+					<div className="card-foot">
+						<span className="card-note">{note}</span>
+						<button type="button" className="btn brand" disabled={busy} onClick={() => void start()}>
+							<Icon name="practice" size="sm" />
+							{picked.length > 1 ? `Practice these ${picked.length}` : "Start practice"}
+						</button>
+					</div>
+				</>
 			)}
-			<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-				<span style={{ fontSize: 12, color: "var(--v-muted)" }}>{note}</span>
-				<button type="button" className="btn" style={{ marginLeft: "auto" }} disabled={busy} onClick={() => void start()}>
-					{picked.length > 1 ? `Practice these ${picked.length}` : "Start practice"}
-				</button>
-			</div>
 		</section>
 	);
 }
 
 // ─── Just added ───────────────────────────────────────────────────────────
+
+const JUST_ADDED = 3;
 
 function JustAdded({ ideas, now }: { ideas: IndexedIdea[] | null; now: Date | null }) {
 	const topics = useTopics();
@@ -624,34 +801,47 @@ function JustAdded({ ideas, now }: { ideas: IndexedIdea[] | null; now: Date | nu
 		return m;
 	}, [topics]);
 	const week = now ? (ideas ?? []).filter((i) => now.getTime() - new Date(i.createdAt).getTime() < 7 * 86_400_000).length : 0;
-	const shown = (ideas ?? []).slice(0, 2);
+	const shown = (ideas ?? []).slice(0, JUST_ADDED);
 	return (
-		<section className="glass card rise" aria-labelledby="new" style={{ gridColumn: "span 5", display: "flex", flexDirection: "column", gap: 2, animationDelay: "240ms" }}>
-			<div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 2 }}>
-				<h2 id="new" className="h">Just added to your knowledge</h2>
-				<Link href="/knowledge" style={{ fontSize: 12, fontWeight: 600, color: "var(--v-accent)" }}>
-					Graph →
+		<section className="added glass card rise" aria-labelledby="new">
+			<div className="card-head">
+				<h2 id="new" className="h">Just added</h2>
+				<Link href="/knowledge" className="link t-small">
+					Graph
+					<Icon name="arrow-right" size="sm" />
 				</Link>
 			</div>
-			{shown.length === 0 && <span style={{ color: "var(--v-muted)", padding: "6px 0" }}>{ideas === null ? "Loading…" : "Ideas appear here as your lessons are saved."}</span>}
-			{shown.map((idea, i) => {
-				const topic = topicOf.get(idea.id);
-				const more = i === shown.length - 1 && week > shown.length ? ` · +${week - shown.length} more this week` : "";
-				return (
-					<Link key={idea.id} className="idea" href={`/knowledge?idea=${encodeURIComponent(idea.id)}`}>
-						<span className="dot" style={{ marginTop: 7, background: topic ? topicColor(topic.id) : "#2f8f7f" }} />
-						<span style={{ display: "flex", flexDirection: "column" }}>
-							<span className="serif" style={{ fontSize: 14, lineHeight: "20px" }} title={idea.statement}>
-								{idea.name}
-							</span>
-							<span style={{ fontSize: 11, color: "var(--faint)" }}>
-								{[topic?.name ?? idea.source, now ? ago(idea.createdAt, now) : null].filter(Boolean).join(" · ")}
-								{more}
-							</span>
+			{ideas === null ? (
+				<div className="ideas" aria-hidden="true">
+					{[0, 1, 2].map((i) => (
+						<span key={i} className="idea-sk">
+							<i className="skel" />
+							<i className="skel" />
 						</span>
-					</Link>
-				);
-			})}
+					))}
+				</div>
+			) : shown.length === 0 ? (
+				<EmptyState icon="idea" title="No ideas yet" className="card-empty">
+					What you learn is saved here as ideas, linked into your graph.
+				</EmptyState>
+			) : (
+				<div className="ideas">
+					{shown.map((idea) => {
+						const topic = topicOf.get(idea.id);
+						const from = topic ? displayTopic(topic.name) : idea.source ? displayTopic(idea.source) : null;
+						return (
+							<Link key={idea.id} className="idea" href={`/knowledge?idea=${encodeURIComponent(idea.id)}`} title={idea.statement}>
+								<span className="idea-dot" aria-hidden="true" style={topic ? { background: topicColor(topic.id) } : undefined} />
+								<span className="idea-t">
+									<span className="serif trunc">{idea.name}</span>
+									<span className="trunc">{[from, now ? ago(idea.createdAt, now) : null].filter(Boolean).join(" · ")}</span>
+								</span>
+							</Link>
+						);
+					})}
+					{week > shown.length && <span className="ideas-more">{week - shown.length} more this week</span>}
+				</div>
+			)}
 		</section>
 	);
 }

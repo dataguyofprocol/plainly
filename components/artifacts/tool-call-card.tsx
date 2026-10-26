@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronRight, FileText, FolderOpen, History, Search, Waypoints } from "lucide-react";
+import { Icon, type IconName } from "@/components/ui/icon";
 import { toolHeadline, type ToolIcon } from "@/components/artifacts/tool-headline";
 import type { ArtifactPartProps } from "@/src/core";
 
@@ -44,16 +44,62 @@ function outputText(output: unknown): string | null {
 	}
 }
 
-const ICONS: Record<ToolIcon, typeof FileText> = {
-	sessions: History,
-	ideas: Waypoints,
-	file: FileText,
-	folder: FolderOpen,
-	search: Search,
+/** The tool kind's glyph (tool-headline.ts names the kind). */
+export const TOOL_ICON: Record<ToolIcon, IconName> = {
+	sessions: "history",
+	ideas: "path",
+	file: "file",
+	folder: "import",
+	search: "search",
 };
 
-/** The chip's shell — shared with the live card so a call reads the same
- *  while it runs and once it settles. */
+/** THE ROW — the one grammar every call and job line in the transcript
+ *  speaks (finesse pass, 2026-10-26): kind icon (a spinner while it
+ *  runs), the verb label, the argument in mono, the status glyph, and a
+ *  chevron when there is something to open. Rendered as the <summary> of
+ *  an expandable row, or as a plain div for a static line. */
+export function ToolRow({
+	icon,
+	label,
+	detail,
+	note,
+	status,
+	expandable = true,
+	leading,
+	trailing,
+	as = "summary",
+	testId,
+}: {
+	icon: IconName;
+	label: React.ReactNode;
+	detail?: string | null;
+	/** Quiet words after the label ("delivered", "complete · 6 sources"). */
+	note?: React.ReactNode;
+	status: "running" | "done" | "failed" | "info";
+	expandable?: boolean;
+	/** Replaces the kind icon (the live card's spinner). */
+	leading?: React.ReactNode;
+	trailing?: React.ReactNode;
+	as?: "summary" | "div";
+	testId?: string;
+}) {
+	const Tag = as;
+	return (
+		<Tag className={`ls-row${status === "failed" ? " failed" : ""}`} data-testid={testId}>
+			{leading ?? <Icon name={icon} size="sm" className="ls-kind" />}
+			<span className="ls-label">{label}</span>
+			{detail && <span className="ls-arg" title={detail}>{detail}</span>}
+			{note && <span className="ls-note">{note}</span>}
+			{status === "done" && <Icon name="status-ok" size="sm" className="text-good" label="Done" />}
+			{status === "failed" && <Icon name="status-error" size="sm" className="text-danger" label="Failed" />}
+			{trailing}
+			{expandable && <Icon name="chevron-right" size="xs" className="ls-chev" />}
+		</Tag>
+	);
+}
+
+/** The settled chip's shell — kept for callers that only need the
+ *  summary (the live card shares the row grammar). */
 export function ToolChip({
 	icon,
 	label,
@@ -65,18 +111,7 @@ export function ToolChip({
 	detail: string | null;
 	status: "running" | "done" | "failed";
 }) {
-	const Icon = ICONS[icon];
-	return (
-		<summary
-			className="inline-flex max-w-full cursor-pointer list-none items-center gap-2 rounded-lg border border-border bg-card/70 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-card hover:text-foreground [&::-webkit-details-marker]:hidden"
-		>
-			<Icon className={`size-3.5 shrink-0 ${status === "failed" ? "text-danger" : "text-brand"}`} aria-hidden />
-			<span className={`shrink-0 font-medium ${status === "failed" ? "text-danger" : "text-foreground/80"}`}>{label}</span>
-			{detail && <span className="min-w-0 truncate font-mono text-[11px]">{detail}</span>}
-			{status === "done" && <Check className="size-3 shrink-0 text-good" aria-label="Done" />}
-			<ChevronRight className="size-3 shrink-0 opacity-50 transition-transform group-open:rotate-90" aria-hidden />
-		</summary>
-	);
+	return <ToolRow icon={TOOL_ICON[icon]} label={label} detail={detail} status={status} />;
 }
 
 export function ToolCallCard({ part }: ArtifactPartProps) {
@@ -86,32 +121,29 @@ export function ToolCallCard({ part }: ArtifactPartProps) {
 	const out = outputText(p.output);
 	const failed = p.state === "output-error" || typeof p.errorText === "string";
 	return (
-		<details data-testid="tool-call-card" data-tool={tool} className="group my-0.5 w-full max-w-2xl select-none">
+		<details data-testid="tool-call-card" data-tool={tool} className="ls-tool">
 			<ToolChip icon={head.icon} label={failed ? `${head.label} — failed` : head.label} detail={head.detail} status={failed ? "failed" : p.state === "output-available" ? "done" : "running"} />
-			<div className="mt-1.5 space-y-2 rounded-xl border bg-card p-3 text-xs">
-				<div className="text-[11px] text-muted-foreground">
-					Tool <span className="font-mono">{tool}</span>
-				</div>
+			<div className="ls-tool-body">
 				{p.input != null && (
 					<div>
-						<div className="mb-1 font-medium text-muted-foreground">Input</div>
-						<pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed">
-							{JSON.stringify(p.input, null, 2)}
-						</pre>
+						<span className="over">
+							Input · <span className="mono">{tool}</span>
+						</span>
+						<pre className="short">{JSON.stringify(p.input, null, 2)}</pre>
 					</div>
 				)}
 				{typeof p.errorText === "string" ? (
 					<div>
-						<div className="mb-1 font-medium text-muted-foreground">Error</div>
-						<pre className="whitespace-pre-wrap break-all font-mono text-[11px] text-danger">{p.errorText}</pre>
+						<span className="over">Error</span>
+						<pre className="err">{p.errorText}</pre>
 					</div>
 				) : out != null ? (
 					<div>
-						<div className="mb-1 font-medium text-muted-foreground">Output</div>
-						<pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed">{out}</pre>
+						<span className="over">Output</span>
+						<pre>{out}</pre>
 					</div>
 				) : (
-					p.state !== "output-available" && <div className="text-muted-foreground italic">running…</div>
+					p.state !== "output-available" && <span className="faint">Running…</span>
 				)}
 			</div>
 		</details>

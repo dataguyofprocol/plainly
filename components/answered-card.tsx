@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight } from "lucide-react";
 import { CONFIDENCE_LEVEL_COLORS, nearestLevel } from "@/components/confidence-colors";
-import { GlyphMark } from "@/components/ui/glyph-mark";
+import { Icon } from "@/components/ui/icon";
 import { ThinkingBlock } from "@/components/thinking-block";
 import { cn } from "@/lib/utils";
 import { MessageResponse } from "@/components/ai-elements/message";
@@ -13,8 +12,8 @@ import { parseAskInput, parseQuizInput } from "@/src/core";
 /**
  * Static rendering of an answered question (tool part in `output-available`).
  *
- * Quiz answers are GRADED: ✓/✗ marks, the correct answers, and the
- * explanation. Ask answers are NOT graded — a plain record of what was said.
+ * Quiz answers are GRADED: check/cross marks, the correct answers, and
+ * the explanation (tucked behind "Why"). Ask answers are NOT graded — a plain record of what was said.
  * (The v1 bug this pins: ask answers must never get quiz grading UI.)
  * Explain answers are graded by the MODEL in its next reply, not by the
  * client — the card reveals his answer, the committed correct answer, and
@@ -24,8 +23,10 @@ export function AnsweredCard({ answer, input }: { answer: QuestionAnswerData; in
 	const [whyOpen, setWhyOpen] = useState(false); // the tucked explanation (predictions, owner 2026-10-03)
 	if (answer.dismissed) {
 		return (
-			<div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
-				<span className="font-medium">{answer.questionText}</span> — skipped
+			<div className="ls-skip" data-outcome="skipped">
+				<Icon name="status-paused" size="sm" />
+				<span className="ls-skip-q">{answer.questionText}</span>
+				<span className="pill muted">Skipped</span>
 			</div>
 		);
 	}
@@ -44,188 +45,107 @@ export function AnsweredCard({ answer, input }: { answer: QuestionAnswerData; in
 	const parsedDetails = askInput?.details ?? (answer.kind === "quiz" ? parseQuizInput(input)?.details : undefined);
 	const descByIndex = new Map((askInput?.options ?? []).map((o, i) => [i + 1, o.description]));
 
+	// The tool's OWN name first (owner 2026-10-09): probe-phase cards label
+	// Probe/Recall — the phase boundary visible in the transcript. No
+	// `tool` on old records: kind labels as before.
+	const kindLabel =
+		answer.tool === "probe"
+			? "Probe"
+			: answer.tool === "recall"
+				? "Recall"
+				: isQuiz
+					? answer.questionType === "predict"
+						? "Prediction"
+						: "Check"
+					: isExplain
+						? "Explain"
+						: "Question";
+	const outcome = !isQuiz ? undefined : answer.dontKnow ? "dontKnow" : answer.correct ? "correct" : "incorrect";
+	const thinking = answer.thinking ?? answer.note;
+	const why = isQuiz && answer.explanation ? answer.explanation : null;
+
 	return (
 		<>
 		{/* The reading channel LIFTED (owner round, 2026-10-05): thoughts
 		    captured while reading are chronologically PRIOR to the question —
-		    rendered as its own user-side block ABOVE the card, the unified
-		    ThinkingBlock, instead of an inset inside the answer. Same muted
-		    rail as before; the label is now plain "Your thinking". */}
+		    their own row ABOVE the card, arriving expanded. */}
 		{answer.readingThinking && (
 			<ThinkingBlock testId="reading-thinking-block" label="Your thinking" text={answer.readingThinking} defaultOpen />
 		)}
-		{/* [&>*:last-child]:mb-0 (owner round, 2026-10-07): on ask cards the
-		    thinking row is the last child — its my-3 stacked with the card's
-		    p-4 into a 28px void below (12px above); the card's own padding is
-		    the bottom rhythm when a row ends the card. */}
-		<div
-			// Compact record (v4): the card reads at 14px — a past answer is
-			// context, not the lesson — with options in the UI sans.
-			className="lh-answered rounded-xl border bg-card px-4 py-3 text-card-foreground [&>*:last-child]:mb-0"
-			data-testid="answered-card"
-		>
-			<div className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-				{/* The tool's OWN name first (owner 2026-10-09): probe-phase
-			    cards label Probe/Recall — the phase boundary visible in the
-			    transcript. No `tool` on old records: kind labels as before. */}
-				{answer.tool === "probe"
-					? "Probe"
-					: answer.tool === "recall"
-						? "Recall"
-						: isQuiz
-								? answer.questionType === "predict"
-									? "Prediction"
-									: "Check"
-									: isExplain
-										? "Explain"
-											: "Question"}
-				{isQuiz &&
-					(answer.dontKnow ? (
-						<span className="rounded bg-muted px-1.5 py-0.5">didn't know</span>
-					) : answer.correct ? (
-						<span className="rounded bg-good/15 px-1.5 py-0.5 text-good">correct</span>
-					) : (
-						<span className="rounded bg-danger/15 px-1.5 py-0.5 text-danger">incorrect</span>
-					))}
+		<div className="lh-answered ls-card" data-testid="answered-card" data-outcome={outcome}>
+			<div className="ls-ans-h">
+				<span className="over">{kindLabel}</span>
+				{outcome === "dontKnow" ? (
+					<span className="pill muted">Didn’t know</span>
+				) : outcome === "correct" ? (
+					<span className="pill good">Correct</span>
+				) : outcome === "incorrect" ? (
+					<span className="pill danger">Incorrect</span>
+				) : null}
 			</div>
-			<div className="mb-2 font-medium">
+			<div className="ls-ans-q">
 				<MessageResponse>{answer.questionText}</MessageResponse>
 			</div>
 			{parsedDetails && (
 				// The details line, same paint as the pending dock (owner,
 				// 2026-10-12): full markdown, LaTeX included.
-				<div className="mb-2 text-sm text-muted-foreground">
+				<div className="ls-ans-d">
 					<MessageResponse>{parsedDetails}</MessageResponse>
 				</div>
 			)}
 
 			{((answer.options?.length ?? 0) > 0 || answer.other) && (
-				<div className="lh-answered-ui flex flex-col gap-1 font-ui text-[13px] leading-snug">
+				<ul className="ls-opts lh-answered-ui">
 					{answer.options?.map((opt) => {
 						const sel = selectedIdx.has(opt.index);
 						const key = isQuiz && correctIdx.has(opt.index);
+						const wrong = isQuiz && sel && !key;
 						return (
-							<div
-								key={opt.index}
-								className={cn(
-									"flex items-start gap-2 rounded-lg border px-2.5 py-1",
-									sel && key && "border-good/50 bg-good/10",
-									sel && !key && isQuiz && "border-danger/50 bg-danger/10",
-									sel && !isQuiz && "border-brand/50 bg-brand-soft",
-									!sel && key && "border-good/40",
-									!sel && !key && "border-transparent",
-								)}
-							>
-								{isQuiz && (
-									// Zapf-Dingbats-derived SVG outlines — the exact LaTeX \ding{51}/
-									// \ding{55} hand-drawn shapes (owner, round 6); see ui/glyph-mark.
-									<span
-										aria-hidden
-										data-mark={sel && key ? "check" : sel && !key ? "x" : !sel && key ? "check" : undefined}
-										className={cn(
-											"flex shrink-0 items-center",
-											sel && key && "text-good",
-											sel && !key && "text-danger",
-											!sel && key && "text-good",
-										)}
-									>
-										{/* Owner round 8: a touch smaller than the text (size-4→size-3.5,
-											   ≈14px vs the 16px row) while centered. */}
-										{(key || sel) && <GlyphMark kind={key ? "check" : "x"} className="size-3.5" />}
-									</span>
-								)}
-								<span className={cn(!sel && "text-muted-foreground")}>
+							<li key={opt.index} className={cn("ls-opt", key && "key", sel && "sel", wrong && "wrong", sel && !isQuiz && "pick")}>
+								<span
+									className="ls-opt-mark"
+									aria-hidden
+									data-mark={isQuiz ? (key ? "check" : wrong ? "x" : undefined) : undefined}
+								>
+									{key || (sel && !isQuiz) ? (
+										<Icon name="check" size="sm" />
+									) : wrong ? (
+										<Icon name="close" size="sm" />
+									) : (
+										<span className="ls-ring" />
+									)}
+								</span>
+								<span className="ls-opt-body">
 									<MessageResponse>{opt.label}</MessageResponse>
 									{sel && descByIndex.get(opt.index) && (
 										// Ask-option subtext (owner, 2026-10-12): same markdown path
 										// as the pending dock — LaTeX included. Quiz options carry
 										// none (owner ruling 2026-09-26); the map stays empty for them.
-										<MessageResponse className="lh-prose block text-xs text-muted-foreground [&_p]:my-0">
-											{descByIndex.get(opt.index)}
-										</MessageResponse>
+										<MessageResponse className="ls-opt-desc">{descByIndex.get(opt.index)}</MessageResponse>
 									)}
 								</span>
-							</div>
+								{sel && <span className="ls-opt-you">Your answer</span>}
+							</li>
 						);
 					})}
-					{/* The learner's own typed option is an OPTION — same container,
-					    same selected styling as its siblings, not a loose quote
-					    floating outside the list. Quotes keep the learner's words. */}
+					{/* The learner's own typed option is an OPTION — same list,
+					    same selected styling as its siblings. */}
 					{answer.other && (
-						<div
-							data-testid="answered-other"
-							className="flex items-center gap-2 rounded-lg border border-brand/50 bg-brand-soft px-2.5 py-1"
-						>
-							<span>“{answer.other}”</span>
-						</div>
+						<li data-testid="answered-other" className="ls-opt sel pick">
+							<span className="ls-opt-mark" aria-hidden>
+								<Icon name="check" size="sm" />
+							</span>
+							<span className="ls-opt-body">“{answer.other}”</span>
+							<span className="ls-opt-you">Your answer</span>
+						</li>
 					)}
-				</div>
+				</ul>
 			)}
 
-			{answer.text && <div className="lh-prose mt-2 whitespace-pre-wrap">“{answer.text}”</div>}
-
-			{/* The confidence record (owner round 6): the slider's rail, disc
-			    removed — the missing handle itself says "this is a record, not a
-			    control". Same paint, same ticks, same ramp, same % read-out as the
-			    live dock. Quiz answers only, and only when a confidence exists:
-			    "I don't know" sent none (its slider was grayed out), explain and
-			    ask never had one, and records from before the feature carry no
-			    field — nothing to show, nothing rendered. */}
-			{isQuiz && answer.confidence != null && (() => {
-				// The confidence record: the level word in its colour (the
-				// live switch's palette); old six-stop answers read as their
-				// nearest level, the number kept in the title.
-				const level = nearestLevel(answer.confidence);
-				const c = CONFIDENCE_LEVEL_COLORS[level.value]!;
-				return (
-					<div className="mt-2 flex items-center gap-2 text-xs" data-testid="answered-confidence" title={`${answer.confidence}%`}>
-						<span className="text-muted-foreground">How sure</span>
-						<span className="rounded-full px-2 py-0.5 font-semibold" style={{ background: c.soft, color: c.ink }}>
-							{level.label}
-						</span>
-					</div>
-				);
-			})()}
-			{answer.dontKnow && isQuiz && (
-				<div className="mt-2 text-sm text-muted-foreground">Answered “I don't know”.</div>
-			)}
-
-			{(answer.thinking ?? answer.note) && (
-				/* The SAME unified row (owner round, 2026-10-05): the quiz answer's
-				    thinking is the identical collapsible ThinkingBlock — one
-				    geometry, but NO band on the card (owner round five, 2026-10-07:
-				    the accent lift read too light); rail only, heights identical. */
-				<ThinkingBlock
-					testId="your-thinking"
-					label="Your thinking"
-					text={answer.thinking ?? answer.note ?? ""}
-					inCard
-				/>
-			)}
-
-			{isQuiz && answer.explanation && (
-				/* The TUCKED explanation — ALL questions (owner, 2026-10-07): the
-				   verdict shows, the explanation sits collapsed behind the Why
-				   toggle — viewable, never center stage. Identical to the
-				   prediction pattern it generalizes (owner, 2026-10-03). */
-				<div className="mt-2.5" data-testid="tucked-explanation">
-					{/* A real control (owner, 2026-10-26: "doesn't look like a
-					    button"): a small pill with a turning chevron. */}
-					<button
-						type="button"
-						aria-expanded={whyOpen}
-						onClick={() => setWhyOpen((v) => !v)}
-						className="inline-flex h-6 items-center gap-1 rounded-full border border-border bg-background px-2.5 font-ui text-xs font-semibold text-foreground/70 transition-colors hover:border-foreground/25 hover:text-foreground"
-					>
-						<ChevronRight aria-hidden className={cn("size-3 transition-transform", whyOpen && "rotate-90")} />
-						{whyOpen ? "Hide why" : "Why"}
-					</button>
-					{whyOpen && (
-						<div className="mt-2 rounded-lg border border-border/70 bg-foreground/[0.03] px-3 py-2 lh-answered-ui font-ui text-[13px] leading-relaxed text-foreground/80">
-							{/* The markdown wrapper must go truly inline (owner's fix list). */}
-							<MessageResponse className="inline [&_p]:inline [&_p]:m-0">{answer.explanation}</MessageResponse>
-						</div>
-					)}
+			{answer.text && (
+				<div className="ls-mine">
+					<span className="over">Your answer</span>
+					<p>{answer.text}</p>
 				</div>
 			)}
 
@@ -233,9 +153,54 @@ export function AnsweredCard({ answer, input }: { answer: QuestionAnswerData; in
 			    — one field, reasoning included — shown on submit; no verdict,
 			    the model's next reply IS the grading. */}
 			{isExplain && answer.committed && (
-				<div className="lh-answered-ui mt-3 rounded-lg border border-border/70 bg-foreground/[0.03] px-3 py-2 text-[13px] text-muted-foreground">
-					<span className="font-medium text-foreground">The answer: </span>
+				<div className="ls-reveal lh-answered-ui">
+					<b>The answer: </b>
 					<MessageResponse className="inline [&_p]:inline [&_p]:m-0">{answer.committed}</MessageResponse>
+				</div>
+			)}
+
+			{/* The confidence record: the level word in its colour (the live
+			    switch's palette); old six-stop answers read as their nearest
+			    level, the number kept in the title. Quiz answers only, and only
+			    when a confidence exists. */}
+			{isQuiz && answer.confidence != null && (() => {
+				const level = nearestLevel(answer.confidence);
+				const c = CONFIDENCE_LEVEL_COLORS[level.value]!;
+				return (
+					<div className="ls-ans-meta">
+						<span data-testid="answered-confidence" title={`${answer.confidence}%`}>
+							How sure
+							<span className="ls-conf" style={{ background: c.soft, color: c.ink }}>
+								{level.label}
+							</span>
+						</span>
+					</div>
+				);
+			})()}
+
+			{(thinking || why) && (
+				<div className="ls-ans-foot">
+					{thinking && (
+						/* The SAME unified row as every user-thinking surface; in a
+						   card it arrives collapsed. */
+						<ThinkingBlock testId="your-thinking" label="Your thinking" text={thinking} inCard />
+					)}
+					{why && (
+						/* The TUCKED explanation — ALL questions (owner, 2026-10-07):
+						   the verdict shows, the explanation sits behind Why. */
+						<div className="ls-think" data-testid="tucked-explanation">
+							<button type="button" className="ls-think-t" aria-expanded={whyOpen} onClick={() => setWhyOpen((v) => !v)}>
+								<Icon name="idea" size="sm" />
+								Why
+								<Icon name="chevron-right" size="xs" className="ls-chev" />
+							</button>
+							{whyOpen && (
+								<div className="ls-well lh-answered-ui">
+									<MessageResponse>{why}</MessageResponse>
+								</div>
+							)}
+						</div>
+					)}
 				</div>
 			)}
 		</div>

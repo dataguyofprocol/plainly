@@ -39,8 +39,8 @@ describe("hintText — the parenthesized composition", () => {
 });
 
 describe("subtlety round pins (owner 2026-09-25)", () => {
-	it("the rest delay is 500ms — tooltips appear on pause, never in passing", () => {
-		assert.equal(TOOLTIP_DELAY_MS, 500);
+	it("the rest delay is 300ms — tooltips appear on pause, never in passing (v4: matches .tipb)", () => {
+		assert.equal(TOOLTIP_DELAY_MS, 300);
 	});
 });
 

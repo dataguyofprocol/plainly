@@ -23,6 +23,34 @@ import { useEffect, useRef, useState } from "react";
 import type { ModelCatalogEntry } from "@/src/core";
 import { fuzzyScore, subscriptionLabel } from "@/src/core";
 import { formatTokens } from "@/components/usage-format";
+import { Icon } from "@/components/ui/icon";
+
+/** Provider ids in their own spelling (display-only; ids are the contract). */
+const PROVIDER_NAMES: Record<string, string> = {
+	openai: "OpenAI",
+	openrouter: "OpenRouter",
+	anthropic: "Anthropic",
+	deepseek: "DeepSeek",
+	google: "Google",
+	zai: "Z.AI",
+	xai: "xAI",
+	groq: "Groq",
+	mistral: "Mistral",
+	chatgpt: "ChatGPT",
+};
+export function providerName(id: string): string {
+	return PROVIDER_NAMES[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
+}
+
+/** The search field every menu opens with (focus lands here). */
+function MenuSearch(props: React.ComponentProps<"input">) {
+	return (
+		<div className="mm-search">
+			<Icon name="search" size="sm" />
+			<input {...props} className="finput sm" spellCheck={false} autoComplete="off" />
+		</div>
+	);
+}
 
 function priceLabel(cost: ModelCatalogEntry["cost"]): string {
 	const fmt = (n: number) => `$${n < 1 ? n.toFixed(2).replace(/0$/, "") : n.toFixed(2)}`;
@@ -74,10 +102,14 @@ export function ModelMenuList({
 		.filter((r) => r.s !== null)
 		.sort((a, b) => b.s! - a.s! || a.m.id.localeCompare(b.m.id))
 		.map((r) => r.m);
+	// Grouped by provider in order of each provider's best match, so the
+	// first row stays the best match overall (Enter picks it).
+	const order = [...new Set(results.map((m) => m.provider))];
+	results.sort((a, b) => order.indexOf(a.provider) - order.indexOf(b.provider));
 
 	return (
 		<>
-			<input
+			<MenuSearch
 				ref={searchRef}
 				data-testid="model-search"
 				value={query}
@@ -105,43 +137,55 @@ export function ModelMenuList({
 					}
 				}}
 				placeholder="Search models…"
-				className="lh-input mb-1.5 w-full rounded-lg border bg-background px-2 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-ring"
 			/>
-			{!models && <div className="px-2 py-3 text-center text-muted-foreground">Loading models…</div>}
-			{models && results.length === 0 && (
-				<div className="px-2 py-3 text-center text-muted-foreground">No models match.</div>
+			{!models && (
+				<div className="mm-note" aria-busy="true">
+					Loading models…
+				</div>
 			)}
-			<ul ref={listRef} data-testid="model-list" className="flex max-h-72 flex-col overflow-y-auto px-1">
-				{results.map((m, i) => (
-					<li key={`${m.provider}/${m.id}`}>
-						<button
-							type="button"
-							data-testid={`model-option-${m.id.replace(/[^a-z0-9-]/gi, "_")}`}
-							data-idx={i}
-							onClick={() => onPick(m)}
-							className={`flex w-full flex-col gap-0.5 rounded-lg px-2 py-1.5 text-left outline-none transition-colors hover:bg-muted ${
-								i === menuIdx ? "bg-accent/40 ring-1 ring-inset ring-border" : ""
-							}${m.id === effectiveId && m.provider === (effectiveProvider ?? m.provider) && i !== menuIdx ? " bg-muted/60" : ""}`}
-						>
-							<span className="flex items-center justify-between gap-2">
-								<span className="truncate text-card-foreground">{m.name}</span>
-								<span className="shrink-0 tabular-nums text-muted-foreground" title={subscriptionLabel(`${m.provider}:${m.id}`) ? "Subscription connection" : "USD per 1M tokens in/out"}>
-									{subscriptionLabel(`${m.provider}:${m.id}`) ?? (m.unpriced ? "price unknown" : priceLabel(m.cost))}
+			{models && results.length === 0 && <div className="mm-note">No models match.</div>}
+			<ul ref={listRef} data-testid="model-list" className="mm-list">
+				{results.map((m, i) => {
+					const sub = subscriptionLabel(`${m.provider}:${m.id}`);
+					const on = m.id === effectiveId && m.provider === (effectiveProvider ?? m.provider);
+					const head = i === 0 || results[i - 1]!.provider !== m.provider;
+					return (
+						<li key={`${m.provider}/${m.id}`}>
+							{head && <div className="over mm-group">{sub ? `${sub} (subscription)` : providerName(m.provider)}</div>}
+							<button
+								type="button"
+								data-testid={`model-option-${m.id.replace(/[^a-z0-9-]/gi, "_")}`}
+								data-idx={i}
+								onClick={() => onPick(m)}
+								className={`mm-row two${i === menuIdx ? " walk" : ""}${on ? " on" : ""}`}
+							>
+								<span className="mm-line">
+									<span className="mm-name">
+										<span>{m.name}</span>
+										{on && <Icon name="check" size="sm" className="tick" />}
+									</span>
+									<span className="mm-meta" title={sub ? "Included in your subscription" : "USD per 1M tokens, in / out"}>
+										{sub ?? (m.unpriced ? "Price unknown" : priceLabel(m.cost))}
+									</span>
 								</span>
-							</span>
-							<span className="flex items-center justify-between gap-2 text-muted-foreground">
-								<span className="truncate">{subscriptionLabel(`${m.provider}:${m.id}`) ? `${subscriptionLabel(`${m.provider}:${m.id}`)} (subscription)` : m.provider} · {m.id}</span>
-								<span className="shrink-0 tabular-nums">{formatTokens(m.contextWindow)}</span>
-							</span>
-						</button>
-					</li>
-				))}
+								<span className="mm-line">
+									<span className="mm-id">{m.id}</span>
+									<span className="mm-meta" title="Context window">{formatTokens(m.contextWindow)} context</span>
+								</span>
+							</button>
+						</li>
+					);
+				})}
 			</ul>
-			{footer && (
-				<div className="mt-1 border-t px-2 pt-1.5 text-xs text-muted-foreground">{footer}</div>
-			)}
+			{footer && <div className="mm-foot">{footer}</div>}
 		</>
 	);
+}
+
+/** A thinking level in sentence case ("xhigh" → "Extra high"). */
+export function levelName(level: string): string {
+	if (level === "xhigh") return "Extra high";
+	return level.charAt(0).toUpperCase() + level.slice(1);
 }
 
 /** The thinking-level dropdown body — the levels this model actually
@@ -163,7 +207,7 @@ export function ThinkingMenuList({
 	return (
 		<>
 			{levels.length === 0 ? (
-				<div className="px-2 py-3 text-center text-muted-foreground">{empty ?? "No thinking levels."}</div>
+				<div className="mm-note">{empty ?? "No thinking levels."}</div>
 			) : (
 				levels.map((level) => (
 					<button
@@ -171,18 +215,14 @@ export function ThinkingMenuList({
 						type="button"
 						data-testid={`thinking-option-${level}`}
 						onClick={() => onPick(level)}
-						className={`flex items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted ${
-							level === effectiveLevel ? "bg-muted/60 text-card-foreground" : "text-card-foreground"
-						}`}
+						className={level === effectiveLevel ? "mm-row on" : "mm-row"}
 					>
-						<span>{level}</span>
-						{level === effectiveLevel && <span aria-hidden>✓</span>}
+						<span className="flex-1">{levelName(level)}</span>
+						{level === effectiveLevel && <Icon name="check" size="sm" className="tick" />}
 					</button>
 				))
 			)}
-			{footer && (
-				<div className="mt-1 border-t px-2 pt-1.5 text-xs text-muted-foreground">{footer}</div>
-			)}
+			{footer && <div className="mm-foot">{footer}</div>}
 		</>
 	);
 }
@@ -221,7 +261,7 @@ export function ProviderMenuList({
 
 	return (
 		<>
-			<input
+			<MenuSearch
 				ref={searchRef}
 				data-testid="provider-search"
 				value={query}
@@ -249,12 +289,9 @@ export function ProviderMenuList({
 					}
 				}}
 				placeholder="Search providers…"
-				className="lh-input mb-1.5 w-full rounded-lg border bg-background px-2 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-ring"
 			/>
-			{results.length === 0 && (
-				<div className="px-2 py-3 text-center text-muted-foreground">No providers match.</div>
-			)}
-			<ul ref={listRef} data-testid="provider-list" className="flex max-h-72 flex-col overflow-y-auto px-1">
+			{results.length === 0 && <div className="mm-note">No providers match.</div>}
+			<ul ref={listRef} data-testid="provider-list" className="mm-list">
 				{results.map((p, i) => (
 					<li key={p.id}>
 						<button
@@ -262,12 +299,12 @@ export function ProviderMenuList({
 							data-testid={`provider-option-${p.id.replace(/[^a-z0-9-]/gi, "_")}`}
 							data-idx={i}
 							onClick={() => onPick(p)}
-							className={`flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left outline-none transition-colors hover:bg-muted ${
-								i === menuIdx ? "bg-accent/40 ring-1 ring-inset ring-border" : ""
-							}`}
+							className={i === menuIdx ? "mm-row walk" : "mm-row"}
 						>
-							<span className="truncate text-card-foreground">{p.label}</span>
-							<span className="shrink-0 font-mono text-[11px] text-muted-foreground">{p.envVar}</span>
+							<span className="mm-name flex-1">
+								<span>{p.label}</span>
+							</span>
+							<span className="mm-id">{p.envVar}</span>
 						</button>
 					</li>
 				))}
@@ -291,7 +328,7 @@ export function fontMenuResults(query: string, families: string[]): Array<string
 		.map((r) => r.f);
 	// The default row's searchable identity: the factory family + the
 	// word "default" (the suffix it renders with).
-	const defaultScore = fuzzyScore(query, "Source Sans 3", "default");
+	const defaultScore = fuzzyScore(query, "Source Sans 3", "default", "Literata");
 	if (query.trim() === "" || defaultScore !== null) return [null, ...scored];
 	return scored;
 }
@@ -351,7 +388,7 @@ export function FontMenuList({
 
 	return (
 		<>
-			<input
+			<MenuSearch
 				ref={searchRef}
 				data-testid="font-search"
 				value={query}
@@ -379,10 +416,9 @@ export function FontMenuList({
 					}
 				}}
 				placeholder="Search fonts…"
-				className="lh-input mb-1.5 w-full rounded-lg border bg-background px-2 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-ring"
 			/>
-			{!families && <div className="px-2 py-3 text-center text-muted-foreground">Loading fonts…</div>}
-			<ul ref={listRef} data-testid="font-list" className="flex max-h-72 flex-col overflow-y-auto px-1">
+			{!families && <div className="mm-note">Loading fonts…</div>}
+			<ul ref={listRef} data-testid="font-list" className="mm-list">
 				{families &&
 					results.map((family, i) => {
 						const isDefault = family === null;
@@ -394,12 +430,14 @@ export function FontMenuList({
 									data-testid={isDefault ? "font-option-default" : `font-option-${family.replace(/[^a-z0-9-]/gi, "_")}`}
 									data-idx={i}
 									onClick={() => onPick(family)}
-									className={`flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left outline-none transition-colors hover:bg-muted ${
-										i === menuIdx ? "bg-accent/40 ring-1 ring-inset ring-border" : ""
-									}${effective && i !== menuIdx ? " bg-muted/60" : ""}`}
+									// bg-muted/60 marks the effective family (pinned by the font-menu test).
+									className={`mm-row${i === menuIdx ? " walk" : ""}${effective ? " on" : ""}${effective && i !== menuIdx ? " bg-muted/60" : ""}`}
 								>
-									<span className="truncate text-card-foreground">{family ?? "Source Sans 3"}</span>
-									<span className="shrink-0 text-muted-foreground">{isDefault ? "default" : effective && <span aria-hidden>✓</span>}</span>
+									<span className="mm-name flex-1">
+										<span>{family ?? "Literata"}</span>
+									</span>
+									{isDefault && <span className="mm-meta">default</span>}
+									{effective && <Icon name="check" size="sm" className="tick" />}
 								</button>
 							</li>
 						);
@@ -411,17 +449,17 @@ export function FontMenuList({
 							data-testid="font-option-custom"
 							data-idx={0}
 							onClick={() => onPick(customFamily)}
-							className={`flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left outline-none transition-colors hover:bg-muted ${
-								menuIdx === 0 ? "bg-accent/40 ring-1 ring-inset ring-border" : ""
-							}`}
+							className={menuIdx === 0 ? "mm-row walk" : "mm-row"}
 						>
-							<span className="truncate text-card-foreground">Use “{customFamily}”</span>
-							<span className="shrink-0 text-muted-foreground">custom</span>
+							<span className="mm-name flex-1">
+								<span>Use “{customFamily}”</span>
+							</span>
+							<span className="mm-meta">custom</span>
 						</button>
 					</li>
 				)}
 			</ul>
-			{footer && <div className="px-2 pt-1.5 text-xs text-muted-foreground">{footer}</div>}
+			{footer && <div className="mm-foot">{footer}</div>}
 		</>
 	);
 }

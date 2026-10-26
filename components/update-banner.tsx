@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { Icon } from "@/components/ui/icon";
 
 // The window.lh bridge type lives in components/sidebar.tsx (the incumbent
 // declare-global) — onUpdateStatus/installUpdate are declared there too.
@@ -30,21 +31,21 @@ export default function UpdateBanner() {
 
 	if (!ready) return null;
 	return (
-		<div
-			data-testid="update-banner"
-			className="fixed right-4 bottom-4 z-50 flex items-center gap-3 rounded-lg border border-border bg-popover px-4 py-3 shadow-lg"
-		>
-			<div className="text-sm">
-				<span className="font-medium">LearnHarness {ready.version ?? "update"} is ready</span>
-				<span className="text-muted-foreground"> — restart to finish installing.</span>
+		<div className="v4 scope">
+			<div data-testid="update-banner" role="status" className="pop ub">
+				<span className="well" aria-hidden>
+					<Icon name="download" size="md" />
+				</span>
+				<span className="st-text grow-1">
+					<span className="ub-t">Update ready</span>
+					<span className="ub-d">
+						LearnHarness {ready.version ?? "update"} installs when you restart.
+					</span>
+				</span>
+				<button type="button" onClick={() => window.lh?.installUpdate?.()} className="btn sm brand">
+					Restart
+				</button>
 			</div>
-			<button
-				type="button"
-				onClick={() => window.lh?.installUpdate?.()}
-				className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent/80"
-			>
-				Restart
-			</button>
 		</div>
 	);
 }

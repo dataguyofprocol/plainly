@@ -18,22 +18,24 @@
  *                 (Nudge → Bigger hint → First step), submit; then the set.
  */
 
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { finishDictation, useDictationTarget, joinDictation } from "@/components/dictation";
 import { JobsContext } from "@/components/jobs-context";
-import { CONFIDENCE_LEVEL_COLORS } from "@/components/confidence-colors";
+import { CONFIDENCE_LEVEL_COLORS, nearestLevel } from "@/components/confidence-colors";
+import { ConfidenceLadder } from "@/components/confidence-rail";
 import { catalogLimits, useModelCatalog } from "@/components/model-picker";
 import { latestTree, type PopupMessage } from "@/components/plan-block";
 import { QuestionDock } from "@/components/question-dock";
 import { ReadingThinkingField } from "@/components/reading-thinking";
 import { formatTokens, planCostLabel } from "@/components/usage-format";
 import { useChats } from "@/components/v4/data";
-import { MicIcon } from "@/components/v4/icons";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Icon, type IconName } from "@/components/ui/icon";
+import { cn } from "@/lib/utils";
 import {
 	CONFIDENCE_LEVELS,
 	HINT_RUNGS,
 	PRACTICE_SET_SIZE,
-	confidenceLabel,
 	derivedNodeStatus,
 	derivePlanStatuses,
 	type HintRung,
@@ -94,6 +96,13 @@ const JOB_LABEL: Record<JobRecord["kind"], string> = {
 	demo: "Demo builder",
 	visual: "Figure maker",
 	pdf: "PDF reader",
+};
+
+const JOB_ICON: Record<JobRecord["kind"], IconName> = {
+	research: "research",
+	demo: "demo",
+	visual: "figure",
+	pdf: "pdf",
 };
 
 /** The question tab's name — what kind of question waits (Lesson4 calls a
@@ -173,6 +182,9 @@ export function LessonPanel({
 	const jobs = useContext(JobsContext);
 	const progress = useMemo(() => planProgress(latestTree(messages), messages), [messages]);
 	const [tab, setTab] = useState<Tab>("question");
+	// The learner chose a tab since the dock last moved on its own — the
+	// resting rule below never overrides a deliberate pick.
+	const [picked, setPicked] = useState(false);
 
 	// Reveal state per question (the W5 rule, unchanged).
 	const pendingId = pending?.toolCallId ?? null;
@@ -184,9 +196,23 @@ export function LessonPanel({
 		if (pendingId) {
 			setRevealed(requiresReveal ? revealArrival(wasQuestion).revealed : true);
 			setTab("question");
+			setPicked(false);
 		}
 	}
 	const revealPending = !!pending && requiresReveal && !revealed;
+
+	// THE RESTING TAB (PM, finesse pass 2026-10-26): with no question
+	// pending and the tutor not mid-reply, the dock rests on Path — an empty
+	// question tab is not a place to open on. Without a plan the question
+	// tab keeps the spot (its resting state says what comes next). While
+	// the tutor replies to an answer, the question tab stays put so the
+	// learner sees their answer land.
+	const restTab: Tab | null = !pending && !busy ? (progress ? "path" : "question") : null;
+	const [prevRestTab, setPrevRestTab] = useState<Tab | null>(null);
+	if (restTab !== prevRestTab) {
+		setPrevRestTab(restTab);
+		if (restTab && !picked) setTab(restTab);
+	}
 
 	// A question just landed: ring the dock (a few seconds — the CSS runs
 	// three pulses), and if the window isn't in front, a system
@@ -234,31 +260,39 @@ export function LessonPanel({
 
 	const running = jobs.filter((j) => j.status === "running").length;
 	const answered = !pending ? lastAnswer(messages) : null;
-	const tabs: { id: Tab; label: string; badge?: string; dot?: boolean }[] = [
-		{ id: "question", label: pending ? "Your turn" : questionTabLabel(pending), dot: !!pending },
-		{ id: "path", label: "Path", badge: progress ? `${progress.currentIndex ?? progress.visited}/${progress.total}` : undefined },
-		{ id: "helpers", label: "Helpers", badge: running ? String(running) : undefined },
+	const tabs: { id: Tab; icon: IconName; label: string; count?: string; wait?: boolean }[] = [
+		{ id: "question", icon: "ask", label: pending ? "Your turn" : questionTabLabel(pending), wait: !!pending },
+		{ id: "path", icon: "path", label: "Path", count: progress ? `${progress.currentIndex ?? progress.visited}/${progress.total}` : undefined },
+		{ id: "helpers", icon: "agent", label: "Helpers", count: running ? String(running) : undefined },
 	];
 
 	return (
 		<aside className="dock" aria-label="Question and lesson details" data-testid="lesson-panel">
-			<div className={`dockin glass ${attn ? "attn" : ""}`} style={{ "--lh-prose-size": "15px" } as React.CSSProperties}>
-				<div className="tabs" role="tablist">
+			<div className={cn("dockin glass", attn && "attn")}>
+				<div className="tabs" role="tablist" aria-label="Lesson dock">
 					{tabs.map((t) => (
-						<button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={tab === t.id ? "on" : ""} onClick={() => setTab(t.id)} data-testid={`lesson-tab-${t.id}`}>
-							{t.label}
-							{t.dot && <span className="ping" aria-label="waiting on you" />}
-							{t.badge && (
-								<span className="mono" style={{ fontSize: 11, color: "var(--v-muted)" }}>
-									{t.badge}
-								</span>
-							)}
+						<button
+							key={t.id}
+							type="button"
+							role="tab"
+							aria-selected={tab === t.id}
+							className={cn(tab === t.id && "on", t.wait && "wait")}
+							onClick={() => {
+								setTab(t.id);
+								setPicked(true);
+							}}
+							data-testid={`lesson-tab-${t.id}`}
+						>
+							<Icon name={t.icon} size="sm" />
+							<span className="tab-l">{t.label}</span>
+							{t.wait && <span className="ping" aria-label="waiting on you" />}
+							{t.count && <span className="tab-n">{t.count}</span>}
 						</button>
 					))}
 				</div>
 
 				{tab === "question" && (
-					<div className="pane fade" role="tabpanel" style={{ "--dock-max-h": "none" } as React.CSSProperties}>
+					<div className="pane fade" role="tabpanel">
 						{pending ? (
 							<>
 								<QuestionDock
@@ -284,95 +318,157 @@ export function LessonPanel({
 									/>
 								)}
 							</>
-						) : answered ? (
-							<div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-								<div className="settle" style={{ padding: "10px 12px", borderRadius: 11, background: "var(--line)", display: "flex", flexDirection: "column", gap: 4 }}>
-									<span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--v-muted)" }}>
-										{answered.questionType === "predict" ? "You predicted" : "You answered"}
-										{answered.confidence !== undefined && ` · ${(confidenceLabel(answered.confidence) ?? `${answered.confidence}%`).toLowerCase()}`}
-										{answered.correct === true ? " · right" : answered.correct === false ? " · not quite" : ""}
-									</span>
-									<span className="serif" style={{ fontSize: 14, lineHeight: "21px" }}>
-										{answered.dontKnow
-											? "I don’t know yet"
-											: (answered.options?.filter((o) => answered.answers.some((a) => a.index === o.index)).map((o) => o.label).join("; ") || answered.text || answered.other || "")}
-									</span>
-								</div>
-								{busy ? (
-									<div className="settle" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-										<span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--v-accent)" }}>Tutor</span>
-										<span style={{ fontSize: 12.5, color: "var(--v-muted)" }}>Replying in the lesson…</span>
-										<span className="ind" aria-hidden="true">
-											<i />
-										</span>
-									</div>
-								) : (
-									<span style={{ fontSize: 12.5, color: "var(--v-muted)" }}>The next check appears here when you reach it.</span>
-								)}
-							</div>
 						) : (
-							<span style={{ fontSize: 12.5, color: "var(--v-muted)" }}>
-								{phase === "probe" ? "The check-in’s questions appear here." : "No question right now. Checks appear here as the lesson goes; ask or steer any time below."}
-							</span>
+							<QuestionRest answered={answered} busy={busy} phase={phase} />
 						)}
 					</div>
 				)}
 
 				{tab === "path" && (
 					<div className="pane fade" role="tabpanel">
-						{progress ? (
-							<>
-								<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-									<span style={{ fontSize: 12, color: "var(--v-muted)" }}>
-										{progress.visited} of {progress.total} visited
-										{progress.currentIndex !== null && ` · on step ${progress.currentIndex}`}
-									</span>
-									<button type="button" className="ghost" style={{ height: 28, fontSize: 12 }} onClick={onOpenPlan}>
-										Open map
-									</button>
-								</div>
-								<div className="pbar">
-									<i style={{ transform: `scaleX(${(progress.visited / progress.total).toFixed(3)})` }} />
-								</div>
-								<ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 1 }} data-testid="path-steps">
-									{progress.steps.map((st) => (
-										<li key={st.id} className={`step ${st.status === "current" ? "c" : st.status === "visited" ? "d" : ""}`} data-status={st.status}>
-											<i aria-hidden="true" />
-											{st.title}
-										</li>
-									))}
-								</ol>
-							</>
-						) : (
-							<span style={{ fontSize: 12.5, color: "var(--v-muted)" }}>The path appears once the check-in finds where you are.</span>
+						{progress ? <PathSteps progress={progress} onOpenPlan={onOpenPlan} /> : (
+							<EmptyState icon="path" title="Your path is on its way">
+								The check-in finds where you are first, then lays out the steps.
+							</EmptyState>
 						)}
 					</div>
 				)}
 
 				{tab === "helpers" && (
 					<div className="pane fade" role="tabpanel">
-						{jobs.length === 0 && <span style={{ fontSize: 12.5, color: "var(--v-muted)" }}>Helpers research, build demos and draw figures when the lesson calls for one.</span>}
-						{[...jobs].reverse().map((j) => (
-							<div key={j.id} className="agent" style={j.status === "running" ? undefined : { opacity: 0.75 }}>
-								<span style={{ display: "flex", justifyContent: "space-between" }}>
-									<b style={{ fontWeight: 700 }}>{JOB_LABEL[j.kind]}</b>
-									<span className="mono" style={{ fontSize: 11, color: j.status === "error" ? "#b3261e" : "var(--v-muted)" }}>
-										{j.status === "running" ? elapsed(j.createdAt) : j.status === "done" ? "done" : "failed"}
-									</span>
-								</span>
-								{j.activity && <span style={{ fontSize: 12, color: "var(--v-muted)" }}>{j.activity}</span>}
-								{j.status === "running" && (
-									<span className="ind" aria-hidden="true">
-										<i />
-									</span>
-								)}
-							</div>
-						))}
+						{jobs.length === 0 ? (
+							<EmptyState icon="agent" title="No helpers yet">
+								When the lesson calls for one, helpers research, build demos and draw figures.
+							</EmptyState>
+						) : (
+							<ul className="agents">
+								{[...jobs].reverse().map((j) => (
+									<li key={j.id} className={cn("agent", j.status)}>
+										<span className="agent-ic" aria-hidden="true">
+											<Icon name={JOB_ICON[j.kind]} size="sm" />
+										</span>
+										<span className="agent-tx">
+											<span className="agent-n">{JOB_LABEL[j.kind]}</span>
+											{(j.status === "running" || (j.activity && !/^(done|failed)$/i.test(j.activity))) && (
+												<span className="agent-a">
+													{j.status === "running" ? [j.activity, elapsed(j.createdAt)].filter(Boolean).join(" · ") : j.activity}
+												</span>
+											)}
+										</span>
+										<span className={cn("pill", j.status === "running" ? "brand" : j.status === "done" ? "good" : "danger")}>
+											{j.status === "running" ? "Working" : j.status === "done" ? "Done" : "Failed"}
+										</span>
+										{j.status === "running" && (
+											<span className="ind" aria-hidden="true">
+												<i />
+											</span>
+										)}
+									</li>
+								))}
+							</ul>
+						)}
 						<LessonNumbers chatId={chatId} turns={turns} contextTokens={contextTokens} pricing={pricing} />
 					</div>
 				)}
 			</div>
 		</aside>
+	);
+}
+
+/** The question tab at rest: the last answer, compact, and what comes
+ *  next — the tutor replying, or where the next check will land. */
+function QuestionRest({ answered, busy, phase }: { answered: QuestionAnswerData | null; busy: boolean; phase: "probe" | "plan" | "teach" }) {
+	const conf = answered?.confidence !== undefined ? nearestLevel(answered.confidence) : null;
+	const confColor = conf ? CONFIDENCE_LEVEL_COLORS[conf.value] : undefined;
+	const said = answered
+		? answered.dontKnow
+			? "I don’t know yet"
+			: answered.options?.filter((o) => answered.answers.some((a) => a.index === o.index)).map((o) => o.label).join("; ") || answered.text || answered.other || ""
+		: "";
+	return (
+		<div className="qrest">
+			{answered && (
+				<div className="qlast settle">
+					<div className="qlast-h">
+						<span className="over">{answered.questionType === "predict" ? "You predicted" : "You answered"}</span>
+						{answered.correct === true && <span className="pill good">Right</span>}
+						{answered.correct === false && <span className="pill muted">Not quite</span>}
+						{conf && confColor && (
+							<span className="pill lvl" style={{ "--lvl": confColor.ink, "--lvl-soft": confColor.soft } as CSSProperties}>
+								{conf.label}
+							</span>
+						)}
+					</div>
+					{said && <p className="qlast-a">{said}</p>}
+				</div>
+			)}
+			{busy ? (
+				<div className="qreply settle" role="status">
+					<span className="qreply-t">
+						<span className="wave" aria-hidden="true">
+							<i />
+							<i />
+							<i />
+							<i />
+						</span>
+						The tutor is replying in the lesson
+					</span>
+					<span className="ind" aria-hidden="true">
+						<i />
+					</span>
+				</div>
+			) : answered ? (
+				<EmptyState icon="ask" title="Your next check will appear here">
+					Keep reading. You can ask or steer any time from the box below.
+				</EmptyState>
+			) : (
+				<EmptyState icon="ask" title={phase === "probe" ? "The check-in’s questions land here" : "No question right now"}>
+					{phase === "probe" ? "A few quick ones, to find where you are." : "Checks show up here as the lesson goes. Ask or steer any time below."}
+				</EmptyState>
+			)}
+		</div>
+	);
+}
+
+/** Path: where you are in the plan — a vertical stepper (visited / current
+ *  / upcoming are POSITION, never mastery), with the map one click away. */
+function PathSteps({ progress, onOpenPlan }: { progress: PlanProgress; onOpenPlan: () => void }) {
+	const currentRef = useRef<HTMLLIElement>(null);
+	// Long plans: open with the current step in view.
+	useEffect(() => {
+		currentRef.current?.scrollIntoView({ block: "nearest" });
+	}, []);
+	const at = progress.currentIndex ?? progress.visited;
+	return (
+		<>
+			<div className="path-h">
+				<div className="path-hx">
+					<span className="h">{progress.currentIndex !== null ? `Step ${progress.currentIndex} of ${progress.total}` : `${progress.total} steps`}</span>
+					<span className="t-meta faint">{progress.visited === 0 ? "None visited yet" : `${progress.visited} visited`}</span>
+				</div>
+				<button type="button" className="btn sm secondary" onClick={onOpenPlan}>
+					<Icon name="plan" size="sm" />
+					Open map
+				</button>
+			</div>
+			<div className="pbar" aria-hidden="true">
+				<i style={{ transform: `scaleX(${(at / progress.total).toFixed(3)})` }} />
+			</div>
+			<ol className="stepper" data-testid="path-steps">
+				{progress.steps.map((st) => (
+					<li
+						key={st.id}
+						ref={st.status === "current" ? currentRef : undefined}
+						className={cn("step", st.status === "current" ? "c" : st.status === "visited" ? "d" : "")}
+						data-status={st.status}
+						aria-current={st.status === "current" ? "step" : undefined}
+					>
+						<i aria-hidden="true" />
+						<span className="step-t">{st.title}</span>
+					</li>
+				))}
+			</ol>
+		</>
 	);
 }
 
@@ -405,7 +501,7 @@ function elapsed(iso: string): string {
 }
 
 /** Helpers' "This lesson" block (Lesson4): time, answers, context, tokens,
- *  cost — the context bar against the model's window. */
+ *  cost — a stat list, the context meter against the model's window. */
 function LessonNumbers({ chatId, turns, contextTokens, pricing }: { chatId: string; turns: TurnUsage[]; contextTokens: number | null; pricing?: SessionPricing }) {
 	const chats = useChats();
 	const me = chats?.find((c) => c.id === chatId);
@@ -414,31 +510,32 @@ function LessonNumbers({ chatId, turns, contextTokens, pricing }: { chatId: stri
 	const limit = model && catalog ? (catalogLimits(catalog).get(model) ?? null) : null;
 	const tokens = sumTokens(turns);
 	const rows: Array<[string, string]> = [
-		["Time", me?.minutes !== undefined ? `${me.minutes} min` : "—"],
+		["Time", me?.minutes === undefined ? "—" : me.minutes < 1 ? "< 1 min" : `${me.minutes} min`],
 		["Answers", me?.answers ? `${me.answers.total} · ${me.answers.firstTry} first try` : "—"],
-		["Context", `${contextTokens === null ? "?" : formatTokens(contextTokens)}${limit ? ` / ${formatTokens(limit)}` : ""}`],
+		["Context", `${contextTokens === null ? "—" : formatTokens(contextTokens)}${limit ? ` / ${formatTokens(limit)}` : ""}`],
 		["Tokens", tokens > 0 ? formatTokens(tokens) : "—"],
 		["Cost", lessonCostLabel(turns, pricing)],
 	];
+	const fill = limit && contextTokens !== null ? Math.min(1, contextTokens / limit) : null;
 	return (
-		<div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 6 }}>
-			<span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--faint)" }}>This lesson</span>
-			<dl style={{ margin: 0, display: "grid", gridTemplateColumns: "1fr auto", gap: "6px 12px", fontSize: 12.5 }}>
+		<section className="stats">
+			<span className="over">This lesson</span>
+			<dl className="stat">
 				{rows.map(([k, v]) => (
-					<div key={k} style={{ display: "contents" }}>
-						<dt style={{ color: "var(--v-muted)" }}>{k}</dt>
-						<dd className="mono" style={{ margin: 0 }}>
-							{v}
+					<div key={k}>
+						<dt>{k}</dt>
+						<dd>
+							{k === "Context" && fill !== null && (
+								<span className="meter" aria-hidden="true">
+									<i style={{ transform: `scaleX(${fill.toFixed(3)})` }} />
+								</span>
+							)}
+							<span className="mono num">{v}</span>
 						</dd>
 					</div>
 				))}
 			</dl>
-			{limit && contextTokens !== null && (
-				<div className="pbar">
-					<i style={{ transform: `scaleX(${Math.min(1, contextTokens / limit).toFixed(3)})` }} />
-				</div>
-			)}
-		</div>
+		</section>
 	);
 }
 
@@ -474,12 +571,37 @@ export function practiceSet(messages: readonly PopupMessage[]): SetProblem[] {
 }
 
 
+/** A set row's status: its label and pill tone (Practice marks wear the
+ *  warm --practice; the problem being worked is the brand's "current"). */
+function setStatus(p: SetProblem | undefined): { label: string; tone: string } | null {
+	if (!p) return null;
+	if (p.outcome === null) return { label: "Working", tone: "brand" };
+	if (p.outcome === "solved") return { label: "Solid", tone: "good" };
+	if (p.outcome === "solvedWithHints") return { label: "With hints", tone: "practice" };
+	if (p.outcome === "dismissed") return { label: "Skipped", tone: "muted" };
+	return { label: "Moved on", tone: "muted" };
+}
+
+/** Hints the learner asked for on one problem, read off the view's
+ *  practice-thinking parts (each carries its rung when it was a hint). */
+function hintsOn(messages: readonly PopupMessage[], problemId: string): number {
+	let n = 0;
+	for (const m of messages)
+		for (const part of m.parts) {
+			if (part.type !== "data-practice-thinking") continue;
+			const d = (part as { data?: { problemCallId?: unknown; hint?: unknown } }).data;
+			if (d?.problemCallId === problemId && (d.hint === 1 || d.hint === 2 || d.hint === 3)) n += 1;
+		}
+	return n;
+}
+
 /**
  * THE PRACTICE DOCK (Practice4): your working for the open problem — the
  * field (with dictation), how sure, the hint ladder, submit — and then the
  * set. A hint request rides the thinking lane with its rung (the server
  * makes the request explicit to the agent; the doctrine's ladder decides
- * what the hint says).
+ * what the hint says). Between problems the working gives way to a
+ * compact outcome card, with the set right under it.
  */
 export function PracticePanel({
 	messages,
@@ -532,105 +654,118 @@ export function PracticePanel({
 		onSubmitThinking(t, nextRung);
 	};
 	const tokens = sumTokens(turns);
+	const outOfHints = hintsUsed >= HINT_RUNGS.length;
+	const last = set.at(-1);
+	const lastStatus = setStatus(last);
+	// The set's window: the latest five (a second set starts a fresh list).
+	const base = Math.floor(Math.max(0, set.length - 1) / PRACTICE_SET_SIZE) * PRACTICE_SET_SIZE;
 
 	return (
-		<aside className="dock full" aria-label="Your working" data-testid="practice-panel">
-			<div className="dockin glass" style={{ padding: 16, gap: 14, overflow: "auto" }}>
-				{practice ? (
-					<div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-						<label htmlFor="work" style={{ fontWeight: 700 }}>
-							Your working
-						</label>
-						<div style={{ position: "relative" }}>
-							<textarea
-								id="work"
-								rows={7}
-								className="serif"
-								value={draft}
-								data-testid="practice-thinking-field"
-								onChange={(e) => setText(e.target.value)}
-								onKeyDown={(e) => {
-									if (e.key === "Escape" && dictationCancel) {
-										e.stopPropagation();
-										dictationCancel();
-									} else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-										e.preventDefault();
-										submit();
-									}
-								}}
-								placeholder="Think out loud. Hints read your working; Submit ends the problem."
-								style={{ width: "100%", display: "block", padding: "10px 40px 10px 12px", borderRadius: 11, border: "1px solid var(--line)", background: "var(--v-input)", resize: "vertical", fontSize: 14.5, lineHeight: "22px", outline: "none" }}
-							/>
-							<span style={{ position: "absolute", right: 6, bottom: 6, color: "var(--v-muted)" }} aria-hidden="true">
-								<MicIcon />
-							</span>
-						</div>
-						<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-							<span id="sure" style={{ fontSize: 12, fontWeight: 600 }}>
-								How sure?
-							</span>
-							<div className="seg conf" role="radiogroup" aria-labelledby="sure">
-								{CONFIDENCE_LEVELS.map((l) => (
-									<button
-										key={l.value}
-										type="button"
-										role="radio"
-										aria-checked={conf === l.value}
-										className={conf === l.value ? "on" : ""}
-										onClick={() => setConf(l.value)}
-										style={{ "--lvl": CONFIDENCE_LEVEL_COLORS[l.value]!.ink, "--lvl-soft": CONFIDENCE_LEVEL_COLORS[l.value]!.soft } as React.CSSProperties}
-									>
-										{l.label}
-									</button>
-								))}
+		<aside className="dock pdock" aria-label="Your working" data-testid="practice-panel">
+			<div className="dockin glass">
+				<div className="pane">
+					{practice ? (
+						<section className="pwork">
+							<div className="qfield">
+								<label htmlFor="work" className="h">
+									Your working
+								</label>
+								<div className="fwrap">
+									<textarea
+										id="work"
+										rows={7}
+										className="ftext pwork-in"
+										value={draft}
+										data-testid="practice-thinking-field"
+										onChange={(e) => setText(e.target.value)}
+										onKeyDown={(e) => {
+											if (e.key === "Escape" && dictationCancel) {
+												e.stopPropagation();
+												dictationCancel();
+											} else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+												e.preventDefault();
+												submit();
+											}
+										}}
+										placeholder="Think out loud. Hints read your working; Submit ends the problem."
+									/>
+									<span className="fmic" aria-hidden="true">
+										<Icon name="mic" size="sm" />
+									</span>
+								</div>
 							</div>
-						</div>
-						<div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 12px", borderRadius: 11, background: "var(--line)" }}>
-							<span style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-								<b style={{ fontWeight: 600 }}>Hints</b>
-								<span style={{ color: "var(--v-muted)" }}>{hintsUsed === 0 ? "none used" : `${hintsUsed} of ${HINT_RUNGS.length} used`}</span>
-							</span>
-							<span style={{ display: "flex", gap: 4 }} aria-hidden="true">
-								{HINT_RUNGS.map((r, i) => (
-									<span key={r.rung} className={`rung ${i < hintsUsed ? "on" : ""}`} />
-								))}
-							</span>
-							<button type="button" className="ghost tall" style={{ marginTop: 4 }} disabled={compactionRunning || hintsUsed >= HINT_RUNGS.length} onClick={askHint} data-testid="practice-hint">
-								{hintsUsed >= HINT_RUNGS.length ? "No more hints" : `Ask for a ${HINT_RUNGS[nextRung - 1]!.label.toLowerCase()}`}
+							<div className="qfield">
+								<span id="sure" className="flabel">
+									How sure?
+								</span>
+								<ConfidenceLadder value={conf} onChange={setConf} labelledBy="sure" />
+							</div>
+							<div className="hints">
+								<div className="hints-h">
+									<span className="flabel">Hints</span>
+									<span className="t-meta faint">{hintsUsed === 0 ? "none used" : `${hintsUsed} of ${HINT_RUNGS.length} used`}</span>
+								</div>
+								<ol className="rungs" aria-hidden="true">
+									{HINT_RUNGS.map((r, i) => (
+										<li key={r.rung} className={cn(i < hintsUsed && "on", i === hintsUsed && "next")}>
+											<i />
+											{r.label}
+										</li>
+									))}
+								</ol>
+								<button type="button" className="btn secondary hintbtn" disabled={compactionRunning || outOfHints} onClick={askHint} data-testid="practice-hint">
+									<Icon name="hint" size="sm" />
+									{outOfHints ? "No more hints" : `Ask for a ${HINT_RUNGS[nextRung - 1]!.label.toLowerCase()}`}
+								</button>
+							</div>
+							<button type="button" className="btn brand lg psubmit" disabled={!draft.trim() || compactionRunning} onClick={submit} data-testid="practice-send">
+								Submit answer
 							</button>
-						</div>
-						<button type="button" className="btn tall" disabled={!draft.trim() || compactionRunning} onClick={submit} data-testid="practice-send">
-							Submit answer
-						</button>
-					</div>
-				) : (
-					<div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-						<span style={{ fontSize: 12, fontWeight: 700, color: "var(--v-muted)" }}>
-							{set.length > 0 ? `Problem ${set.length} done` : "Your working"}
-						</span>
-						<span style={{ fontSize: 12.5, color: "var(--v-muted)" }}>
-							{set.length > 0 ? "Press Enter in the box below for the next problem, or ask about the last one." : "The first problem arrives once the session opens."}
-						</span>
-					</div>
-				)}
-				<div style={{ marginTop: "auto", display: "flex", flexDirection: "column" }} data-testid="practice-set">
-					<span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--faint)", paddingBottom: 4 }}>This set</span>
-					{Array.from({ length: Math.max(PRACTICE_SET_SIZE, set.length % PRACTICE_SET_SIZE === 0 && set.length ? PRACTICE_SET_SIZE : set.length) }, (_, i) => {
-						const base = Math.floor(Math.max(0, set.length - 1) / PRACTICE_SET_SIZE) * PRACTICE_SET_SIZE;
-						const p = set[base + i];
-						const working = p && p.outcome === null;
-						const label = !p ? "—" : working ? "Working" : p.outcome === "solved" ? "Solid" : p.outcome === "solvedWithHints" ? "With help" : p.outcome === "dismissed" ? "Skipped" : "Moved on";
-						const cls = !p || working ? "" : p.outcome === "solved" ? "solid" : p.outcome === "solvedWithHints" ? "help" : "miss";
-						return (
-							<div key={i} className="prob">
-								<span style={{ flex: 1, fontWeight: working ? 700 : 500 }}>Problem {i + 1}</span>
-								{cls ? <span className={`pill ${cls}`}>{label}</span> : <span style={{ fontWeight: working ? 700 : 500, color: working ? "var(--ink)" : "var(--v-muted)" }}>{label}</span>}
+						</section>
+					) : last && lastStatus ? (
+						<section className="pdone settle" data-testid="practice-done">
+							<div className="pdone-h">
+								<span className={cn("pdone-ic", lastStatus.tone)} aria-hidden="true">
+									<Icon name={last.outcome === "solved" || last.outcome === "solvedWithHints" ? "check" : last.outcome === null ? "loading" : "minus"} size="sm" />
+								</span>
+								<span className="pdone-t">{last.outcome === null ? `Wrapping up problem ${set.length}` : `Problem ${set.length} done`}</span>
+								<span className={cn("pill", lastStatus.tone)}>{lastStatus.label}</span>
 							</div>
-						);
-					}).slice(0, PRACTICE_SET_SIZE)}
-					<span className="mono" style={{ paddingTop: 8, fontSize: 11, color: "var(--faint)" }}>
-						{tokens > 0 ? `${formatTokens(tokens)} tokens this session` : " "}
-					</span>
+							<span className="pdone-m">
+								{(() => {
+									const n = hintsOn(messages, last.id);
+									return n === 0 ? "No hints used" : `${n} ${n === 1 ? "hint" : "hints"} used`;
+								})()}
+							</span>
+							<p className="pdone-next">
+								Press <span className="kbd">↵</span> in the box below for the next problem, or ask about this one.
+							</p>
+						</section>
+					) : (
+						<EmptyState icon="practice" title="Your working goes here">
+							The first problem arrives once the session opens.
+						</EmptyState>
+					)}
+
+					<section className="pset" data-testid="practice-set">
+						<span className="over">This set</span>
+						<ul>
+							{Array.from({ length: PRACTICE_SET_SIZE }, (_, i) => {
+								const s = setStatus(set[base + i]);
+								return (
+									<li key={i} className="prob" data-state={s ? (s.label === "Working" ? "now" : "done") : "next"}>
+										<span className="prob-t">Problem {i + 1}</span>
+										{s ? <span className={cn("pill", s.tone)}>{s.label}</span> : <span className="prob-x">—</span>}
+									</li>
+								);
+							})}
+						</ul>
+					</section>
+					{tokens > 0 && (
+						<span className="pfoot">
+							<span className="mono num">{formatTokens(tokens)}</span> tokens this session
+						</span>
+					)}
 				</div>
 			</div>
 		</aside>

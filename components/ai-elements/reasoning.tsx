@@ -8,7 +8,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import { ChevronDownIcon } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import type { ComponentProps, ReactNode } from "react";
 import {
@@ -111,7 +111,7 @@ export const Reasoning = memo(
     return (
       <ReasoningContext.Provider value={contextValue}>
         <Collapsible
-          className={cn("not-prose mb-4", className)}
+          className={cn("ls-think", className)}
           onOpenChange={handleOpenChange}
           open={isOpen}
           {...props}
@@ -129,16 +129,15 @@ export type ReasoningTriggerProps = ComponentProps<
   getThinkingMessage?: (isStreaming: boolean) => ReactNode;
 };
 
-/* The settled label (owner round, 2026-10-05): static "Agent's thinking" —
-   the duration was live-turn state that died on remount anyway ("thought
-   for a few seconds"), bookkeeping for information we knowingly lose. The
-   label pairs with the user's collapsed "Your thinking" rows — one
-   language; motion (spinner + shimmer) stays the working signal. */
+/* The settled label (finesse pass, 2026-10-26): a quiet "Thinking" —
+   the old "Agent's thinking" repeated loudly between every turn. Motion
+   (spinner + shimmer) stays the working signal; a settled row carries
+   the brain glyph instead. */
 const defaultGetThinkingMessage = (isStreaming: boolean) => {
   if (isStreaming) {
-    return <Shimmer duration={1}>Thinking...</Shimmer>;
+    return <Shimmer duration={1} as="span">Thinking…</Shimmer>;
   }
-  return <p>Agent’s thinking</p>;
+  return <span>Thinking</span>;
 };
 
 export const ReasoningTrigger = memo(
@@ -148,17 +147,11 @@ export const ReasoningTrigger = memo(
     getThinkingMessage = defaultGetThinkingMessage,
     ...props
   }: ReasoningTriggerProps) => {
-    const { isStreaming, isOpen } = useReasoning();
+    const { isStreaming } = useReasoning();
 
     return (
       <CollapsibleTrigger
-        className={cn(
-          /* The heading register (owner round 4, 2026-10-05): the small
-             mono caps of the card eyebrows — matching YOUR THINKING, whose
-             rail offsets it by exactly the one-character difference. */
-          "flex w-full items-center gap-2 text-muted-foreground text-xs font-medium transition-colors hover:text-foreground",
-          className
-        )}
+        className={cn("ls-think-t", className)}
         {...props}
         /* FOCUS HYGIENE (owner, keyboard round 2026-10-10): a pointer click
            on the thinking toggle must not leave focus here — the learner's
@@ -169,20 +162,12 @@ export const ReasoningTrigger = memo(
         {children ?? (
           <>
             {/* The working-state grammar (owner, streaming round
-                2026-10-01): the Braille spinner replaces the brain icon
-                WHILE STREAMING ONLY — motion is the signal, so a finished
-                row carries no icon at all, just text + chevron. Size:
-                the component default (h-3) — IDENTICAL to the placeholder
-                spinner (owner, 2026-10-02): the handoff between the two
-                states must be visually seamless, one size everywhere. */}
-            {isStreaming && <BrailleSpinner label="Thinking" />}
+                2026-10-01): the Braille spinner WHILE STREAMING — the same
+                size as the transcript placeholder, so the handoff between
+                the two states is seamless. */}
+            {isStreaming ? <BrailleSpinner label="Thinking" /> : <Icon name="thinking" size="sm" />}
             {getThinkingMessage(isStreaming)}
-            <ChevronDownIcon
-              className={cn(
-                "size-4 transition-transform",
-                isOpen ? "rotate-180" : "rotate-0"
-              )}
-            />
+            <Icon name="chevron-right" size="xs" className="ls-chev" />
           </>
         )}
       </CollapsibleTrigger>
@@ -203,8 +188,7 @@ export const ReasoningContent = memo(
   ({ className, children, ...props }: ReasoningContentProps) => (
     <CollapsibleContent
       className={cn(
-        "mt-4 text-sm",
-        "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-muted-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
+        "ls-well outline-none data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=open]:animate-in",
         className
       )}
       {...props}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2Icon, MicIcon } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { Hint } from "@/components/ui/hint";
 
@@ -698,7 +698,7 @@ export function DictationBar({ dictation }: { dictation: Dictation }) {
 			// but lower opacity — the mic stays quieter than the model pills.
 			className="flex h-7 w-full items-center justify-center gap-1.5 rounded-md border border-border/50 bg-card/50 text-xs text-muted-foreground/70 shadow-lg backdrop-blur transition-colors hover:border-border hover:text-muted-foreground"
 			>
-					<MicIcon className="size-3.5" />
+					<Icon name="mic" size="sm" />
 					<span className="max-w-full truncate">{error ?? "Dictate"}</span>
 				</button>
 			</Hint>
@@ -722,9 +722,9 @@ export function DictationBar({ dictation }: { dictation: Dictation }) {
 				className="flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-destructive/10 px-2 text-xs font-medium text-destructive transition-colors hover:bg-destructive/20"
 			>
 				{phase === "stopping" ? (
-					<Loader2Icon className="size-3.5 animate-spin" />
+					<Icon name="loading" size="sm" className="animate-spin" />
 				) : (
-					<MicIcon className="size-3.5" />
+					<Icon name="mic" size="sm" />
 				)}
 					Stop
 				</button>

@@ -27,10 +27,12 @@ import { useEffect, useRef, useState } from "react";
 import { AUTH_KEYS, type AuthKeyStatus } from "@/src/core";
 import { SettingsGroup } from "./controls.tsx";
 import { SubscriptionConnections } from "./subscription-connections.tsx";
+import { ProviderMark } from "./connection-controls.tsx";
 import { ProviderMenuList } from "./model-menu.tsx";
 import { MenuShell } from "@/components/menu-shell";
 import { notifySettingsSaved } from "@/components/settings-signal";
 import { OPEN_CONNECT_EVENT } from "@/components/connect-provider";
+import { Icon } from "@/components/ui/icon";
 
 /** One pi-ai provider with plain API-key auth (the Platform seam —
  *  derived from pi-ai's own env-key table; no drift possible). */
@@ -106,6 +108,20 @@ export function keyStatusLine(status: AuthKeyStatus): string {
 	return `${tail} · ${chars}${status.source === "env" ? " · env" : ""}`;
 }
 
+/** The masked tail alone ("…ab12"), for display beside the name. Pure. */
+function maskedTail(status: AuthKeyStatus): string | null {
+	if (!status.present || !status.masked) return null;
+	return status.masked.replace(/ \((\d+) chars\)$/, "");
+}
+
+/** What each curated tool key is FOR, in the learner's words (display-only;
+ *  the catalog's own descriptions are written for operators). */
+const TOOL_PURPOSE: Record<string, string> = {
+	DEEPGRAM_API_KEY: "Lets you answer out loud instead of typing",
+	TAVILY_API_KEY: "Lets the research assistant search the web",
+	BRAVE_API_KEY: "Another web search for the research assistant",
+};
+
 /** One table row: label left, tiny docs link + status right. Writable
  *  rows click-unfold an editor beneath (owner interaction); env-owned
  *  rows are dimmed and read-only (a paste box there would mislead). */
@@ -119,8 +135,11 @@ function KeyTableRow({
 	onDelete,
 	onCancel,
 	testid,
+	purpose,
 }: {
 	label: string;
+	/** One line on what the key unlocks (the tool keys). */
+	purpose?: string;
 	/** The "Get a key ↗" target — curated keys carry one. */
 	docsUrl?: string;
 	status: AuthKeyStatus;
@@ -149,14 +168,15 @@ function KeyTableRow({
 	}
 
 	// INLINE editing (owner, fix wave: "type the keys in line — more
-	// table-like"): the expanded row becomes the editor itself — label
+	// table-like"): the expanded row becomes the editor itself — name
 	// left, the paste field filling the middle, Save | Cancel (| Delete)
 	// right — instead of a second line beneath the row.
 	if (expanded && !envOwned) {
 		return (
 			<div data-testid={testid}>
-				<div className="flex items-center gap-2 rounded-sm px-1 py-1.5" data-testid={`${testid}-editor`}>
-					<span className="shrink-0 font-ui text-xs text-foreground">{label}</span>
+				<div className="st-editor" data-testid={`${testid}-editor`}>
+					<ProviderMark label={label} />
+					<span className="st-editor-name">{label}</span>
 					<input
 						type="text"
 						value={value}
@@ -164,45 +184,41 @@ function KeyTableRow({
 						onKeyDown={(e) => {
 							if (e.key === "Enter") void save();
 						}}
-						placeholder="Paste key…"
+						placeholder={status.present ? "Paste a new key" : "Paste your key"}
 						aria-label={`${label} key`}
 						data-testid={`${testid}-input`}
 						disabled={busy}
 						autoFocus
-						className="h-7 min-w-0 flex-1 rounded-sm border border-border bg-background px-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-muted-foreground/50"
+						spellCheck={false}
+						autoComplete="off"
+						className="finput sm"
 					/>
-					<button
-						type="button"
-						onClick={() => void save()}
-						disabled={busy || !value.trim()}
-						data-testid={`${testid}-save`}
-						className="shrink-0 text-xs text-foreground underline-offset-2 hover:underline disabled:text-muted-foreground/40 disabled:no-underline"
-					>
-						Save
-					</button>
-					<button
-						type="button"
-						onClick={onCancel}
-						disabled={busy}
-						data-testid={`${testid}-cancel`}
-						className="shrink-0 text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
-					>
-						Cancel
-					</button>
 					{status.present && status.source === "file" && onDelete && (
 						<button
 							type="button"
 							onClick={() => void onDelete()}
 							disabled={busy}
 							data-testid={`${testid}-delete`}
-							className="shrink-0 text-xs text-muted-foreground/70 underline-offset-2 hover:text-danger hover:underline"
+							className="btn sm quiet"
 						>
-							Delete
+							Remove
 						</button>
 					)}
+					<button type="button" onClick={onCancel} disabled={busy} data-testid={`${testid}-cancel`} className="ghost sm">
+						Cancel
+					</button>
+					<button
+						type="button"
+						onClick={() => void save()}
+						disabled={busy || !value.trim()}
+						data-testid={`${testid}-save`}
+						className="btn sm"
+					>
+						{busy ? "Saving…" : "Save"}
+					</button>
 				</div>
 				{error && (
-					<p role="alert" data-testid={`${testid}-error`} className="px-1 text-xs text-danger">
+					<p role="alert" data-testid={`${testid}-error`} className="st-rowerr">
 						{error}
 					</p>
 				)}
@@ -210,37 +226,66 @@ function KeyTableRow({
 		);
 	}
 
+	const tail = maskedTail(status);
 	return (
-		<div data-testid={testid} className={envOwned ? "opacity-40" : undefined}>
+		<div data-testid={testid} className={envOwned ? "st-envrow" : undefined}>
 			<button
 				type="button"
 				aria-expanded={expanded}
 				data-testid={`${testid}-row`}
 				onClick={() => !envOwned && onToggle()}
-				className={`flex w-full items-center justify-between gap-3 rounded-sm px-1 py-1.5 text-left ${
-					envOwned ? "cursor-default" : "cursor-pointer transition-colors hover:bg-accent/50"
-				}`}
+				className={envOwned ? "st-keyrow ro" : "st-keyrow"}
+				title={envOwned ? "Set by an environment variable — change it where it is defined" : undefined}
 			>
-				<span className="font-ui text-xs text-foreground">{label}</span>
-				<span className="flex items-center gap-2">
-					{docsUrl && (
-						<a
-							href={docsUrl}
-							target="_blank"
-							rel="noreferrer"
-							onClick={(e) => e.stopPropagation()}
-							className="text-[10px] text-muted-foreground/60 underline-offset-2 hover:text-foreground hover:underline"
-						>
-							key ↗
-						</a>
+				<ProviderMark label={label} />
+				<span className="st-text">
+					<span className="st-label">{label}</span>
+					{purpose ? (
+						<span className="st-desc">{purpose}</span>
+					) : (
+						tail && (
+							<span className="st-mask" data-testid={`${testid}-status`}>
+								{tail}
+							</span>
+						)
 					)}
-					<span data-testid={`${testid}-status`} className="font-mono text-[11px] text-muted-foreground">
-						{keyStatusLine(status)}
-					</span>
 				</span>
+				{purpose && tail && (
+					<span className="st-mask" data-testid={`${testid}-status`}>
+						{tail}
+					</span>
+				)}
+				{!status.present ? (
+					<>
+						<span className="pill muted">Not set</span>
+						{docsUrl && (
+							<a
+								href={docsUrl}
+								target="_blank"
+								rel="noreferrer"
+								onClick={(e) => e.stopPropagation()}
+								className="link st-docs"
+							>
+								Get a key
+								<Icon name="external" size="xs" />
+							</a>
+						)}
+						<span className="st-act">
+							<Icon name="plus" size="xs" />
+							Add key
+						</span>
+					</>
+				) : envOwned ? (
+					<span className="pill muted">From environment</span>
+				) : (
+					<>
+						<span className="pill good">Saved</span>
+						<span className="st-act">Replace</span>
+					</>
+				)}
 			</button>
 			{error && (
-				<p role="alert" data-testid={`${testid}-error`} className="pl-6 text-xs text-danger">
+				<p role="alert" data-testid={`${testid}-error`} className="st-rowerr">
 					{error}
 				</p>
 			)}
@@ -283,31 +328,34 @@ function AddProviderRow({
 	}, [open]);
 
 	return (
-		<div ref={anchorRef} className="relative">
+		<div ref={anchorRef} className="st-actions">
 			<button
 				type="button"
 				aria-expanded={open}
 				data-testid="add-provider"
 				onClick={() => setOpen((v) => !v)}
-				className="flex w-full items-center justify-between gap-3 rounded-sm px-1 py-1.5 text-left font-ui text-xs text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+				className="ghost sm"
 			>
-				<span>+ Add provider key</span>
-				{addable.length > 0 && <span className="font-mono text-[11px]">{addable.length}</span>}
+				<Icon name="plus" size="sm" />
+				Add provider key
 			</button>
 			<button
 				type="button"
 				data-testid="add-custom-provider"
 				onClick={() => window.dispatchEvent(new Event(OPEN_CONNECT_EVENT))}
-				className="flex w-full items-center rounded-sm px-1 py-1.5 text-left font-ui text-xs text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+				className="btn sm quiet"
 			>
-				+ Connect an OpenAI-compatible endpoint
+				<Icon name="link" size="sm" />
+				Connect an OpenAI-compatible endpoint
 			</button>
+			{addable.length > 0 && <span className="meta">{addable.length} more providers available</span>}
 			{open && (
 				<MenuShell
 					anchorRef={anchorRef}
 					testid="add-provider-menu"
 					preferredSide="down"
-					menuClass="flex w-72 flex-col rounded-xl border border-border bg-card p-2 text-xs shadow-xl"
+					align="left"
+					menuClass="pop lh-menu mm mid"
 				>
 					{/* Close on pick (owner, fix wave): a chosen provider ends
 					    the dropdown — the paste row is the next step. */}
@@ -406,7 +454,14 @@ export function KeysSection({
 	}
 
 	if (loading || statuses === null) {
-		return <p className="px-6 py-5 text-xs text-muted-foreground/70">Loading keys…</p>;
+		return (
+			<div className="st-skel" aria-busy="true">
+				<span className="sr">Loading keys…</span>
+				<span className="skel t" aria-hidden />
+				<span className="skel c" aria-hidden />
+				<span className="skel c2" aria-hidden />
+			</div>
+		);
 	}
 
 	const { providerRows, toolRows, unknownRows, addable } = classifyKeys(statuses, providers);
@@ -420,13 +475,25 @@ export function KeysSection({
 		}
 	}
 
+	const labelFor = (status: AuthKeyStatus) =>
+		providers?.find((p) => p.envVar === status.id)?.label ?? status.info?.label ?? status.id;
+
 	return (
 		<>
-			<SettingsGroup label="Model API keys" testid="group-provider-keys">
+			<SettingsGroup
+				label="Model API keys"
+				description="One key is enough to start. Keys stay on this device and go only to that provider."
+				testid="group-provider-keys"
+				bare
+			>
+				<div className="st-card">
+				{providerRows.length === 0 && !adding && (
+					<p className="st-empty">No provider keys yet. Add one to start learning.</p>
+				)}
 				{providerRows.map((status) => (
 					<KeyTableRow
 						key={status.id}
-						label={providers?.find((p) => p.envVar === status.id)?.label ?? status.info?.label ?? status.id}
+						label={labelFor(status)}
 						docsUrl={status.info?.docsUrl}
 						status={status}
 						expanded={openRow === status.id}
@@ -441,6 +508,27 @@ export function KeysSection({
 						testid={`key-${status.id.toLowerCase()}`}
 					/>
 				))}
+				{adding && (
+					<div>
+						<div className="st-editor" data-testid={`key-${adding.id}-editor`}>
+							<ProviderMark label={adding.label} />
+							<span className="st-editor-name">{adding.label}</span>
+							<AddProviderEditor provider={adding} onSave={(v) => void saveNewProvider(adding, v)} onCancel={() => setAdding(null)} />
+						</div>
+						{addError && (
+							<p role="alert" className="st-rowerr" data-testid={`key-${adding.id}-error`}>
+								{addError}
+							</p>
+						)}
+					</div>
+				)}
+				{unknownRows.length > 0 && <div data-testid="group-unknown-keys">
+					{unknownRows.map((status) => <div key={status.id} data-testid={`unknown-${status.id}`} className="st-unknown" title="Not a provider LearnHarness recognises — kept as is">
+						<span>{status.id}</span>
+						<span className="st-mask">{status.masked}</span>
+					</div>)}
+				</div>}
+				</div>
 				{providers !== undefined && (
 					<AddProviderRow
 						addable={addable}
@@ -450,21 +538,14 @@ export function KeysSection({
 						}}
 					/>
 				)}
-				{adding && (
-					<div className="flex items-center gap-2 rounded-sm px-1 py-1.5" data-testid={`key-${adding.id}-editor`}>
-						<span className="shrink-0 font-ui text-xs text-foreground">{adding.label}</span>
-						<AddProviderEditor provider={adding} onSave={(v) => void saveNewProvider(adding, v)} onCancel={() => setAdding(null)} error={addError} />
-					</div>
-				)}
-				{unknownRows.length > 0 && <div data-testid="group-unknown-keys">
-					{unknownRows.map((status) => <div key={status.id} data-testid={`unknown-${status.id}`} className="flex items-center justify-between gap-3 px-1 py-1.5 opacity-40">
-						<span className="font-mono text-xs text-foreground">{status.id}</span>
-						<span className="font-mono text-[11px] text-muted-foreground">{status.masked}</span>
-					</div>)}
-				</div>}
 			</SettingsGroup>
 
-			<SettingsGroup label="Subscriptions" testid="group-subscriptions">
+			<SettingsGroup
+				label="Subscriptions"
+				description="Use a plan you already pay for instead of an API key."
+				testid="group-subscriptions"
+				bare
+			>
 				<SubscriptionConnections />
 			</SettingsGroup>
 
@@ -473,6 +554,7 @@ export function KeysSection({
 					<KeyTableRow
 						key={status.id}
 						label={status.info?.label ?? status.id}
+						purpose={TOOL_PURPOSE[status.id]}
 						docsUrl={status.info?.docsUrl}
 						status={status}
 						expanded={openRow === status.id}
@@ -494,17 +576,15 @@ export function KeysSection({
 }
 
 /** The paste field for a provider chosen in the Add dropdown — rendered
- *  beneath the Add row until saved or cancelled. */
+ *  as the card's editor row until saved or cancelled. */
 function AddProviderEditor({
 	provider,
 	onSave,
 	onCancel,
-	error,
 }: {
 	provider: ProviderKeyInfo;
 	onSave: (value: string) => void;
 	onCancel: () => void;
-	error: string | null;
 }) {
 	const [value, setValue] = useState("");
 	return (
@@ -516,34 +596,26 @@ function AddProviderEditor({
 				onKeyDown={(e) => {
 					if (e.key === "Enter" && value.trim()) onSave(value);
 				}}
-				placeholder="Paste key…"
+				placeholder="Paste your key"
 				aria-label={`${provider.label} key`}
 				data-testid={`key-${provider.id}-input`}
 				autoFocus
-				className="h-7 min-w-0 flex-1 rounded-sm border border-border bg-background px-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-muted-foreground/50"
+				spellCheck={false}
+				autoComplete="off"
+				className="finput sm"
 			/>
+			<button type="button" onClick={onCancel} data-testid={`key-${provider.id}-cancel`} className="ghost sm">
+				Cancel
+			</button>
 			<button
 				type="button"
 				onClick={() => value.trim() && onSave(value)}
 				disabled={!value.trim()}
 				data-testid={`key-${provider.id}-save`}
-				className="shrink-0 text-xs text-foreground underline-offset-2 hover:underline disabled:text-muted-foreground/40 disabled:no-underline"
+				className="btn sm"
 			>
 				Save
 			</button>
-			<button
-				type="button"
-				onClick={onCancel}
-				data-testid={`key-${provider.id}-cancel`}
-				className="shrink-0 text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
-			>
-				Cancel
-			</button>
-			{error && (
-				<p role="alert" className="w-full pl-0 text-xs text-danger" data-testid={`key-${provider.id}-error`}>
-					{error}
-				</p>
-			)}
 		</>
 	);
 }

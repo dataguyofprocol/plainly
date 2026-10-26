@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { LhViewMessage, LhViewPart } from "@/src/core";
-import { ArrowDownIcon, DownloadIcon } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import type { ComponentProps } from "react";
 import { useCallback } from "react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
@@ -29,7 +29,7 @@ export const ConversationContent = ({
   ...props
 }: ConversationContentProps) => (
   <StickToBottom.Content
-    className={cn("flex flex-col gap-8 p-4", className)}
+    className={cn("flex flex-col", className)}
     {...props}
   />
 );
@@ -50,16 +50,16 @@ export const ConversationEmptyState = ({
 }: ConversationEmptyStateProps) => (
   <div
     className={cn(
-      "flex size-full flex-col items-center justify-center gap-3 p-8 text-center",
+      "flex size-full min-h-[50vh] flex-col items-center justify-center gap-3 p-8 text-center",
       className
     )}
     {...props}
   >
     {children ?? (
       <>
-        {icon && <div className="text-muted-foreground">{icon}</div>}
+        {icon && <div className="text-faint">{icon}</div>}
         <div className="space-y-1">
-          <h3 className="font-medium text-sm">{title}</h3>
+          <h3 className="font-semibold text-sm">{title}</h3>
           {description && (
             <p className="text-muted-foreground text-sm">{description}</p>
           )}
@@ -69,8 +69,10 @@ export const ConversationEmptyState = ({
   </div>
 );
 
-export type ConversationScrollButtonProps = ComponentProps<typeof Button>;
+export type ConversationScrollButtonProps = ComponentProps<"button">;
 
+/** Back to the newest message: a round floating button, shown only while
+ *  the reader has scrolled away from the bottom. */
 export const ConversationScrollButton = ({
   className,
   ...props
@@ -83,19 +85,15 @@ export const ConversationScrollButton = ({
 
   return (
     !isAtBottom && (
-      <Button
-        className={cn(
-          "absolute bottom-4 left-[50%] translate-x-[-50%] rounded-full dark:bg-background dark:hover:bg-muted",
-          className
-        )}
+      <button
+        className={cn("ls-down pop", className)}
         onClick={handleScrollToBottom}
-        size="icon"
         type="button"
-        variant="outline"
+        aria-label="Scroll to the newest message"
         {...props}
       >
-        <ArrowDownIcon className="size-4" />
-      </Button>
+        <Icon name="arrow-down" size="md" />
+      </button>
     )
   );
 };
@@ -162,7 +160,7 @@ export const ConversationDownload = ({
       variant="outline"
       {...props}
     >
-      {children ?? <DownloadIcon className="size-4" />}
+      {children ?? <Icon name="download" size="md" />}
     </Button>
   );
 };

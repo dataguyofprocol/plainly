@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { joinDictation, useDictationTarget } from "@/components/dictation";
+import { Icon } from "@/components/ui/icon";
 
 /**
  * The reading-thinking field (owner design 2026-10-03, "two questions per
@@ -47,57 +48,57 @@ export function ReadingThinkingField({
 		claim,
 	);
 	return (
-		<div
-			data-testid="reading-thinking-field"
-			className="pointer-events-auto mb-2 rounded-2xl border bg-card/60 px-3 py-2 transition-colors focus-within:border-primary/50"
-		>
-			<div className="pb-1 text-xs font-medium text-muted-foreground">
+		<div data-testid="reading-thinking-field" className="rthink">
+			<label className="flabel" htmlFor="reading-thinking">
 				Thinking while reading
+			</label>
+			<div className="fwrap">
+				<textarea
+					id="reading-thinking"
+					value={value}
+					onChange={(e) => onChange(e.target.value)}
+					/* The field grows with its content (field-sizing) up to 160px
+					   (max-h-40), then scrolls. Its vertical padding is load-bearing:
+					   a zero-padding field-sizing textarea turns the font box's 1px
+					   overhang into a permanent 1px scrollbar (owner round,
+					   2026-10-07); .ftext's 10px absorbs it. */
+					onKeyDown={(e) => {
+						if (e.key === "Escape") {
+							// Esc stops dictation (the strip's rule) — claimed so the
+							// window chain doesn't also read it as abort-turn.
+							e.preventDefault();
+							e.stopPropagation();
+							onEscape?.();
+							return;
+						}
+						// ENTER OPENS THE WAITING CHECK (owner, keyboard round
+						// 2026-10-06): while the check sits closed, plain Enter
+						// (and the universal ⌘/Ctrl+Enter) opens it — the dictation
+						// flush lands HERE first via the caller's finishDictation,
+						// so spoken thoughts ride along. Shift+Enter stays a newline.
+						if (e.key === "Enter" && onOpen !== undefined && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
+							e.preventDefault();
+							e.stopPropagation();
+							onOpen();
+							return;
+						}
+						// The dock's dumping convention: plain Enter is a newline.
+						// No submit button here — the check's own submit is this
+						// field's carrier — so ⌘↵ just blurs.
+						if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+							e.preventDefault();
+							e.currentTarget.blur();
+						}
+					}}
+					placeholder="Whatever comes to mind as you read."
+					rows={1}
+					className="ftext rthink-in field-sizing-content max-h-40"
+				/>
+				<span className="fmic" aria-hidden="true">
+					<Icon name="mic" size="sm" />
+				</span>
 			</div>
-			<textarea
-				value={value}
-				onChange={(e) => onChange(e.target.value)}
-				/* py-0.5 (owner round, 2026-10-07): the scrollbar fix. Source
-				   Sans 3's font box is 22px at 16px; lh-input's 1.25 leading
-				   gives a 20px line box — the content area sticks 1px below the
-				   line, Chromium counts it in scrollHeight, and a zero-padding
-				   textarea turns that into a permanent 1px scroll (the bar shows
-				   empty and at every size below max-h). 2px of vertical padding
-				   absorbs it — the same absorption the composer and dock fields
-				   get implicitly from their py-2. Line-height stays 1.25 (the
-				   caret law, typography round 2). */
-				onKeyDown={(e) => {
-					if (e.key === "Escape") {
-						// Esc stops dictation (the strip's rule) — claimed so the
-						// window chain doesn't also read it as abort-turn.
-						e.preventDefault();
-						e.stopPropagation();
-						onEscape?.();
-						return;
-					}
-					// ENTER OPENS THE WAITING CHECK (owner, keyboard round
-					// 2026-10-06): while the check sits closed, plain Enter
-					// (and the universal ⌘/Ctrl+Enter) opens it — the dictation
-					// flush lands HERE first via the caller's finishDictation,
-					// so spoken thoughts ride along. Shift+Enter stays a newline.
-					if (e.key === "Enter" && onOpen !== undefined && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
-						e.preventDefault();
-						e.stopPropagation();
-						onOpen();
-						return;
-					}
-					// The dock's dumping convention: plain Enter is a newline.
-					// No submit button here — the check's own submit is this
-					// field's carrier — so ⌘↵ just blurs.
-					if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-						e.preventDefault();
-						e.currentTarget.blur();
-					}
-				}}
-				placeholder="Whatever comes to mind as you read."
-				rows={1}
-				className="field-sizing-content lh-input max-h-40 w-full resize-none bg-transparent py-0.5 outline-none placeholder:text-muted-foreground/70"
-			/>
+			<span className="fhint">Sent along with your answer to the check.</span>
 		</div>
 	);
 }

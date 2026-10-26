@@ -41,7 +41,7 @@ import { MenuShell } from "@/components/menu-shell";
 import { Hint } from "@/components/ui/hint";
 import { useAppearance } from "./appearance.tsx";
 import { FontMenuList } from "./model-menu";
-import { CommitInput, SettingsRow, ThinSelect, Toggle } from "./controls.tsx";
+import { CommitInput, SelectTrigger, SettingsGroup, SettingsRow, Toggle } from "./controls.tsx";
 
 /** The factory reading family — the DEFAULT row's identity (unset =
  *  this). Exported for tests. */
@@ -186,120 +186,109 @@ export function AppearanceSection({
 
 	return (
 		<>
-			<SettingsRow
-				label="Reading font"
-				hint={`Empty = ${DEFAULT_READING_FONT}`}
-				testid="row-font"
-			>
-				<span ref={fontMenuOpen ? menuAnchorRef : undefined} className="relative flex items-center gap-2">
-					{/* The MenuTrigger look (agent-section's collapsed
-					    select — it lives unexported there, so the
-					    classes ride inline; the searchable machine is
-					    the shared part). The tooltip rides the CLOSED
-					    button ONLY (owner ruling 2026-09-26: never while
-					    the dropdown is out — it popped over the open
-					    menu when the wrap covered the whole anchor
-					    span). */}
-					{(() => {
-						const triggerButton = (
-							<button
-								type="button"
-								aria-label="Reading font"
-								aria-expanded={fontMenuOpen}
-								data-testid="font-trigger"
-								onClick={openFontMenu}
-								className="flex h-7 min-w-20 items-center gap-1 rounded-sm border border-border bg-background px-1.5 font-ui text-xs text-foreground transition-colors hover:border-muted-foreground/50"
+			<SettingsGroup label="Reading" description="Lesson text — changes apply as you make them.">
+				<SettingsRow label="Reading font" hint="Used for lesson text" testid="row-font">
+					<span ref={fontMenuOpen ? menuAnchorRef : undefined} className="st-ctl">
+						{/* The tooltip rides the CLOSED button ONLY (owner ruling
+						    2026-09-26: never while the dropdown is out). */}
+						{(() => {
+							const trigger = (
+								<SelectTrigger
+									value={appearance?.fontFamily || DEFAULT_READING_FONT}
+									emptyLabel={DEFAULT_READING_FONT}
+									ariaLabel="Reading font"
+									testid="font-trigger"
+									open={fontMenuOpen}
+									onClick={openFontMenu}
+								/>
+							);
+							return fontMenuOpen ? (
+								trigger
+							) : (
+								<Hint label="Choose from your installed fonts" side="left">
+									{trigger}
+								</Hint>
+							);
+						})()}
+						{fontMenuOpen && (
+							<MenuShell
+								preferredSide="down"
+								anchorTestid="font-trigger"
+								testid="font-menu"
+								menuClass="pop lh-menu mm mid"
 							>
-								<span className="min-w-0 flex-1 truncate">{appearance?.fontFamily || DEFAULT_READING_FONT}</span>
-								<span aria-hidden className="text-muted-foreground">
-									▾
-								</span>
-							</button>
-						);
-						return fontMenuOpen ? (
-							triggerButton
-						) : (
-							<Hint label="Choose from your installed fonts" side="left">
-								{triggerButton}
-							</Hint>
-						);
-					})()}
-					{fontMenuOpen && (
-						<MenuShell
-							preferredSide="down"
-							anchorTestid="font-trigger"
-							testid="font-menu"
-							menuClass="flex w-[18rem] flex-col gap-0.5 rounded-xl border border-border bg-card p-2 text-xs shadow-xl"
-						>
-							<FontMenuList
-								families={localFonts === undefined ? undefined : (localFonts ?? [...CURATED_FALLBACK_FONTS])}
-								effectiveFamily={appearance?.fontFamily ?? null}
-								onPick={pickFont}
-								footer={
-									localFonts === undefined
-										? undefined
-										: localFonts === null
-											? enumEmpty
-												? "Common families — installed fonts could not be read"
-												: "Common families — your installed list needs the desktop app"
-											: "Your installed fonts"
-								}
-							/>
-						</MenuShell>
-					)}
-				</span>
-			</SettingsRow>
-			<SettingsRow label="Reading font size" hint={`${resolved.proseFontSize}px`} testid="row-prose-size">
-				<CommitInput
-					type="number"
-					value={String(appearance?.proseFontSize ?? "")}
-					placeholder="17"
-					ariaLabel="prose font size"
-					testid="input-prose-size"
-					onCommit={(v) => {
-						// Empty = factory default (owner, fix wave): omit the key so the record
-						// UNSETS and the field stays empty (absence, not null, is the
-						// unset for numbers). Number("") is 0, so the old clamp wrote 12.
-						if (v === "") {
-							onSectionChange({ ...appearance, proseFontSize: undefined });
-							return;
-						}
-						const n = Number(v);
-						if (!Number.isFinite(n)) return; // bad input: no write, factory stays
-						onSectionChange({ ...appearance, proseFontSize: Math.min(24, Math.max(12, Math.round(n))) });
-					}}
-				/>
-			</SettingsRow>
-			<SettingsRow label="Session names in serif" testid="row-session-serif">
-				<Toggle
-					checked={appearance?.sessionNameSerif ?? true}
-					label="session names serif"
-					onChange={(on) => onSectionChange({ ...appearance, sessionNameSerif: on })}
-				/>
-			</SettingsRow>
-			<SettingsRow label="Heading weight" hint={`${resolved.mdRendering.headingWeight}`} testid="row-heading-weight">
-				<CommitInput
-					type="number"
-					value={String(md?.headingWeight ?? "")}
-					placeholder="600"
-					ariaLabel="heading weight"
-					testid="input-heading-weight"
-					onCommit={(v) => {
-						// Empty = factory default (owner, fix wave): Number("") is 0, so
-						// Absence is the unset representation — the old clamp wrote 100.
-						if (v === "") {
-							onSectionChange({ ...appearance, mdRendering: { ...md, headingWeight: undefined } });
-							return;
-						}
-						const n = Number(v);
-						if (!Number.isFinite(n)) return;
-						onSectionChange({
-							...appearance,
-							mdRendering: { ...md, headingWeight: Math.min(900, Math.max(100, Math.round(n))) },
-						});
-					}}
-				/>
-			</SettingsRow>
+								<FontMenuList
+									families={localFonts === undefined ? undefined : (localFonts ?? [...CURATED_FALLBACK_FONTS])}
+									effectiveFamily={appearance?.fontFamily ?? null}
+									onPick={pickFont}
+									footer={
+										localFonts === undefined
+											? undefined
+											: localFonts === null
+												? enumEmpty
+													? "Common fonts — your installed fonts could not be read"
+													: "Common fonts — the desktop app lists your installed ones"
+												: "Your installed fonts"
+									}
+								/>
+							</MenuShell>
+						)}
+					</span>
+				</SettingsRow>
+				<SettingsRow label="Text size" hint={<>From 12 to 24 · <span className="num">{resolved.proseFontSize}px</span></>} testid="row-prose-size">
+					<CommitInput
+						type="number"
+						value={String(appearance?.proseFontSize ?? "")}
+						placeholder="17"
+						ariaLabel="prose font size"
+						testid="input-prose-size"
+						onCommit={(v) => {
+							// Empty = factory default (owner, fix wave): omit the key so the record
+							// UNSETS and the field stays empty (absence, not null, is the
+							// unset for numbers). Number("") is 0, so the old clamp wrote 12.
+							if (v === "") {
+								onSectionChange({ ...appearance, proseFontSize: undefined });
+								return;
+							}
+							const n = Number(v);
+							if (!Number.isFinite(n)) return; // bad input: no write, factory stays
+							onSectionChange({ ...appearance, proseFontSize: Math.min(24, Math.max(12, Math.round(n))) });
+						}}
+					/>
+				</SettingsRow>
+				<SettingsRow label="Heading weight" hint={<>How bold lesson headings are, 100 to 900 · <span className="num">{resolved.mdRendering.headingWeight}</span></>} testid="row-heading-weight">
+					<CommitInput
+						type="number"
+						value={String(md?.headingWeight ?? "")}
+						placeholder="600"
+						ariaLabel="heading weight"
+						testid="input-heading-weight"
+						onCommit={(v) => {
+							// Empty = factory default (owner, fix wave): Number("") is 0, so
+							// Absence is the unset representation — the old clamp wrote 100.
+							if (v === "") {
+								onSectionChange({ ...appearance, mdRendering: { ...md, headingWeight: undefined } });
+								return;
+							}
+							const n = Number(v);
+							if (!Number.isFinite(n)) return;
+							onSectionChange({
+								...appearance,
+								mdRendering: { ...md, headingWeight: Math.min(900, Math.max(100, Math.round(n))) },
+							});
+						}}
+					/>
+				</SettingsRow>
+			</SettingsGroup>
+			<SettingsGroup label="Sessions">
+				<SettingsRow label="Serif session titles" hint="Show session names in Literata" testid="row-session-serif">
+					<Toggle
+						checked={appearance?.sessionNameSerif ?? true}
+						label="session names serif"
+						onChange={(on) => onSectionChange({ ...appearance, sessionNameSerif: on })}
+					/>
+				</SettingsRow>
+			</SettingsGroup>
 		</>
 	);
 }
@@ -331,59 +320,61 @@ export function GraphSection({
 			    switch below arrived: off ≠ no graph, off = the graph stops
 			    growing. The testid keeps the old name's shape (row-enabled) so
 			    this stays one rename, not a test re-pin. */}
-			<SettingsRow label="Extraction" hint="Off = the graph stops growing" testid="graph-row-enabled">
-				<Toggle
-					checked={graph?.enabled ?? true}
-					label="extraction enabled"
-					onChange={(on) =>
-						// Compose, never replace-whole (the section PUT is, but the
-					// row must not drop its sibling field — fixed with the budget
-					// row's arrival: the old { enabled: on } wiped a stored budget).
-						onSectionChange({ ...graph, enabled: on })
-					}
-				/>
-			</SettingsRow>
-			{/* GRAPH RENDERING (owner, 2026-10-06 — the release graph-controls
-			    round): display-only. Off = the home shows the chains view
-			    instead of the canvas. The ledgers, the pipeline, everything
-			    data keeps working — that is the extraction switch above. */}
-			<SettingsRow label="Graph rendering" hint="Off = home shows the chains view" testid="graph-row-rendering">
-				<Toggle
-					checked={graph?.rendering ?? true}
-					label="graph rendering enabled"
-					onChange={(on) => onSectionChange({ ...graph, rendering: on })}
-				/>
-			</SettingsRow>
-			<SettingsRow
-				label="Extraction chunk budget"
-				hint={`${resolved.extractionChunkTokens} tok`}
-				testid="graph-row-chunk-tokens"
-			>
-				<CommitInput
-					type="number"
-					value={String(graph?.extractionChunkTokens ?? "")}
-					placeholder={String(resolved.extractionChunkTokens)}
-					ariaLabel="extraction chunk budget"
-					testid="input-chunk-tokens"
-					onCommit={(v) => {
-						// Empty = factory default (the fix-wave discipline): absence is
-						// the unset for numbers — Number("") is 0, so clamping would
-						// write the floor instead of unsetting.
-						if (v === "") {
-							onSectionChange({ ...graph, extractionChunkTokens: undefined });
-							return;
+			<SettingsGroup label="Graph">
+				<SettingsRow label="Extraction" hint="Adds the ideas from each lesson to your graph. Off, the graph stops growing." testid="graph-row-enabled">
+					<Toggle
+						checked={graph?.enabled ?? true}
+						label="extraction enabled"
+						onChange={(on) =>
+							// Compose, never replace-whole (the section PUT is, but the
+						// row must not drop its sibling field — fixed with the budget
+						// row's arrival: the old { enabled: on } wiped a stored budget).
+							onSectionChange({ ...graph, enabled: on })
 						}
-						const n = Number(v);
-						if (!Number.isFinite(n) || n <= 0) return; // bad input: no write
-						// Mirror the server sanitize exactly: floor only (cost
-						// protection), no ceiling — a big budget is the user's call.
-						onSectionChange({
-							...graph,
-							extractionChunkTokens: Math.max(EXTRACTION_CHUNK_TOKENS_FLOOR, Math.round(n)),
-						});
-					}}
-				/>
-			</SettingsRow>
+					/>
+				</SettingsRow>
+				{/* GRAPH RENDERING (owner, 2026-10-06 — the release graph-controls
+				    round): display-only. Off = the home shows the chains view
+				    instead of the canvas. The ledgers, the pipeline, everything
+				    data keeps working — that is the extraction switch above. */}
+				<SettingsRow label="Graph rendering" hint="Draw the graph canvas. Off, Knowledge shows the chains view instead." testid="graph-row-rendering">
+					<Toggle
+						checked={graph?.rendering ?? true}
+						label="graph rendering enabled"
+						onChange={(on) => onSectionChange({ ...graph, rendering: on })}
+					/>
+				</SettingsRow>
+				<SettingsRow
+					label="Extraction chunk size"
+					hint={<>How much lesson text each extraction pass reads · <span className="num">{resolved.extractionChunkTokens} tok</span></>}
+					testid="graph-row-chunk-tokens"
+				>
+					<CommitInput
+						type="number"
+						value={String(graph?.extractionChunkTokens ?? "")}
+						placeholder={String(resolved.extractionChunkTokens)}
+						ariaLabel="extraction chunk budget"
+						testid="input-chunk-tokens"
+						onCommit={(v) => {
+							// Empty = factory default (the fix-wave discipline): absence is
+							// the unset for numbers — Number("") is 0, so clamping would
+							// write the floor instead of unsetting.
+							if (v === "") {
+								onSectionChange({ ...graph, extractionChunkTokens: undefined });
+								return;
+							}
+							const n = Number(v);
+							if (!Number.isFinite(n) || n <= 0) return; // bad input: no write
+							// Mirror the server sanitize exactly: floor only (cost
+							// protection), no ceiling — a big budget is the user's call.
+							onSectionChange({
+								...graph,
+								extractionChunkTokens: Math.max(EXTRACTION_CHUNK_TOKENS_FLOOR, Math.round(n)),
+							});
+						}}
+					/>
+				</SettingsRow>
+			</SettingsGroup>
 		</>
 	);
 }

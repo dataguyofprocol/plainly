@@ -47,12 +47,11 @@ describe("PhaseChip (header)", () => {
 });
 
 describe("PhaseDivider (transcript boundary)", () => {
-	it("the plan seam: monochrome dotted rules + node count", () => {
+	it("the plan seam: monochrome hairline rules + node count", () => {
 		const html = renderToStaticMarkup(<PhaseDivider phase="plan" nodeCount={3} />);
 		assert.ok(html.includes('data-testid="phase-divider-plan"'));
 		assert.match(html, /Plan · 3 nodes/);
-		assert.ok(html.includes("border-dotted"), "dotted rule");
-		assert.ok(html.includes("border-border"), "monochrome rule");
+		assert.ok(html.includes("ls-divider"), "the shared hairline divider (finesse pass)");
 		assert.ok(!html.includes("border-phase-"), "phase-colored rules are retired");
 	});
 

@@ -21,11 +21,10 @@ describe("QueuedSteersBody (the quiet queue above the composer)", () => {
 		);
 		assert.match(html, /data-testid="queued-steers"/);
 		assert.equal(html.match(/<span/g)?.length, 2, "one span per steer");
-		assert.match(html, /truncate/, "single-line truncation with ellipsis");
-		assert.match(html, /items-end/, "right-aligned stack");
-		assert.match(html, /max-w-\[240px\]/, "fixed-width stash");
-		assert.match(html, /muted-foreground\/60/, "quiet, roughly half opacity");
-		assert.doesNotMatch(html, /bg-|border|rounded/, "no background, no container");
+		// Finesse pass (2026-10-26): tidy right-aligned chips (app/ui/lesson.css
+		// .ls-queued — truncation, right alignment and the quiet tone live there).
+		assert.match(html, /class="ls-queued"/, "the chip stack");
+		assert.match(html, /title="also cover Venus/, "the full text on hover");
 		assert.match(html, /also cover Venus/, "the text rides the line");
 	});
 

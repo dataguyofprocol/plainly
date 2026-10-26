@@ -19,6 +19,7 @@ import type { AuthKeyStatus } from "@/src/core";
 import { classifyKeys, type ProviderKeyInfo } from "@/components/settings/keys-section";
 import { useModelCatalog } from "@/components/model-picker";
 import type { ModelCatalogResponse } from "@/src/core";
+import { Icon } from "@/components/ui/icon";
 
 /** Pure: does a MODEL-PROVIDER key exist among the statuses? Reuses
  *  classifyKeys (the keys section's own classification — no drift):
@@ -51,8 +52,9 @@ export function ZeroKeysPill({ onOpen, inline = false }: { onOpen: () => void; i
 			type="button"
 			data-testid="setup-cta-keys"
 			onClick={onOpen}
-			className="rounded-sm border border-border bg-card px-3 py-1.5 font-ui text-xs text-foreground transition-colors hover:border-muted-foreground/50 hover:bg-accent cursor-pointer"
+			className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full bg-brand-soft px-3 text-xs font-semibold whitespace-nowrap text-brand shadow-[inset_0_0_0_1px_var(--brand-line)] transition-colors hover:bg-brand hover:text-primary-foreground active:scale-[0.97]"
 		>
+			<Icon name="key" size="sm" />
 			Add a provider key
 		</button>
 	);

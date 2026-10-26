@@ -28,7 +28,7 @@
  */
 
 import { cloneElement, isValidElement, useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
-import { CheckIcon, CopyIcon, MaximizeIcon } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import {
 	CodeBlock,
@@ -101,7 +101,7 @@ export function CopyCorner({
 				type="button"
 				aria-label={label}
 				data-testid="md-copy"
-				className="flex size-6 items-center justify-center rounded-md text-muted-foreground/70 opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover/md:opacity-100"
+				className="ls-corner opacity-0 focus-visible:opacity-100 group-hover/md:opacity-100"
 				onClick={(e) => {
 					blurAfterPointerClick(e);
 					void copyText(getText()).then((ok) => {
@@ -112,7 +112,7 @@ export function CopyCorner({
 					});
 				}}
 			>
-				{copied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
+				{copied ? <Icon name="check" size="sm" className="text-good" /> : <Icon name="copy" size="sm" />}
 			</button>
 		</span>
 	);
@@ -180,8 +180,8 @@ function MermaidInline({ chart }: { chart: string }) {
 
 	if (incomplete || (svg === null && error === null)) {
 		return (
-			<div data-testid="md-mermaid" className="my-4 flex justify-center p-4" aria-busy="true">
-				<span className="inline-block size-4 animate-spin rounded-full border border-current border-b-2 text-muted-foreground" />
+			<div data-testid="md-mermaid" className="ls-mermaid-wait" aria-busy="true">
+				<span className="skel" />
 			</div>
 		);
 	}
@@ -198,7 +198,7 @@ function MermaidInline({ chart }: { chart: string }) {
 				style={capW === null ? undefined : { maxWidth: `${capW}px` }}
 				dangerouslySetInnerHTML={{ __html: svg ?? "" }}
 			/>
-			<div className="absolute top-0 right-0 flex items-start gap-0.5">
+			<div className="absolute top-0 right-0 flex items-start gap-1">
 				<CopyCorner getText={() => chart} label="Copy diagram source" />
 				{overlay && (
 					<Hint
@@ -211,13 +211,13 @@ function MermaidInline({ chart }: { chart: string }) {
 						type="button"
 						aria-label="Expand diagram"
 						data-testid="md-mermaid-expand"
-												className="flex size-6 items-center justify-center rounded-md text-muted-foreground/70 opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/md:opacity-100"
+						className="ls-corner opacity-0 focus-visible:opacity-100 group-hover/md:opacity-100"
 						onClick={(e) => {
 							blurAfterPointerClick(e);
 							overlay.openMermaid(chart);
 						}}
 					>
-						<MaximizeIcon className="size-3.5" />
+						<Icon name="expand" size="sm" />
 					</button>
 				</Hint>
 				)}
@@ -240,7 +240,7 @@ export function MarkdownCode(props: ComponentProps<"code"> & ExtraProps) {
 	// Inline code: no data-block (the pre handler stamps block fences only).
 	if (!("data-block" in props)) {
 		return (
-			<code className={cn("rounded bg-muted px-1.5 py-0.5 font-mono text-sm", className)} data-streamdown="inline-code" {...rest}>
+			<code className={cn("lh-icode", className)} data-streamdown="inline-code" {...rest}>
 				{children}
 			</code>
 		);
@@ -257,7 +257,7 @@ export function MarkdownCode(props: ComponentProps<"code"> & ExtraProps) {
 	const lineNumbers = !/\bnoLineNumbers\b/.test(meta);
 	return (
 		<div className="group/md relative" data-testid="md-code">
-			<CopyCorner className="absolute top-1.5 right-2 z-10" getText={() => source} label="Copy code" />
+			<CopyCorner className="absolute top-2 right-2 z-10" getText={() => source} label="Copy code" />
 			<CodeBlock
 				code={source}
 				language={language}
@@ -333,10 +333,11 @@ export function parseAlertMarker(children: ReactNode): ParsedAlert | null {
 	return { kind, children: restChildren };
 }
 
-/** The key-idea callout (owner rulings, 2026-10-07): SHARP corners, a white
- *  stroke, NO background, NO label, NO icon — just the outline. The box
- *  hugs its text (width: fit-content, capped at the column) instead of
- *  stretching full-width into empty space. */
+/** The key-idea callout: a teal rule and a faint teal wash (owner, finesse
+ *  pass 2026-10-26 — the light theme's answer to the 2026-10-07 outline
+ *  box), still NO label and NO icon. The box hugs its text (width:
+ *  fit-content, capped at the column) instead of stretching full-width
+ *  into empty space. Styles: .lh-callout in app/globals.css. */
 export function MarkdownBlockquote(props: ComponentProps<"blockquote"> & ExtraProps) {
 	const { children, node, ...rest } = props;
 	const alert = parseAlertMarker(children);
@@ -359,7 +360,7 @@ export function MarkdownBlockquote(props: ComponentProps<"blockquote"> & ExtraPr
 		<div
 			data-testid="md-callout"
 			data-alert-kind={alert.kind}
-			className="my-4 w-fit max-w-full border border-foreground px-4 py-3 [&> :first-child]:mt-0 [&> :last-child]:mb-0"
+			className="lh-callout w-fit max-w-full"
 		>
 			{alert.children}
 		</div>
@@ -377,7 +378,7 @@ export function MarkdownTable(props: ComponentProps<"table"> & ExtraProps) {
 	const { children, node, ...rest } = props;
 	const ref = useRef<HTMLTableElement>(null);
 	return (
-		<div className="group/md relative my-4" data-testid="md-table">
+		<div className="group/md ls-table" data-testid="md-table">
 			<CopyCorner
 				// Contained in the table's top-right corner (owner note, 2026-09-19:
 				// the old -top-3 lifted only half the 24px button above the 12px
@@ -388,7 +389,7 @@ export function MarkdownTable(props: ComponentProps<"table"> & ExtraProps) {
 				label="Copy table"
 				getText={() => (ref.current ? tableDataToMarkdown(extractTableDataFromElement(ref.current)) : "")}
 			/>
-			<div className="overflow-x-auto">
+			<div className="ls-table-x">
 				<table
 					ref={ref}
 					// No text-sm here — the table text runs at the session prose size

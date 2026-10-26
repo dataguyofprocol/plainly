@@ -224,36 +224,43 @@ export function MenuShell({
 	// First pass: mounted hidden at the viewport's top-left so the layout
 	// effect can measure the real content height before anything is seen.
 	// The menu is positioned ONCE and then only re-anchored — no flash.
+	// Both passes portal inside a `.v4.scope` — the menu leaves the page's
+	// .v4 root, and the v4 surfaces (.pop, .mrow, .mm-row) resolve only
+	// under one.
 	if (placed === null) {
 		return createPortal(
-			<div
-				ref={menuRef}
-				data-testid={testid}
-				data-lh-menu=""
-				style={{ position: "fixed", left: 0, top: 0, visibility: "hidden" }}
-				className={menuClass}
-			>
-				{children}
+			<div className="v4 scope">
+				<div
+					ref={menuRef}
+					data-testid={testid}
+					data-lh-menu=""
+					style={{ position: "fixed", left: 0, top: 0, visibility: "hidden" }}
+					className={menuClass}
+				>
+					{children}
+				</div>
 			</div>,
 			document.body,
 		);
 	}
 	return createPortal(
-		<div
-			ref={menuRef}
-			data-testid={testid}
-			data-lh-menu=""
-			tabIndex={-1}
-			onKeyDown={onBodyKeyDown}
-			style={{ position: "fixed", zIndex: 60, ...placed.style, maxHeight: placed.maxHeight, overflowY: "auto" }}
-			// The body is the arrow machine's focus home (input-less menus
-			// land focus here on open) — the focus STAYS, but the browser's
-			// default blue ring around it must not draw (owner, polish
-			// round). Arrow cycling moves DOM focus to the buttons, which
-			// carry their own hover/highlight; the ring is pure noise.
-			className={`${menuClass} outline-none`}
-		>
-			{children}
+		<div className="v4 scope">
+			<div
+				ref={menuRef}
+				data-testid={testid}
+				data-lh-menu=""
+				tabIndex={-1}
+				onKeyDown={onBodyKeyDown}
+				style={{ position: "fixed", zIndex: 60, ...placed.style, maxHeight: placed.maxHeight, overflowY: "auto" }}
+				// The body is the arrow machine's focus home (input-less menus
+				// land focus here on open) — the focus STAYS, but the browser's
+				// default blue ring around it must not draw (owner, polish
+				// round). Arrow cycling moves DOM focus to the buttons, which
+				// carry their own hover/highlight; the ring is pure noise.
+				className={`${menuClass} outline-none`}
+			>
+				{children}
+			</div>
 		</div>,
 		document.body,
 	);

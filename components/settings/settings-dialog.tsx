@@ -7,11 +7,11 @@
  * Owner decisions this wave:
  * - Dialog, not a page: opens over whatever screen you're on (the payoff:
  *   appearance edits restyle the chat LIVE behind the dialog). Escape,
- *   backdrop, and ✕ all close. Modal-only — /settings redirects, so
- *   nothing links into a dead surface.
- * - Left section nav in the app's mono chrome (text-only, session-list
- *   language — active = bg-accent), no icons, matching the minimal-color
- *   doctrine.
+ *   backdrop, and the close button all close. Modal-only — /settings
+ *   redirects, so nothing links into a dead surface.
+ * - v4 frame (finesse pass, 2026-10-26): a tinted left nav with icons
+ *   (active = raised surface), each section a titled page of grouped
+ *   rows. Styles: app/ui/settings.css.
  * - The dialog is surface-agnostic by construction: the sections talk to
  *   /api/settings* and localStorage only, so this shell can be re-mounted
  *   as a true OS window in the Electron round with near-zero churn.
@@ -41,29 +41,30 @@ import {
 	type UserSettings,
 } from "@/src/core";
 import { useAppearance } from "./appearance.tsx";
-import { SettingsSection, SettingsRow, Toggle } from "./controls.tsx";
+import { SettingsGroup, SettingsSection, SettingsRow, Toggle } from "./controls.tsx";
+import { Icon, type IconName } from "@/components/ui/icon";
 import { AgentSection } from "./agent-section.tsx";
 import type { ModelsSettings } from "@/src/core";
 import { MENU_CLOSE_EVENT, MENU_OPEN_EVENT } from "@/components/menu-shell";
 import { notifySettingsSaved } from "@/components/settings-signal";
 import { KeysSection } from "./keys-section.tsx";
 import { Hint } from "@/components/ui/hint";
+import { EmptyState } from "@/components/ui/empty-state";
 import { AppearanceSection, GraphSection } from "./appearance-section.tsx";
 import { KeyboardSection } from "./keyboard-section.tsx";
 import { ChatGPTUIProvider } from "./chatgpt-connection.tsx";
 import { NativeSubscriptionUIProvider } from "./subscription-connections.tsx";
 
-/** Owner (2026-09-20): hints earn their place — mechanics-explaining
- *  prose is out; only the keyboard note stays (storage location is a
- *  real question users ask). */
+/** The sections, in nav order. `title` + `hint` head each page (PM copy,
+ *  finesse pass); `label` is the nav's short name. */
 const SECTIONS = [
-	{ id: "keys", label: "Providers" },
-	{ id: "agent", label: "Agent" },
-	{ id: "appearance", label: "Appearance" },
-	{ id: "graph", label: "Graph" },
-	{ id: "keyboard", label: "Keyboard", hint: "Stored on this device" },
-	{ id: "general", label: "General" },
-] as const;
+	{ id: "keys", label: "Providers", icon: "provider", title: "Providers", hint: "The model accounts your tutor runs on, plus voice and web search." },
+	{ id: "agent", label: "Tutor", icon: "model", title: "Tutor", hint: "Which models teach you, and what your tutor is allowed to do." },
+	{ id: "appearance", label: "Appearance", icon: "appearance", title: "Appearance", hint: "How lessons read on this device." },
+	{ id: "graph", label: "Knowledge graph", icon: "knowledge", title: "Knowledge graph", hint: "How your graph grows from the lessons you take." },
+	{ id: "keyboard", label: "Keyboard", icon: "keyboard", title: "Keyboard", hint: "Shortcuts, saved on this device." },
+	{ id: "general", label: "General", icon: "tune", title: "General", hint: "App-wide preferences." },
+] as const satisfies ReadonlyArray<{ id: string; label: string; icon: IconName; title: string; hint: string }>;
 type SectionId = (typeof SECTIONS)[number]["id"];
 
 /** `open(section?, row?)` — the optional ROW deep-links into the Keys
@@ -124,15 +125,12 @@ function SettingsDialog({
 	initialRow: string | null;
 }) {
 	const backdropDismiss = useBackdropDismiss(onClose);
-	// Plain dim backdrop (no blur — nothing decorative); a genuine
-	// backdrop click closes, the dialog body stops propagation.
+	// A genuine backdrop click closes; the dialog body stops propagation.
 	return createPortal(
-		<div
-			className="fixed inset-0 z-50 flex items-center justify-center lh-scrim"
-			data-testid="settings-backdrop"
-			{...backdropDismiss}
-		>
-			<SettingsDialogBody onClose={onClose} initialSection={initialSection} initialRow={initialRow} />
+		<div className="v4 scope">
+			<div className="overlay" data-testid="settings-backdrop" {...backdropDismiss}>
+				<SettingsDialogBody onClose={onClose} initialSection={initialSection} initialRow={initialRow} />
+			</div>
 		</div>,
 		document.body,
 	);
@@ -270,185 +268,133 @@ export function SettingsDialogBody({
 		[onAppearanceChange],
 	);
 
+	const section = SECTIONS.find((s) => s.id === active) ?? SECTIONS[0];
+	const page = (children: React.ReactNode) => (
+		<SettingsSection title={section.title} hint={section.hint} testid={`section-${section.id}`}>
+			{children}
+		</SettingsSection>
+	);
+
 	return (
 		<div
 			role="dialog"
 			aria-modal="true"
 			aria-label="Settings"
 			data-testid="settings-dialog"
-			className="settings-dialog-pop flex h-[620px] max-h-[85vh] w-[920px] max-w-[90vw] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_60px_var(--shadow)]"
+			className="dialog sd"
 			onClick={(e) => e.stopPropagation()}
 		>
-			{/* Header — the app's quiet CMU title language. */}
-			<header className="flex h-15 shrink-0 items-center gap-3 border-b border-border px-5">
-				<h2 className="font-title text-2xl tracking-tight">Settings</h2>
-				<Hint
-						// Esc closes the dialog (its own listener) — surface it.
-						label="Close"
-						binding="escape"
-						side="left"
+			<nav aria-label="Settings sections" data-testid="settings-nav" className="sd-nav">
+				<div className="sd-navt">Settings</div>
+				{SECTIONS.map((s) => (
+					<button
+						key={s.id}
+						type="button"
+						data-testid={`settings-nav-${s.id}`}
+						aria-current={active === s.id}
+						className={active === s.id ? "sd-navi on" : "sd-navi"}
+						onClick={() => setActive(s.id)}
 					>
-						<button
+						<Icon name={s.icon} size="md" />
+						{s.label}
+					</button>
+				))}
+				<div className="sd-navfoot">
+					<Icon name="check" size="xs" />
+					Saves as you go
+				</div>
+			</nav>
+
+			<Hint label="Close" binding="escape" side="left">
+				<button
 					type="button"
 					aria-label="Close settings"
 					data-testid="settings-close"
-					className="ml-auto size-7 rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+					className="ib sd-close"
 					onClick={onClose}
 				>
-					<svg
-						viewBox="0 0 16 16"
-						className="mx-auto size-3.5"
-						fill="none"
-						stroke="currentColor"
-						strokeWidth="1.5"
-					>
-						<path d="M4 4l8 8M12 4l-8 8" />
-					</svg>
+					<Icon name="close" size="md" />
 				</button>
-					</Hint>
-			</header>
+			</Hint>
 
-			<div className="flex min-h-0 flex-1">
-				{/* Left nav — text-only, the session-list mono language,
-					    active = bg-accent. */}
-				<nav
-					aria-label="Settings sections"
-					data-testid="settings-nav"
-					className="flex w-44 shrink-0 flex-col gap-1 border-r border-border p-2"
-				>
-					{SECTIONS.map((s) => (
-						<button
-							key={s.id}
-							type="button"
-							data-testid={`settings-nav-${s.id}`}
-							aria-current={active === s.id}
-							className={`rounded-sm px-3 py-1.5 text-left font-ui text-sm transition-colors ${
-								active === s.id
-									? "bg-accent text-foreground"
-									: "text-muted-foreground hover:bg-accent hover:text-foreground"
-							}`}
-							onClick={() => setActive(s.id)}
+			{/* Content column — one section at a time, this scrolls — and
+			    LOCKS while any MenuShell is open (owner ruling: no
+			    scrolling with a dropdown down; MenuShell announces
+			    open/close, the count keeps overlap honest). The lock
+			    intercepts wheel/touch instead of hiding the scrollbar —
+			    nothing may shift when the lock engages. */}
+			<div ref={contentRef} className="sd-main" data-testid="settings-content">
+				{record === undefined ? (
+					<div className="sd-page" aria-busy="true">
+						<span className="sr">Loading settings…</span>
+						<div className="sd-head" aria-hidden>
+							<span className="skel sd-skel-t" />
+							<span className="skel sd-skel-d" />
+						</div>
+						<div className="st-skel" aria-hidden>
+							<span className="skel t" />
+							<span className="skel c" />
+							<span className="skel c2" />
+						</div>
+					</div>
+				) : record === null ? (
+					<div className="sd-page">
+						<EmptyState
+							icon="status-warn"
+							title="Settings could not be loaded"
 						>
-							{s.label}
-						</button>
-					))}
-				</nav>
-
-				{/* Content column — one section at a time, this scrolls — and
-				    LOCKS while any MenuShell is open (owner ruling: no
-				    scrolling with a dropdown down; MenuShell announces
-				    open/close, the count keeps overlap honest). The lock
-				    intercepts wheel/touch instead of hiding the scrollbar —
-				    nothing may shift when the lock engages. */}
-				<div
-					ref={contentRef}
-					className="min-w-0 flex-1 overflow-y-auto"
-					data-testid="settings-content"
-				>
-					{error && (
-						<p
-							role="alert"
-							className="m-4 rounded-sm border border-danger/40 px-3 py-2 text-xs text-danger"
-							data-testid="settings-error"
-						>
-							{error}
-						</p>
-					)}
-					{record === undefined ? (
-						<p className="px-6 py-5 text-xs text-muted-foreground/70">
-							Loading settings…
-						</p>
-					) : record === null ? (
-						<p className="px-6 py-5 text-xs text-muted-foreground/70">
-							Settings could not be loaded — refresh to retry.
-						</p>
-					) : (
-						<div>
-							{active === "general" && (
-								<SettingsSection
-									title="General"
-									testid="section-general"
-								>
-									<SettingsRow
-										label="Auto-update"
-										hint={AUTO_UPDATE_HINT}
-										testid="row-auto-update"
-									>
+							Close this window and open Settings again to retry.
+						</EmptyState>
+					</div>
+				) : (
+					<>
+						{error && (
+							<div className="sd-page sd-errwrap">
+								<p role="alert" className="sd-error" data-testid="settings-error">
+									<Icon name="status-warn" size="sm" />
+									{error}
+								</p>
+							</div>
+						)}
+						{active === "general" &&
+							page(
+								<SettingsGroup label="Updates">
+									<SettingsRow label="Automatic updates" hint={AUTO_UPDATE_HINT} testid="row-auto-update">
 										<Toggle
 											checked={record.general?.autoUpdate ?? true}
 											label="auto update"
-											onChange={(on) =>
-												void write("general", { autoUpdate: on })
-											}
+											onChange={(on) => void write("general", { autoUpdate: on })}
 										/>
 									</SettingsRow>
-								</SettingsSection>
+								</SettingsGroup>,
 							)}
-							{active === "keys" && (
-								<SettingsSection title="Providers" testid="section-keys">
-									<KeysSection initialRow={initialRow ?? undefined} />
-								</SettingsSection>
+						{active === "keys" && page(<KeysSection initialRow={initialRow ?? undefined} />)}
+						{active === "agent" &&
+							page(
+								<AgentSection
+									agent={record.agent}
+									models={record.models}
+									graph={record.graph}
+									compaction={record.compaction}
+									onModelsChange={(next: ModelsSettings) => void write("models", next)}
+									onSectionChange={(next: AgentSettings) => void write("agent", next)}
+									onCompactionChange={(next: CompactionSettings) => void write("compaction", next)}
+								/>,
 							)}
-							{active === "agent" && (
-								<SettingsSection
-									title="Agent"
-									testid="section-agent"
-								>
-									<AgentSection
-										agent={record.agent}
-										models={record.models}
-										graph={record.graph}
-										compaction={record.compaction}
-										onModelsChange={(next: ModelsSettings) =>
-											void write("models", next)
-										}
-										onSectionChange={(next: AgentSettings) =>
-											void write("agent", next)
-										}
-										onCompactionChange={(next: CompactionSettings) =>
-											void write("compaction", next)
-										}
-									/>
-								</SettingsSection>
+						{active === "appearance" &&
+							page(
+								<AppearanceSection
+									appearance={record.appearance}
+									onSectionChange={(next: AppearanceSettings) => void write("appearance", next)}
+								/>,
 							)}
-							{active === "appearance" && (
-								<SettingsSection
-									title="Appearance"
-									testid="section-appearance"
-								>
-									<AppearanceSection
-										appearance={record.appearance}
-										onSectionChange={(next: AppearanceSettings) =>
-											void write("appearance", next)
-										}
-									/>
-								</SettingsSection>
+						{active === "graph" &&
+							page(
+								<GraphSection graph={record.graph} onSectionChange={(next: GraphSettings) => void write("graph", next)} />,
 							)}
-							{active === "graph" && (
-								<SettingsSection
-									title="Graph"
-									testid="section-graph"
-								>
-									<GraphSection
-										graph={record.graph}
-										onSectionChange={(next: GraphSettings) =>
-											void write("graph", next)
-										}
-									/>
-								</SettingsSection>
-							)}
-							{active === "keyboard" && (
-								<SettingsSection
-									title="Keyboard"
-									hint="Stored on this device"
-									testid="section-keyboard"
-								>
-									<KeyboardSection />
-								</SettingsSection>
-							)}
-						</div>
-					)}
-				</div>
+						{active === "keyboard" && page(<KeyboardSection />)}
+					</>
+				)}
 			</div>
 		</div>
 	);

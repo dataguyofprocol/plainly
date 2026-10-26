@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardCheckIcon } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import { parseProbeDoneInput, type ProbeDoneResult } from "@/src/core";
 
 /**
@@ -40,31 +40,30 @@ export function ProbeDoneCard({ part }: { part: { input?: unknown; output?: unkn
 	const strands = assessment && Array.isArray(assessment.strands) ? assessment.strands : null;
 
 	return (
-		<div data-testid="probe-done-card" className="my-3 rounded-xl border bg-card/60 p-3">
-			<div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-				<ClipboardCheckIcon className="size-3.5 text-primary" />
-				Probe concluded — your assessment
+		<div data-testid="probe-done-card" className="ls-card">
+			<div className="ls-card-h">
+				<Icon name="learn" size="sm" />
+				<span className="ls-card-t">Where you’re starting from</span>
+				<span className="ls-card-sub">from the check-in</span>
 			</div>
 			{output && !output.ok ? (
-				<p className="text-sm text-muted-foreground">The prober retried: {output.error}</p>
+				<p className="ls-card-b">The prober retried: {output.error}</p>
 			) : state === "output-error" ? (
-				<p className="text-sm text-muted-foreground">
-					The assessment was malformed — the prober retried with a corrected one.
-				</p>
+				<p className="ls-card-b">The assessment was malformed — the prober retried with a corrected one.</p>
 			) : strands ? (
-				<div className="space-y-2">
-					{strands.map((s, i) => (
-						<div key={i} className="rounded-lg bg-background/60 px-3 py-2">
-							<div className="text-sm font-medium">{s.strand}</div>
-							<div className="mt-0.5 text-sm text-muted-foreground">{s.assessment}</div>
-						</div>
-					))}
-					{assessment?.summary && (
-						<p className="px-1 text-sm text-muted-foreground">{assessment.summary}</p>
-					)}
-				</div>
+				<>
+					<ul className="ls-strands">
+						{strands.map((s, i) => (
+							<li key={i}>
+								<b>{s.strand}</b>
+								<span>{s.assessment}</span>
+							</li>
+						))}
+					</ul>
+					{assessment?.summary && <p className="ls-summary">{assessment.summary}</p>}
+				</>
 			) : (
-				<p className="text-sm text-muted-foreground">Writing the assessment…</p>
+				<p className="ls-card-b">Writing the assessment…</p>
 			)}
 		</div>
 	);

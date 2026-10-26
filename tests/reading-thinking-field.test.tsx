@@ -14,9 +14,9 @@ describe("the reading-thinking field (owner round, 2026-10-07)", () => {
 		// 16px) exceeds lh-input's 20px line box by 1px; Chromium counts that
 		// in scrollHeight and a zero-padding field-sizing textarea becomes a
 		// permanent 1px scroll (a bar shown empty AND at every expansion below
-		// max-h). py-0.5 absorbs it — the composer/dock fields get the same
-		// absorption implicitly from py-2. Line-height stays 1.25 (caret law).
-		assert.ok(html.includes("py-0.5"), "the vertical padding is on the textarea");
+		// max-h). Vertical padding absorbs it — since the finesse pass the
+		// v4 field primitive .ftext carries it (10px), replacing py-0.5.
+		assert.ok(/<textarea[^>]*class="[^"]*\bftext\b/.test(html), "the padded field primitive is on the textarea");
 		// The cap survives: growth past max-h-40 still scrolls honestly.
 		assert.ok(html.includes("max-h-40"), "the 160px growth cap stays");
 	});

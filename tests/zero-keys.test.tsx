@@ -75,7 +75,7 @@ describe("SetupKeysBody — stage 1's connect screen (v4 chips)", () => {
 		assert.deepEqual([...order].sort((x, y) => x - y), order, "chip order is the owner's");
 		assert.ok(html.includes("Z.AI Coding Plan"));
 		assert.ok(html.includes("OpenAI-compatible"));
-		assert.ok(html.includes("1+ more"), "only non-featured providers count toward “more”");
+		assert.ok(html.includes("1 more"), "only non-featured providers count toward “more”");
 		assert.ok(!html.includes('data-testid="setup-key-input"'), "no paste field before a provider is picked");
 	});
 
@@ -88,7 +88,7 @@ describe("SetupKeysBody — stage 1's connect screen (v4 chips)", () => {
 	it("a connected provider carries a check on its chip", () => {
 		const html = renderToStaticMarkup(createElement(SetupKeysBody, { providers: ALL, connected: ["anthropic"] }));
 		const chip = html.slice(html.indexOf('data-testid="connect-chip-anthropic"'), html.indexOf('data-testid="connect-chip-deepseek"'));
-		assert.ok(chip.includes("✓"));
+		assert.ok(chip.includes('title="Connected"'));
 	});
 });
 

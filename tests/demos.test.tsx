@@ -398,8 +398,9 @@ describe("steer card rendering (the delivered artifact)", () => {
 		assert.equal(view.parts.length, 2, "text (teacher-facing) + the data-subagent-aborted marker part");
 		const html = renderToStaticMarkup(<SubagentSteerCard message={view as never} />);
 		assert.match(html, /job-aborted-badge/);
-		assert.match(html, /research/, "the job's kind, lower-cased like the complete-badge idiom");
-		assert.match(html, /aborted by the learner/);
+		assert.match(html, /data-kind="research"/, "the job's kind rides the row");
+		assert.match(html, /Research agent/, "named in the learner's words (finesse pass)");
+		assert.match(html, /stopped by you/, "second person (finesse pass copy)");
 		// the teacher-facing protocol text never renders for the learner
 		assert.ok(!html.includes("no brief is coming"), "no protocol glue in the chip");
 		// the badge renders off the PART, not metadata (the custom-message scheme)
@@ -423,7 +424,7 @@ describe("steer card rendering (the delivered artifact)", () => {
 		assert.match(html, /Research/);
 		assert.match(html, /complete/);
 		assert.match(html, /2 sources/);
-		assert.match(html, /view brief/, "the expansion affordance is offered");
+		assert.match(html, /<summary/, "the expansion affordance is offered (finesse pass: a chevron row)");
 		// the one-liner is a native <details> — collapsed by default, so the
 		// brief + sources ride in the DOM but never clutter the transcript
 		// until the learner opens them (the wave-1 "view full research" ask)
@@ -471,7 +472,8 @@ describe("steer card rendering (the delivered artifact)", () => {
 		const steer = buildSubagentSteer({ id: "jv", kind: "visual", toolCallId: "cv" }, { svg: "", notes: "FAILED: iteration limit" });
 		const html = renderToStaticMarkup(<SubagentSteerCard message={projectNative([steer])[0] as never} />);
 		assert.match(html, /FAILED: iteration limit/);
-		assert.ok(!html.includes("circle") && !html.includes("<svg"), "no svg for a failed build");
+		// (finesse pass: the failed card carries its kind icon — the FIGURE svg is what must be absent)
+		assert.ok(!html.includes('data-testid="visual-svg"') && !html.includes('cx="50"'), "no svg for a failed build");
 	});
 
 	it("renders a fallback note when the artifact part is missing", () => {
@@ -493,7 +495,7 @@ describe("artifact chrome — scrollbar, invert toggles, downloads (release poli
 		assert.match(html, /toggle-invert-demo-brightness/, "the invert switch (house Toggle)");
 		assert.match(html, /data-testid="demo-download"/);
 		assert.ok(!html.includes("hue-rotate"), "inversion is OFF by default — a manual toggle only");
-		assert.match(html, /interactive demo/, "the kind label lives in the caption header");
+		assert.match(html, /Interactive demo/, "the kind label lives in the caption header (finesse pass: sentence case)");
 		assert.match(html, /Wave interference/, "the title rides beside the kind label");
 	});
 

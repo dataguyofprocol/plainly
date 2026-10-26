@@ -124,6 +124,10 @@ export interface CanvasColors {
 	edge: string;
 	label: string;
 	hoverText: string;
+	/** v4: the surface the labels' halo and pills are cut from. */
+	halo?: string;
+	/** v4: the hairline around a topic label's pill. */
+	line?: string;
 }
 
 export interface CanvasData {
@@ -141,6 +145,11 @@ export interface CanvasData {
 	colors: CanvasColors;
 	/** Body font family (labels must match the app typography). */
 	fontFamily: string;
+	/** "v4" (finesse pass): labels are SCREEN-fixed UI type placed with
+	 *  collision avoidance — topic names as pills above their cluster,
+	 *  idea names haloed under their node, skipped where they would
+	 *  overlap — instead of the world-scaled legacy text. */
+	style?: "v4";
 }
 
 export interface RendererCallbacks {
@@ -278,6 +287,52 @@ export function applyClusterLabels(
 	}
 	return true;
 }
+/** v4 labels (finesse pass) — SCREEN px, the app's UI type: topic names
+ *  sit in a pill (swatch dot + 12px semibold ink) above their cluster;
+ *  idea names are 12px medium under their node with a surface halo, so
+ *  text never sits on an edge. Both are placed greedily, most important
+ *  first, and a label that would overlap one already placed is skipped
+ *  for this frame (zooming in makes room — the Maps convention). */
+const PILL_FONT = 12;
+const PILL_WEIGHT = "600";
+const PILL_H = 24;
+const PILL_PAD = 10;
+const PILL_DOT = 6;
+const PILL_DOT_GAP = 6;
+const PILL_TEXT_MAX = 200;
+const PILL_LIFT = 10; // px between the cluster's top node and the pill
+const NAME_FONT = 12;
+const NAME_LINE = 15;
+const NAME_MAX = 150;
+const NAME_GAP = 4; // px between the disc and the first line
+const LABEL_MARGIN = 4; // px of air kept around every placed label
+
+interface RegionMeta {
+	id: string;
+	label: string | null;
+	lines: string[] | null;
+	cx: number;
+	cy: number;
+	hue: number;
+	color?: string;
+	/** v4: the visible members' world box and count (label seat + priority). */
+	box: { x0: number; y0: number; x1: number; y1: number };
+	members: number;
+	/** v4: the one-line pill text and its full width, measured at build. */
+	pill: { text: string; w: number } | null;
+}
+
+/** A placed screen rect (v4 label collision). */
+interface Rect {
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+}
+
+const overlaps = (a: Rect, b: Rect): boolean =>
+	a.x < b.x + b.w + LABEL_MARGIN && b.x < a.x + a.w + LABEL_MARGIN && a.y < b.y + b.h + LABEL_MARGIN && b.y < a.y + a.h + LABEL_MARGIN;
+
 const LABEL_MAX_WIDTH = 170; // wrap width at the reference label size, world units
 const LABEL_GAP = 2.9; // world units between node edge and first label line (the 2px-at-fit reference ÷ 0.69)
 const LABEL_LINE_HEIGHT = 1.3;
@@ -657,11 +712,12 @@ export class GraphCanvasRenderer {
 	/** v4 highlight: the selected idea's chain (ids) — its edges redraw in
 	 *  the accent on top, its nodes get a ring; null = nothing selected. */
 	private highlight: { ids: ReadonlySet<string>; selected: string | null; accent: string } | null = null;
+	private focus: ReadonlySet<string> | null = null;
 	private regionCanvas: HTMLCanvasElement | null = null;
 	/** World rect the bitmap covers (drawImage target coords). */
 	private regionRect: { minX: number; minY: number; w: number; h: number } | null = null;
 	/** Region labels: cluster centroid + hue, computed at splat build. */
-	private regionMeta: { id: string; label: string | null; lines: string[] | null; cx: number; cy: number; hue: number; color?: string }[] = [];
+	private regionMeta: RegionMeta[] = [];
 	private regionTuning: RegionTuning = DEFAULT_REGION_TUNING;
 	private physicsTuning: PhysicsTuning = DEFAULT_PHYSICS_TUNING;
 	/** Gravity center for the live sim (graph bbox centroid at setData). */
@@ -669,6 +725,9 @@ export class GraphCanvasRenderer {
 	private regionBuiltVersion = -1;
 	private frameCount = 0; // draw counter for the live-sim splat throttle
 	private labelLines = new Map<string, string[]>();
+	/** v4: screen-fixed idea names and their placement order. */
+	private names = new Map<string, { lines: string[]; w: number }>();
+	private nameOrder: string[] = [];
 	private worldLabelFont = "";
 	private world: WorldSizes = { nodeR: 0, glowOuter: 0, labelSize: 0, labelGap: 0 };
 
@@ -875,7 +934,34 @@ export class GraphCanvasRenderer {
 			(s) => ctx.measureText(s).width,
 		);
 		ctx.font = prevFont;
+		if (changed && data.style === "v4") this.measurePills();
 		if (changed) this.markDirty();
+	}
+
+	/** v4: is this region the picked topic? (its first member decides —
+	 *  a topic's focus set IS its member list). */
+	private focusTopic(rm: RegionMeta, focus: ReadonlySet<string>): boolean {
+		const c = this.data?.clusters.find((x) => x.id === rm.id);
+		return !!c && c.members.some((m) => focus.has(m));
+	}
+
+	/** v4: the topic pills' one-line text + width, at the fixed UI size. */
+	private measurePills(): void {
+		const data = this.data;
+		if (!data) return;
+		const ctx = this.ctx;
+		const prevFont = ctx.font;
+		ctx.font = `${PILL_WEIGHT} ${PILL_FONT}px ${data.fontFamily}`;
+		const measure = (t: string) => ctx.measureText(t).width;
+		for (const rm of this.regionMeta) {
+			if (!rm.label) {
+				rm.pill = null;
+				continue;
+			}
+			const text = wrapRegionLabel(rm.label, PILL_TEXT_MAX, 1, measure)[0] ?? rm.label;
+			rm.pill = { text, w: Math.ceil(PILL_PAD * 2 + PILL_DOT + PILL_DOT_GAP + measure(text)) };
+		}
+		ctx.font = prevFont;
 	}
 
 	setVisible(visible: ReadonlySet<string> | null): void {
@@ -887,6 +973,13 @@ export class GraphCanvasRenderer {
 	/** v4: highlight the selected idea's chain (null clears). */
 	setHighlight(ids: ReadonlySet<string> | null, selected: string | null = null, accent = "#156e62"): void {
 		this.highlight = ids && ids.size > 0 ? { ids, selected, accent } : null;
+		this.markDirty();
+	}
+
+	/** v4: bring one topic forward (its members; null clears). The rest
+	 *  of the graph steps back; a lit chain outranks it. */
+	setFocus(ids: ReadonlySet<string> | null): void {
+		this.focus = ids && ids.size > 0 ? ids : null;
 		this.markDirty();
 	}
 
@@ -1379,6 +1472,27 @@ export class GraphCanvasRenderer {
 		for (const n of data.nodes) {
 			if (isVisible(n.id) && !isImpNodeId(n.id)) this.labelLines.set(n.id, wrapLabel(ctx, n.label, maxW));
 		}
+		// v4: the screen-fixed names (two lines at most, ellipsized) with
+		// their measured box, and the placement order — the best-connected
+		// ideas claim their space first, so the hubs stay named.
+		this.names = new Map();
+		this.nameOrder = [];
+		if (data.style === "v4") {
+			ctx.font = `500 ${NAME_FONT}px ${data.fontFamily}`;
+			const measure = (t: string) => ctx.measureText(t).width;
+			const degree = new Map<string, number>();
+			for (const e of data.edges) {
+				degree.set(e.from, (degree.get(e.from) ?? 0) + 1);
+				degree.set(e.to, (degree.get(e.to) ?? 0) + 1);
+			}
+			for (const n of data.nodes) {
+				if (!isVisible(n.id) || isImpNodeId(n.id)) continue;
+				const lines = wrapRegionLabel(n.label, NAME_MAX, 2, measure);
+				this.names.set(n.id, { lines, w: Math.ceil(Math.max(...lines.map(measure))) });
+				this.nameOrder.push(n.id);
+			}
+			this.nameOrder.sort((a, b) => (degree.get(b) ?? 0) - (degree.get(a) ?? 0));
+		}
 		ctx.font = prevFont;
 	}
 
@@ -1481,15 +1595,33 @@ export class GraphCanvasRenderer {
 			let members = 0;
 			let sumX = 0;
 			let sumY = 0;
+			const pts: CanvasNode[] = [];
 			for (const id of cluster.members) {
-				if (!isVisible(id)) continue;
+				if (!isVisible(id) || isImpNodeId(id)) continue;
 				const n = this.nodeById.get(id);
 				if (!n) continue;
 				members++;
 				sumX += n.x;
 				sumY += n.y;
+				pts.push(n);
 			}
 			if (members > 0) {
+				// v4 seats a topic's label above the box of its CORE: members
+				// within twice the median distance of the centroid — a few
+				// stray members far away must not drag the label off its body.
+				const cx = sumX / members;
+				const cy = sumY / members;
+				const dist = pts.map((n) => Math.hypot(n.x - cx, n.y - cy));
+				const sorted = [...dist].sort((a, b) => a - b);
+				const reach = Math.max(sorted[Math.floor(sorted.length / 2)]! * 2, 1e-6);
+				let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+				pts.forEach((n, i) => {
+					if (dist[i]! > reach) return;
+					if (n.x < x0) x0 = n.x;
+					if (n.x > x1) x1 = n.x;
+					if (n.y < y0) y0 = n.y;
+					if (n.y > y1) y1 = n.y;
+				});
 				this.regionMeta.push({
 					id: cluster.id,
 					label: cluster.label || null,
@@ -1498,6 +1630,9 @@ export class GraphCanvasRenderer {
 					hue: clusterHue(cluster.id),
 					color: cluster.color,
 					lines: null,
+					box: { x0, y0, x1, y1 },
+					members,
+					pill: null,
 				});
 			}
 		});
@@ -1517,6 +1652,7 @@ export class GraphCanvasRenderer {
 					? wrapRegionLabel(rm.label, REGION_LABEL_MAX_WIDTH, REGION_LABEL_MAX_LINES, (s) => ctx.measureText(s).width)
 					: null;
 			}
+			if (data.style === "v4") this.measurePills();
 			ctx.font = prevFont;
 		}
 
@@ -1730,6 +1866,11 @@ export class GraphCanvasRenderer {
 			ctx.drawImage(this.regionCanvas, minX, minY, w, h);
 		}
 
+		if (data.style === "v4") {
+			this.drawV4(ratio);
+			return;
+		}
+
 		// 3. Edges: shafts + arrowheads from cached paths; width constant on
 		// screen (÷ k), geometry in world units (scales with the graph).
 		// Supports shafts: a second, thinner stroke (owner, 2026-09-29) —
@@ -1879,6 +2020,305 @@ export class GraphCanvasRenderer {
 				for (let i = 0; i < rm.lines.length; i++) {
 					ctx.fillText(rm.lines[i]!, rm.cx, rm.cy + firstOffset + i * lineH);
 				}
+			}
+			ctx.restore();
+		}
+	}
+
+	/** The v4 layers over the region wash (finesse pass): quiet edges, the
+	 *  selected chain in the brand with everything else stepped back,
+	 *  rimmed discs, then the screen-space labels — placed, never piled. */
+	private drawV4(ratio: number): void {
+		const data = this.data!;
+		const settings = this.settings!;
+		const ctx = this.ctx;
+		const { x: tx, y: ty, k } = this.transform;
+		const dpr = window.devicePixelRatio || 1;
+		const w = this.canvas.clientWidth;
+		const h = this.canvas.clientHeight;
+		const { nodeR, glowOuter } = this.world;
+		const hl = this.highlight;
+		const focus = hl ? null : this.focus;
+		const halo = data.colors.halo ?? "#ffffff";
+		const visibleId = (id: string) => isVisibleId(this.visible, id) && !isImpNodeId(id);
+		// With a chain lit (or a topic picked), the rest steps back.
+		const rest = hl || focus ? 0.3 : 1;
+
+		// Edges: hairlines (constant on screen) in the quiet edge ink.
+		if (settings.edgeWidth > 0) {
+			ctx.save();
+			ctx.globalAlpha = rest;
+			ctx.lineWidth = settings.edgeWidth / k;
+			ctx.lineCap = "round";
+			const buckets = this.edgeBuckets.size > 0 ? [...this.edgeBuckets] : [[data.colors.edge, { shafts: this.shaftsPath, heads: this.headsPath }] as const];
+			for (const [color, b] of buckets) {
+				ctx.strokeStyle = color;
+				ctx.fillStyle = color;
+				ctx.stroke(b.shafts);
+				ctx.fill(b.heads);
+			}
+			ctx.restore();
+		}
+
+		// A picked topic: its own edges and discs again, at full strength.
+		if (focus) {
+			const own = new Path2D();
+			for (const e of data.edges) {
+				if (!focus.has(e.from) && !focus.has(e.to)) continue;
+				if (!isVisibleId(this.visible, e.from) || !isVisibleId(this.visible, e.to)) continue;
+				const a = this.nodeById.get(e.from);
+				const b = this.nodeById.get(e.to);
+				if (!a || !b) continue;
+				own.moveTo(a.x, a.y);
+				own.lineTo(b.x, b.y);
+			}
+			ctx.strokeStyle = data.colors.edge;
+			ctx.lineWidth = Math.max(settings.edgeWidth, 1) / k;
+			ctx.stroke(own);
+		}
+
+		// The selected idea's chain: its edges again, on top, in the brand.
+		if (hl) {
+			const hot = new Path2D();
+			for (const e of data.edges) {
+				if (!hl.ids.has(e.from) || !hl.ids.has(e.to)) continue;
+				const a = this.nodeById.get(e.from);
+				const b = this.nodeById.get(e.to);
+				if (!a || !b) continue;
+				hot.moveTo(a.x, a.y);
+				hot.lineTo(b.x, b.y);
+			}
+			ctx.strokeStyle = hl.accent;
+			ctx.lineWidth = 1.75 / k;
+			ctx.lineCap = "round";
+			ctx.stroke(hot);
+			// Where co-premises meet (an implication junction), a small
+			// brand point — so a lit line never just ends in the air.
+			ctx.fillStyle = hl.accent;
+			for (const id of hl.ids) {
+				if (!isImpNodeId(id)) continue;
+				const n = this.nodeById.get(id);
+				if (!n) continue;
+				ctx.beginPath();
+				ctx.arc(n.x, n.y, 2.5 / k, 0, Math.PI * 2);
+				ctx.fill();
+			}
+		}
+
+		// Discs in their topic colour, each with a surface rim so touching
+		// discs stay distinct.
+		const rim = Math.min(1.5 / k, nodeR * 0.3);
+		ctx.save();
+		ctx.globalAlpha = rest;
+		ctx.fillStyle = data.colors.node;
+		ctx.fill(this.nodesPath!);
+		for (const [color, path] of this.nodeBuckets) {
+			ctx.fillStyle = color;
+			ctx.fill(path);
+		}
+		ctx.strokeStyle = halo;
+		ctx.lineWidth = rim;
+		ctx.stroke(this.nodesPath!);
+		ctx.restore();
+		if (focus) {
+			ctx.strokeStyle = halo;
+			ctx.lineWidth = rim;
+			for (const id of focus) {
+				const n = this.nodeById.get(id);
+				if (!n || !visibleId(id)) continue;
+				ctx.beginPath();
+				ctx.arc(n.x, n.y, nodeR, 0, Math.PI * 2);
+				ctx.fillStyle = n.color ?? data.colors.node;
+				ctx.fill();
+				ctx.stroke();
+			}
+		}
+		if (hl) {
+			for (const id of hl.ids) {
+				const n = this.nodeById.get(id);
+				if (!n || !visibleId(id)) continue;
+				ctx.beginPath();
+				ctx.arc(n.x, n.y, nodeR, 0, Math.PI * 2);
+				ctx.fillStyle = n.color ?? data.colors.node;
+				ctx.fill();
+				ctx.strokeStyle = halo;
+				ctx.lineWidth = rim;
+				ctx.stroke();
+				// The brand ring: a gap of surface, then the accent.
+				const sel = id === hl.selected;
+				ctx.beginPath();
+				ctx.arc(n.x, n.y, nodeR + (sel ? 3.5 : 2.5) / k, 0, Math.PI * 2);
+				ctx.strokeStyle = hl.accent;
+				ctx.lineWidth = (sel ? 2.25 : 1.5) / k;
+				ctx.stroke();
+			}
+		}
+
+		// Hover: a soft halo and a thin ring in the node's own colour.
+		const hover = this.hoverNode && this.hoverFade > 0.02 && visibleId(this.hoverNode.id) ? this.hoverNode : null;
+		if (hover) {
+			const color = hover.color ?? data.colors.node;
+			const glow = ctx.createRadialGradient(hover.x, hover.y, nodeR, hover.x, hover.y, glowOuter + 4 / k);
+			glow.addColorStop(0, rgbaFromHex(color, GLOW_ALPHA * this.hoverFade));
+			glow.addColorStop(1, rgbaFromHex(color, 0));
+			ctx.fillStyle = glow;
+			ctx.beginPath();
+			ctx.arc(hover.x, hover.y, glowOuter + 4 / k, 0, Math.PI * 2);
+			ctx.arc(hover.x, hover.y, nodeR, 0, Math.PI * 2, true);
+			ctx.fill("evenodd");
+			ctx.beginPath();
+			ctx.arc(hover.x, hover.y, nodeR + 2.5 / k, 0, Math.PI * 2);
+			ctx.strokeStyle = rgbaFromHex(color, this.hoverFade);
+			ctx.lineWidth = 1.5 / k;
+			ctx.stroke();
+		}
+
+		// ── Labels, in screen space ──
+		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+		// A search leaves few ideas standing: name them at any zoom.
+		const nodeAlpha = this.visible ? 1 : labelAlpha(ratio, settings.labelZoom);
+		const regionAlpha = 1 - nodeAlpha;
+		const placed: Rect[] = [];
+		const inView = (r: Rect) => r.x >= 4 && r.y >= 4 && r.x + r.w <= w - 4 && r.y + r.h <= h - 4;
+		const free = (r: Rect) => inView(r) && !placed.some((p) => overlaps(p, r));
+		const reach = nodeR * k + 2;
+		const discsUnder = (r: Rect) => {
+			let hits = 0;
+			for (const n of data.nodes) {
+				if (!visibleId(n.id)) continue;
+				const sx = n.x * k + tx;
+				const sy = n.y * k + ty;
+				if (sx > r.x - reach && sx < r.x + r.w + reach && sy > r.y - reach && sy < r.y + r.h + reach) hits++;
+			}
+			return hits;
+		};
+
+		// Topic pills seat first (largest topic first): above the cluster,
+		// else below it, else on its centroid — or not at all this frame.
+		const pills: { r: Rect; rm: RegionMeta }[] = [];
+		if (settings.clusterLabels && regionAlpha > 0.01) {
+			const order = [...this.regionMeta].sort((a, b) => b.members - a.members);
+			// A picked topic's pill seats first.
+			if (focus) order.sort((a, b) => Number(this.focusTopic(b, focus)) - Number(this.focusTopic(a, focus)));
+			const lift = nodeR * k + PILL_LIFT;
+			for (const rm of order) {
+				if (!rm.pill) continue;
+				const x0 = rm.box.x0 * k + tx;
+				const x1 = rm.box.x1 * k + tx;
+				const y0 = rm.box.y0 * k + ty;
+				const y1 = rm.box.y1 * k + ty;
+				if (x1 < 0 || x0 > w || y1 < 0 || y0 > h) continue;
+				const pw = rm.pill.w;
+				const x = Math.min(Math.max((x0 + x1) / 2 - pw / 2, 8), w - 8 - pw);
+				// Of the seats that collide with no label, take the one that
+				// covers the fewest discs (in this order on a tie).
+				let best: Rect | null = null;
+				let bestHits = Infinity;
+				for (const top of [y0 - lift - PILL_H, y1 + lift, rm.cy * k + ty - PILL_H / 2]) {
+					const r = { x, y: top, w: pw, h: PILL_H };
+					if (!free(r)) continue;
+					const hits = discsUnder(r);
+					if (hits < bestHits) {
+						best = r;
+						bestHits = hits;
+						if (hits === 0) break;
+					}
+				}
+				if (best) {
+					placed.push(best);
+					pills.push({ r: best, rm });
+				}
+			}
+		}
+
+		// Idea names: the selected idea, the hovered one and the lit chain
+		// always ask first; the rest only past the zoom gate, hubs first.
+		const forced: string[] = [];
+		if (hl?.selected) forced.push(hl.selected);
+		if (hover) forced.push(hover.id);
+		if (hl) for (const id of hl.ids) forced.push(id);
+		const seen = new Set<string>();
+		const nameRect = (id: string): Rect | null => {
+			const n = this.nodeById.get(id);
+			const name = this.names.get(id);
+			if (!n || !name) return null;
+			const sx = n.x * k + tx;
+			const sy = n.y * k + ty;
+			return { x: sx - name.w / 2, y: sy + nodeR * k + NAME_GAP, w: name.w, h: name.lines.length * NAME_LINE };
+		};
+		const drawn: { id: string; r: Rect; strong: boolean }[] = [];
+		for (const id of forced) {
+			if (seen.has(id) || !visibleId(id)) continue;
+			seen.add(id);
+			const r = nameRect(id);
+			if (!r) continue;
+			// The selected and hovered names always draw; chain names yield.
+			if (id !== hl?.selected && id !== hover?.id && !free(r)) continue;
+			placed.push(r);
+			drawn.push({ id, r, strong: true });
+		}
+		if (nodeAlpha > 0.01) {
+			const order = focus ? [...this.nameOrder.filter((id) => focus.has(id)), ...this.nameOrder.filter((id) => !focus.has(id))] : this.nameOrder;
+			for (const id of order) {
+				if (seen.has(id) || !visibleId(id)) continue;
+				const r = nameRect(id);
+				// A name never sits on another idea's disc either.
+				if (!r || !free(r) || discsUnder(r) > 0) continue;
+				placed.push(r);
+				drawn.push({ id, r, strong: false });
+			}
+		}
+		if (drawn.length > 0) {
+			ctx.save();
+			ctx.textAlign = "center";
+			ctx.textBaseline = "top";
+			ctx.lineJoin = "round";
+			ctx.lineWidth = 3;
+			ctx.strokeStyle = halo;
+			for (const d of drawn) {
+				const name = this.names.get(d.id)!;
+				const sel = d.id === hl?.selected;
+				ctx.font = `${sel ? 600 : 500} ${NAME_FONT}px ${data.fontFamily}`;
+				ctx.fillStyle = d.strong ? data.colors.hoverText : data.colors.label;
+				ctx.globalAlpha = d.strong ? 1 : nodeAlpha * (hl || (focus && !focus.has(d.id)) ? 0.45 : 1);
+				const cx = d.r.x + d.r.w / 2;
+				for (let i = 0; i < name.lines.length; i++) {
+					const y = d.r.y + i * NAME_LINE + 1;
+					ctx.strokeText(name.lines[i]!, cx, y);
+					ctx.fillText(name.lines[i]!, cx, y);
+				}
+			}
+			ctx.restore();
+		}
+
+		// The pills draw last — UI, never occluded by content.
+		if (pills.length > 0) {
+			ctx.save();
+			ctx.font = `${PILL_WEIGHT} ${PILL_FONT}px ${data.fontFamily}`;
+			ctx.textAlign = "left";
+			ctx.textBaseline = "middle";
+			for (const { r, rm } of pills) {
+				ctx.globalAlpha = regionAlpha * (focus && !this.focusTopic(rm, focus) ? 0.45 : 1);
+				ctx.beginPath();
+				ctx.roundRect(r.x, r.y, r.w, r.h, r.h / 2);
+				ctx.fillStyle = halo;
+				ctx.shadowColor = data.colors.line ?? "transparent";
+				ctx.shadowBlur = 6;
+				ctx.shadowOffsetY = 1;
+				ctx.fill();
+				ctx.shadowColor = "transparent";
+				if (data.colors.line) {
+					ctx.strokeStyle = data.colors.line;
+					ctx.lineWidth = 1;
+					ctx.stroke();
+				}
+				const cy = r.y + r.h / 2;
+				ctx.beginPath();
+				ctx.arc(r.x + PILL_PAD + PILL_DOT / 2, cy, PILL_DOT / 2, 0, Math.PI * 2);
+				ctx.fillStyle = rm.color ?? `hsl(${rm.hue}, 45%, 40%)`;
+				ctx.fill();
+				ctx.fillStyle = data.colors.hoverText;
+				ctx.fillText(rm.pill!.text, r.x + PILL_PAD + PILL_DOT + PILL_DOT_GAP, cy + 0.5);
 			}
 			ctx.restore();
 		}

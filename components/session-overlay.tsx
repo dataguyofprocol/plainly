@@ -1,12 +1,12 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { MaximizeIcon, MinusIcon, PlusIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fitGraphView, fitZoomFor, zoomedGraphView, type Viewport } from "@/components/pan-zoom";
 import { renderMermaid } from "@/components/mermaid-render";
 import { MermaidError } from "@/components/mermaid-error";
 import { Hint } from "@/components/ui/hint";
+import { Icon } from "@/components/ui/icon";
 
 /**
  * SESSION-SCOPED OVERLAYS (owner wave, 2026-09-19): the "fullscreen"
@@ -215,30 +215,30 @@ export function MermaidOverlay({
 			// page's session-area div — below the drag bar, right of the
 			// sidebar. 80% + blur: the transcript ghosts through (owner
 			// decision, 2026-09-19).
-			className="absolute inset-0 z-40 flex flex-col bg-background/80 p-4 backdrop-blur-sm"
+			className="absolute inset-0 z-40 flex flex-col bg-background/80 px-4 pt-3 pb-4 backdrop-blur-md"
 			role="dialog"
 			aria-modal="true"
 			aria-label="Diagram focus"
 		>
-			<div className="mb-2 flex items-center gap-2">
-				<span className="text-sm font-medium">Diagram</span>
-				<span className="text-xs text-muted-foreground">from this lesson</span>
+			<div className="mb-3 flex items-center gap-2">
+				<span className="text-sm font-semibold">Diagram</span>
+				<span className="text-xs text-faint">from this lesson</span>
 				<Hint label="Close" binding="escape" side="left">
-<button
-					type="button"
-					onClick={onClose}
-					aria-label="Close"
-					data-testid="mermaid-overlay-close"
-					className="ml-auto rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-				>
-					<XIcon className="size-4" />
-				</button>
-</Hint>
+					<button
+						type="button"
+						onClick={onClose}
+						aria-label="Close"
+						data-testid="mermaid-overlay-close"
+						className="ml-auto flex size-[30px] items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-hover hover:text-foreground active:scale-95"
+					>
+						<Icon name="close" size="md" />
+					</button>
+				</Hint>
 			</div>
 			<div
 				ref={viewportRef}
 				className={cn(
-					"relative min-h-0 flex-1 touch-none overflow-hidden rounded-xl border select-none",
+					"relative min-h-0 flex-1 touch-none overflow-hidden rounded-2xl bg-surface shadow-[inset_0_0_0_1px_var(--line),var(--e1)] select-none",
 					atFloor ? "cursor-default" : "cursor-grab",
 				)}
 				onPointerDown={startDrag}
@@ -287,16 +287,16 @@ export function MermaidOverlay({
 							/>
 						</div>
 						<div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between p-2">
-							<span className="text-xs text-muted-foreground/60">Drag to pan · scroll to zoom</span>
-							<div className="flex gap-1">
+							<span className="text-xs text-faint">Drag to pan · scroll to zoom</span>
+							<div className="pointer-events-auto flex gap-0.5 rounded-[10px] bg-surface/90 p-0.5 shadow-[inset_0_0_0_1px_var(--line-strong),var(--e2)] backdrop-blur">
 								<Hint label="Zoom out" side="bottom">
 <button
 									type="button"
 									aria-label="Zoom out"
 									onClick={() => stepZoom(1 / 1.25)}
-									className="pointer-events-auto flex size-7 items-center justify-center rounded-md border border-border/70 bg-card/80 text-muted-foreground backdrop-blur transition-colors hover:bg-accent hover:text-foreground"
+									className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-hover hover:text-foreground active:scale-95"
 								>
-									<MinusIcon className="size-3.5" />
+									<Icon name="minus" size="sm" />
 								</button>
 </Hint>
 								<Hint label="Fit diagram to view" side="bottom">
@@ -304,9 +304,9 @@ export function MermaidOverlay({
 									type="button"
 									aria-label="Fit diagram to view"
 									onClick={fitView}
-									className="pointer-events-auto flex size-7 items-center justify-center rounded-md border border-border/70 bg-card/80 text-muted-foreground backdrop-blur transition-colors hover:bg-accent hover:text-foreground"
+									className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-hover hover:text-foreground active:scale-95"
 								>
-									<MaximizeIcon className="size-3.5" />
+									<Icon name="expand" size="sm" />
 								</button>
 </Hint>
 								<Hint label="Zoom in" side="bottom">
@@ -314,9 +314,9 @@ export function MermaidOverlay({
 									type="button"
 									aria-label="Zoom in"
 									onClick={() => stepZoom(1.25)}
-									className="pointer-events-auto flex size-7 items-center justify-center rounded-md border border-border/70 bg-card/80 text-muted-foreground backdrop-blur transition-colors hover:bg-accent hover:text-foreground"
+									className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-hover hover:text-foreground active:scale-95"
 								>
-									<PlusIcon className="size-3.5" />
+									<Icon name="plus" size="sm" />
 								</button>
 </Hint>
 							</div>
@@ -324,8 +324,8 @@ export function MermaidOverlay({
 					</>
 				) : (
 					<div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
-						<span className="inline-block size-4 animate-spin rounded-full border border-current border-b-2" />
-						Rendering diagram…
+						<Icon name="loading" size="md" className="animate-spin text-faint" />
+						Drawing the diagram…
 					</div>
 				)}
 			</div>

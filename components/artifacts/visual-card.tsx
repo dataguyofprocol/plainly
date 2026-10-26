@@ -2,7 +2,8 @@
 
 import { useContext, useState } from "react";
 import { ChatActionsContext } from "@/components/chat";
-import { DownloadIcon, MaximizeIcon } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
+import { Hint } from "@/components/ui/hint";
 import { InvertDiscIcon } from "@/components/artifacts/invert-disc";
 import { Toggle } from "@/components/settings/controls";
 import { useSessionMermaid } from "@/components/session-overlay";
@@ -82,56 +83,49 @@ export function VisualOutputCard({
 	const natural = result && typeof result.svg === "string" ? svgNaturalWidth(result.svg) : null;
 	if (!result || typeof result.svg !== "string") {
 		return (
-			<div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
-				Figure completed, but the result could not be displayed.
+			<div className="ls-card">
+				<div className="ls-card-b">The figure was drawn, but it could not be displayed.</div>
 			</div>
 		);
 	}
 	const failed = result.svg.length === 0;
 	if (failed) {
 		return (
-			<div className="rounded-xl border bg-card p-4 text-card-foreground" data-testid="visual-card-failed">
-				<div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-					Figure
-					<span className="rounded bg-danger/15 px-1.5 py-0.5 text-danger">failed</span>
+			<div className="ls-card" data-testid="visual-card-failed">
+				<div className="ls-card-h">
+					<Icon name="figure" size="sm" />
+					<span className="ls-card-t">Figure</span>
+					<span className="pill danger">failed</span>
 				</div>
-				<p className="mt-2 text-sm text-muted-foreground">{result.notes ?? "The figure could not be drawn."}</p>
+				<p className="ls-card-b">{result.notes ?? "The figure could not be drawn."}</p>
 			</div>
 		);
 	}
 	return (
 		/* NO CARD CHROME (owner round, 2026-10-07): the figure is document
-		   material — no border, no padding box. Image first, then the CAPTION
-		   ROW below: "Figure" left, the controls right, both edges following
-		   the IMAGE's own width (the wrapper carries the natural-sizing law,
-		   so the row hugs a centered narrow figure, not the column). */
-		<div
-			className={
-				natural !== null
-					? "my-4 mx-auto w-fit max-w-full"
-					: "my-4 w-full"
-			}
-			data-testid="visual-card"
-		>
+		   material — the image on its white backing, then the CAPTION ROW
+		   below: "Figure" left, the controls right, both edges following the
+		   IMAGE's own width (a declared-width svg hugs and centers). */
+		<div className={natural !== null ? "ls-figure hug w-fit" : "ls-figure"} data-testid="visual-card">
 			{/* Natural sizing (owner, 2026-10-07): a declared-width svg sits at
 			   ITS size; max-w-full still shrinks oversized ones to fit. No
 			   declared size (viewBox-only, %-width) keeps the full-width law.
-			   The invert filter rides the bg-white holder, so the backing flips
-			   white→black together with the strokes; transparent areas ARE the
-			   backing. */}
+			   The invert filter rides the white holder, so the backing flips
+			   together with the strokes. */}
 			<div
 				className={
 					natural !== null
-						? "w-fit max-w-full overflow-hidden rounded-lg bg-white [&_svg]:h-auto [&_svg]:max-w-full"
-						: "w-full overflow-hidden rounded-lg bg-white [&_svg]:h-auto [&_svg]:w-full"
+						? "ls-figure-img w-fit max-w-full [&_svg]:h-auto [&_svg]:max-w-full"
+						: "ls-figure-img w-full [&_svg]:h-auto [&_svg]:w-full"
 				}
 				style={{ filter: inverted ? "invert(1) hue-rotate(180deg)" : undefined }}
 				dangerouslySetInnerHTML={{ __html: sanitizeSvg(result.svg) }}
 				data-testid="visual-svg"
 			/>
-			<div className="mt-2 flex items-center justify-between gap-2">
-				<div className="text-xs font-medium text-muted-foreground">Figure</div>
-				<div className="flex items-center gap-1.5">
+			<div className="ls-figure-cap">
+				<Icon name="figure" size="xs" />
+				<span>Figure</span>
+				<span className="ls-card-x">
 					{/* The invert affordance (owner round, 2026-10-07): the disc IS
 					    the half-filled contrast circle; the tooltip names it. */}
 					<Toggle
@@ -141,29 +135,31 @@ export function VisualOutputCard({
 						title="Invert colors"
 						discIcon={<InvertDiscIcon className="size-3" />}
 					/>
-					<button
-						type="button"
-						aria-label="Download figure as SVG"
-						title="Download as SVG"
-						onClick={() => downloadFile("figure.svg", result.svg, "image/svg+xml")}
-						data-testid="visual-download"
-						className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-					>
-						<DownloadIcon className="size-3.5" />
-					</button>
-					{overlay && (
+					<Hint label="Download as SVG" side="bottom">
 						<button
 							type="button"
-							aria-label="Open figure fullscreen"
-							title="Open fullscreen"
-							onClick={() => overlay.openFigure(result.svg, inverted)}
-							data-testid="visual-open"
-							className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+							aria-label="Download figure as SVG"
+							onClick={() => downloadFile("figure.svg", result.svg, "image/svg+xml")}
+							data-testid="visual-download"
+							className="ib sm"
 						>
-							<MaximizeIcon className="size-3.5" />
+							<Icon name="download" size="sm" />
 						</button>
+					</Hint>
+					{overlay && (
+						<Hint label="Open full-screen" side="bottom">
+							<button
+								type="button"
+								aria-label="Open figure fullscreen"
+								onClick={() => overlay.openFigure(result.svg, inverted)}
+								data-testid="visual-open"
+								className="ib sm"
+							>
+								<Icon name="expand" size="sm" />
+							</button>
+						</Hint>
 					)}
-				</div>
+				</span>
 			</div>
 		</div>
 	);

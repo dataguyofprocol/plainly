@@ -1,18 +1,26 @@
 "use client";
 
 /**
- * THE V4 SHELL (rebuild, 2026-10-26) — the pieces every screen frames
- * itself with, as drawn in Home4 / Knowledge4 / Lesson4 / Practice4:
+ * THE V4 SHELL (rebuild, 2026-10-26; finesse pass) — the pieces every
+ * screen frames itself with:
  *
  *   Field        the drifting gradient behind everything (paused when the
  *                window is in the background; still under reduced motion)
- *   SidebarCard  the inset glass card: wordmark, Home / Knowledge /
- *                Practice, a screen-owned middle (sessions on Home, topics
- *                on Knowledge), a footer (Settings, or Import notes)
- *   SessionGroups  Waiting on you / Today / Earlier, with the right-click
- *                menu (rename, export, delete, extraction coverage)
- *   Rail         the 60px icon column of Lesson and Practice, with the
- *                sessions flyout (hover, focus, or ⌘B)
+ *   SidebarCard  the inset glass card at ≥1100px: wordmark, Home /
+ *                Knowledge / Practice, a screen-owned middle (sessions by
+ *                default, topics on Knowledge), a footer (Settings, or
+ *                Import notes). Between 800 and 1099px the same frame
+ *                renders as the icon rail; below 800 the rail lies flat
+ *                along the top. CSS decides which one shows (no layout
+ *                flash on first paint).
+ *   SessionGroups  Waiting on you / Today / Earlier, capped per group,
+ *                with the right-click menu (rename, export, delete,
+ *                extraction coverage)
+ *   Rail         the icon column of Lesson and Practice, with the
+ *                sessions flyout (hover, focus, click, or ⌘B) — the very
+ *                same component the sidebar card collapses into
+ *
+ * Styles: app/ui/shell.css.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -22,9 +30,34 @@ import { DeleteSessionDialog } from "@/components/delete-session-dialog";
 import { CoverageMenuBlock } from "@/components/extraction-coverage";
 import { MenuShell } from "@/components/menu-shell";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
+import { Icon, LogoMark, type IconName } from "@/components/ui/icon";
+import { displayTitle } from "@/components/ui/format";
 import { kbdEventForAction, type ChatDeleteMode } from "@/src/core";
-import { dotColor, groupChats, sessionLine, sessionState, useChats, type V4Chat } from "@/components/v4/data";
-import { HomeIcon, KnowledgeIcon, LogoMark, PlusIcon, PracticeIcon, SessionsIcon, SettingsIcon } from "@/components/v4/icons";
+import { groupChats, sessionLine, sessionState, useChats, type V4Chat } from "@/components/v4/data";
+
+/** Rows shown per group before "Show all" (a real library runs to hundreds). */
+const GROUP_CAP = 8;
+
+type Place = "home" | "knowledge" | "practice";
+
+const NAV: Array<{ href: string; label: string; icon: IconName; place: Place }> = [
+	{ href: "/", label: "Home", icon: "home", place: "home" },
+	{ href: "/knowledge", label: "Knowledge", icon: "knowledge", place: "knowledge" },
+	{ href: "/practice", label: "Practice", icon: "practice", place: "practice" },
+];
+
+function placeOf(pathname: string | null): Place | undefined {
+	return pathname === "/" ? "home" : pathname === "/knowledge" ? "knowledge" : pathname === "/practice" ? "practice" : undefined;
+}
+
+/** New lesson = Home with the omnibar focused (⌘N does the same). */
+function useNewLesson() {
+	const router = useRouter();
+	return useCallback(() => {
+		router.push("/");
+		window.setTimeout(() => window.dispatchEvent(new CustomEvent("lh:focus-omnibar")), 150);
+	}, [router]);
+}
 
 // ─── Field ─────────────────────────────────────────────────────────────────
 
@@ -48,6 +81,9 @@ export function Field({ variant = "home" }: { variant?: "home" | "knowledge" | "
 
 // ─── Sidebar card ──────────────────────────────────────────────────────────
 
+/** The sidebar card. With no `children` its middle is the session list;
+ *  a screen may pass its own (Knowledge passes topics) — in rail mode that
+ *  middle and the footer move into the rail's panel flyout. */
 export function SidebarCard({
 	children,
 	footer,
@@ -58,41 +94,56 @@ export function SidebarCard({
 	knowledgeCount?: number | null;
 }) {
 	const pathname = usePathname();
+	const chats = useChats();
 	const { open: openSettings } = useSettingsDialog();
-	const nav = [
-		{ href: "/", label: "Home", icon: <HomeIcon />, on: pathname === "/" },
-		{ href: "/knowledge", label: "Knowledge", icon: <KnowledgeIcon />, on: pathname === "/knowledge", count: knowledgeCount },
-		{ href: "/practice", label: "Practice", icon: <PracticeIcon />, on: pathname === "/practice" },
-	];
+	const newLesson = useNewLesson();
+	const here = placeOf(pathname);
 	return (
-		<aside className="side" aria-label="Navigation">
-			<div className="sidein glass">
-				<div className="brand lh-drag" style={{ display: "flex", alignItems: "center", gap: 9, padding: "2px 6px" }}>
-					<LogoMark />
-					<b style={{ fontSize: 14 }}>LearnHarness</b>
-				</div>
-				<nav style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-					{nav.map((n) => (
-						<Link key={n.href} className={`srow ${n.on ? "on" : ""}`} href={n.href} aria-current={n.on ? "page" : undefined}>
-							{n.icon}
-							{n.label}
-							{n.count != null && (
-								<span className="mono" style={{ marginLeft: "auto", fontSize: 10.5, color: "var(--faint)" }}>
-									{n.count}
-								</span>
-							)}
+		<>
+			<aside className="side" aria-label="Navigation">
+				<div className="sidein glass">
+					<div className="side-brand lh-drag">
+						<Link href="/" className="side-logo" aria-label="LearnHarness home">
+							<LogoMark size={24} />
+							<span>LearnHarness</span>
 						</Link>
-					))}
-				</nav>
-				<div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", margin: "0 -2px" }}>{children}</div>
-				{footer ?? (
-					<button type="button" className="srow" onClick={() => openSettings()} data-testid="settings-entry" style={{ border: 0, background: "transparent", width: "100%" }}>
-						<SettingsIcon />
-						Settings
-					</button>
-				)}
+						<button type="button" className="ib sm tipb" aria-label="New lesson" data-tip="New lesson  ⌘N" onClick={newLesson}>
+							<Icon name="plus" size="sm" />
+						</button>
+					</div>
+					<nav className="side-nav" aria-label="Places">
+						{NAV.map((n) => {
+							const on = here === n.place;
+							const count = n.place === "knowledge" ? knowledgeCount : null;
+							return (
+								<Link key={n.href} className={`srow ${on ? "on" : ""}`} href={n.href} aria-current={on ? "page" : undefined}>
+									<Icon name={n.icon} size="md" />
+									<span>{n.label}</span>
+									{count != null && <span className="srow-count num">{count}</span>}
+								</Link>
+							);
+						})}
+					</nav>
+					<div className="side-mid">{children ?? <SessionGroups chats={chats} />}</div>
+					<div className="side-foot">
+						{footer ?? (
+							<button type="button" className="srow" onClick={() => openSettings()} data-testid="settings-entry">
+								<Icon name="settings" size="md" />
+								<span>Settings</span>
+							</button>
+						)}
+					</div>
+				</div>
+			</aside>
+			<div className="side-rail">
+				<RailNav
+					chats={chats}
+					active={here}
+					embedded
+					panel={children !== undefined || footer !== undefined ? { label: "Topics", content: (<>{children}{footer && <div className="fly-foot">{footer}</div>}</>) } : undefined}
+				/>
 			</div>
-		</aside>
+		</>
 	);
 }
 
@@ -109,6 +160,7 @@ export function SessionGroups({ chats, compact = false }: { chats: V4Chat[] | nu
 	const anchorRef = useRef<HTMLElement | null>(null);
 	const [renaming, setRenaming] = useState<string | null>(null);
 	const [deleting, setDeleting] = useState<V4Chat | null>(null);
+	const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
 
 	useEffect(() => {
 		if (ctx === null) return;
@@ -154,52 +206,92 @@ export function SessionGroups({ chats, compact = false }: { chats: V4Chat[] | nu
 		[pathname, router],
 	);
 
-	if (chats === null) return <div className="gl">Loading…</div>;
+	if (chats === null) {
+		return (
+			<div className="sess-skel" aria-hidden="true">
+				{[0, 1, 2, 3].map((i) => (
+					<span key={i}>
+						<i className="skel" />
+						<i className="skel" />
+					</span>
+				))}
+			</div>
+		);
+	}
 	if (groups.length === 0) {
-		return <p style={{ margin: 0, padding: "10px 10px", fontSize: 12.5, color: "var(--v-muted)" }}>Your lessons will be listed here.</p>;
+		return (
+			<div className="sess-empty">
+				<Icon name="lesson" size="md" />
+				<span>Your lessons will be listed here as you start them.</span>
+			</div>
+		);
 	}
 	return (
-		<>
-			{groups.map((g) => (
-				<div key={g.name} style={{ display: "flex", flexDirection: "column" }}>
-					<div className="gl" style={compact ? { padding: "8px 10px 2px", fontSize: 11.5 } : undefined}>
-						<span>{g.name}</span>
-						<span>{g.chats.length}</span>
-					</div>
-					{g.chats.map((c) =>
-						renaming === c.id ? (
-							<RenameRow key={c.id} chat={c} onCommit={(t) => void commitRename(c.id, t)} onCancel={() => setRenaming(null)} />
-						) : (
+		<div className={`sgroups ${compact ? "compact" : ""}`}>
+			{groups.map((g) => {
+				const all = expanded.has(g.name);
+				const activeAt = g.chats.findIndex((c) => pathname === `/chat/${c.id}`);
+				// Capped, but the open session always stays in view.
+				const shown = all ? g.chats : g.chats.filter((_, i) => i < GROUP_CAP || i === activeAt);
+				return (
+					<section key={g.name} className="sgroup" aria-label={g.name}>
+						<div className="gl">
+							<span>{g.name}</span>
+							<span className="num">{g.chats.length}</span>
+						</div>
+						{shown.map((c) => {
+							const on = pathname === `/chat/${c.id}`;
+							const state = sessionState(c);
+							return renaming === c.id ? (
+								<RenameRow key={c.id} chat={c} onCommit={(t) => void commitRename(c.id, t)} onCancel={() => setRenaming(null)} />
+							) : (
+								<button
+									key={c.id}
+									type="button"
+									className={`sess ${on ? "on" : ""} ${ctx === c.id ? "ctx" : ""}`}
+									data-testid="session-row"
+									aria-current={on ? "page" : undefined}
+									title={displayTitle(c.title)}
+									onClick={() => router.push(`/chat/${c.id}`)}
+									onContextMenu={(e) => {
+										e.preventDefault();
+										anchorRef.current = e.currentTarget;
+										setCtx(c.id);
+									}}
+								>
+									<span className="sess-mark" aria-hidden="true">
+										{state === "waiting" ? <span className="ping" /> : <span className={`dot ${state === "working" ? "brand" : ""}`} />}
+									</span>
+									<span className="sess-t trunc">{displayTitle(c.title)}</span>
+									<span className="sess-m trunc">{sessionLine(c)}</span>
+								</button>
+							);
+						})}
+						{g.chats.length > GROUP_CAP && (
 							<button
-								key={c.id}
 								type="button"
-								className={`sess ${pathname === `/chat/${c.id}` ? "on" : ""}`}
-								data-testid="session-row"
-								onClick={() => router.push(`/chat/${c.id}`)}
-								onContextMenu={(e) => {
-									e.preventDefault();
-									anchorRef.current = e.currentTarget;
-									setCtx(c.id);
-								}}
+								className="sess-more"
+								aria-expanded={all}
+								onClick={() =>
+									setExpanded((s) => {
+										const next = new Set(s);
+										if (all) next.delete(g.name);
+										else next.add(g.name);
+										return next;
+									})
+								}
 							>
-								<b>
-									<span className="dot" style={{ background: dotColor(c, g.name) }} />
-									<span>{c.title}</span>
-								</b>
-								<span>{sessionLine(c)}</span>
+								<Icon name={all ? "chevron-up" : "chevron-down"} size="xs" />
+								{all ? "Show fewer" : `Show all ${g.chats.length}`}
 							</button>
-						),
-					)}
-				</div>
-			))}
+						)}
+					</section>
+				);
+			})}
 			{ctx !== null && (
-				<MenuShell
-					anchorRef={anchorRef}
-					testid="session-context-menu"
-					preferredSide="down"
-					menuClass="pop flex w-52 flex-col gap-0.5 rounded-[14px] p-2 text-[12.5px]"
-				>
+				<MenuShell anchorRef={anchorRef} testid="session-context-menu" preferredSide="down" menuClass="v4 scope ctx-menu">
 					<button type="button" className="mrow" data-testid="ctx-rename" onClick={() => (setRenaming(ctx), setCtx(null))}>
+						<Icon name="edit" size="sm" />
 						Rename
 					</button>
 					<button
@@ -217,26 +309,30 @@ export function SessionGroups({ chats, compact = false }: { chats: V4Chat[] | nu
 							a.remove();
 						}}
 					>
-						Export as Markdown…
+						<Icon name="download" size="sm" />
+						Export as Markdown
 					</button>
+					<div className="msep" aria-hidden="true" />
 					<button
 						type="button"
-						className="mrow"
+						className="mrow danger"
 						data-testid="ctx-delete"
-						style={{ color: "var(--v-muted)" }}
 						onClick={() => {
 							setDeleting(chats.find((c) => c.id === ctx) ?? null);
 							setCtx(null);
 						}}
 					>
+						<Icon name="delete" size="sm" />
 						Delete…
 					</button>
-					<div style={{ margin: "2px 0", borderTop: "1px solid var(--line)" }} aria-hidden="true" />
-					<CoverageMenuBlock chatId={ctx} />
+					<div className="msep" aria-hidden="true" />
+					<div className="ctx-coverage">
+						<CoverageMenuBlock chatId={ctx} />
+					</div>
 				</MenuShell>
 			)}
 			<DeleteSessionDialog chat={deleting} onClose={() => setDeleting(null)} onDeleted={onDeleted} />
-		</>
+		</div>
 	);
 }
 
@@ -248,9 +344,13 @@ function RenameRow({ chat, onCommit, onCancel }: { chat: V4Chat; onCommit: (t: s
 		ref.current?.select();
 	}, []);
 	return (
-		<div className="sess on" data-testid="session-rename-row">
+		<div className="sess on renaming" data-testid="session-rename-row">
+			<span className="sess-mark" aria-hidden="true">
+				<Icon name="edit" size="xs" />
+			</span>
 			<input
 				ref={ref}
+				className="sess-input"
 				value={draft}
 				aria-label="Rename session"
 				data-testid="session-rename-input"
@@ -264,69 +364,153 @@ function RenameRow({ chat, onCommit, onCancel }: { chat: V4Chat; onCommit: (t: s
 						onCancel();
 					}
 				}}
-				style={{ border: 0, borderBottom: "1px solid var(--line2)", background: "transparent", outline: "none", fontWeight: 600, fontSize: 12.5, padding: "0 0 0 15px" }}
 			/>
-			<span>{sessionLine(chat)}</span>
+			<span className="sess-m trunc">Enter to save · Esc to cancel</span>
 		</div>
 	);
 }
 
 // ─── Rail ──────────────────────────────────────────────────────────────────
 
-export function Rail({ active }: { active?: "home" | "knowledge" | "practice" }) {
+/** The rail of Lesson and Practice. */
+export function Rail({ active }: { active?: Place }) {
 	const chats = useChats();
-	const router = useRouter();
-	const { open: openSettings } = useSettingsDialog();
-	const waiting = (chats ?? []).filter((c) => sessionState(c) === "waiting").length;
-	const [fly, setFly] = useState(false);
+	return <RailNav chats={chats} active={active} />;
+}
 
-	// ⌘B toggles the sessions flyout on rail screens.
+/** One rail item's tooltip (a real element, so it can carry a key hint). */
+function Tip({ label, keys }: { label: string; keys?: string }) {
+	return (
+		<span className="tip" aria-hidden="true">
+			{label}
+			{keys && <span className="tip-k">{keys}</span>}
+		</span>
+	);
+}
+
+/** A hover/focus/click flyout anchored to a rail button. Closing waits a
+ *  beat so the pointer can cross from the button to the panel. */
+function useFlyout() {
+	const [open, setOpen] = useState(false);
+	const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+	const show = useCallback(() => {
+		clearTimeout(timer.current);
+		setOpen(true);
+	}, []);
+	const hide = useCallback(() => {
+		clearTimeout(timer.current);
+		timer.current = setTimeout(() => setOpen(false), 160);
+	}, []);
+	useEffect(() => () => clearTimeout(timer.current), []);
+	const wrap = {
+		onMouseEnter: show,
+		onMouseLeave: hide,
+		onFocus: show,
+		onBlur: (e: React.FocusEvent<HTMLDivElement>) => {
+			if (!e.currentTarget.contains(e.relatedTarget as Node)) hide();
+		},
+	};
+	return { open, setOpen, wrap };
+}
+
+function RailNav({
+	chats,
+	active,
+	embedded = false,
+	panel,
+}: {
+	chats: V4Chat[] | null;
+	active?: Place;
+	/** Inside the sidebar card's rail mode: the card owns the settings testid. */
+	embedded?: boolean;
+	/** A screen's own sidebar middle (Knowledge's topics), as a second flyout. */
+	panel?: { label: string; content: ReactNode };
+}) {
+	const { open: openSettings } = useSettingsDialog();
+	const newLesson = useNewLesson();
+	const waiting = (chats ?? []).filter((c) => sessionState(c) === "waiting").length;
+	const sessions = useFlyout();
+	const extra = useFlyout();
+	const railRef = useRef<HTMLElement>(null);
+	const { setOpen: setSessionsOpen } = sessions;
+
+	// ⌘B toggles the sessions flyout — only on the rail that is showing.
 	useEffect(() => {
 		const event = kbdEventForAction("toggle-sidebar");
-		const on = () => setFly((v) => !v);
+		const on = () => {
+			if (railRef.current?.offsetParent === null) return;
+			setSessionsOpen((v) => !v);
+		};
 		window.addEventListener(event, on);
 		return () => window.removeEventListener(event, on);
-	}, []);
+	}, [setSessionsOpen]);
 
+	const sessionsLabel = waiting ? `Sessions, ${waiting} waiting on you` : "Sessions";
 	return (
-		<nav className="rail" aria-label="App">
+		<nav ref={railRef} className="rail" aria-label="App">
 			<div className="rail-lights lh-drag" aria-hidden="true" />
-			<Link className="ri" href="/" aria-label="LearnHarness home" style={{ marginBottom: 8 }}>
-				<LogoMark size={22} />
+			<Link className="ri logo" href="/" aria-label="LearnHarness home">
+				<LogoMark size={28} />
 			</Link>
-			<Link className={`ri ${active === "home" ? "on" : ""}`} href="/" aria-label="Home">
-				<HomeIcon size={18} />
-				<span className="tip">Home</span>
+			<Link className={`ri ${active === "home" ? "on" : ""}`} href="/" aria-label="Home" aria-current={active === "home" ? "page" : undefined}>
+				<Icon name="home" size="lg" />
+				<Tip label="Home" />
 			</Link>
-			<div style={{ position: "relative" }} onMouseEnter={() => setFly(true)} onMouseLeave={() => setFly(false)} onFocus={() => setFly(true)} onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setFly(false)}>
-				<button type="button" className={`ri ${fly ? "on" : ""}`} aria-label={waiting ? `Sessions, ${waiting} waiting on you` : "Sessions"} aria-haspopup="true" aria-expanded={fly} onClick={() => setFly((v) => !v)}>
-					<SessionsIcon />
+			<div className="ri-wrap" {...sessions.wrap}>
+				<button
+					type="button"
+					className={`ri ${sessions.open ? "open" : ""}`}
+					aria-label={sessionsLabel}
+					aria-haspopup="true"
+					aria-expanded={sessions.open}
+					onClick={() => sessions.setOpen((v) => !v)}
+				>
+					<Icon name="sessions" size="lg" />
 					{waiting > 0 && <span className="badge" aria-hidden="true" />}
+					{!sessions.open && <Tip label={waiting ? `Sessions · ${waiting} waiting` : "Sessions"} keys="⌘B" />}
 				</button>
-				{fly && (
+				{sessions.open && (
 					<nav className="fly pop settle" aria-label="Sessions">
+						<div className="fly-head">
+							<span className="h">Sessions</span>
+							<button type="button" className="mini" onClick={newLesson}>
+								<Icon name="plus" size="sm" />
+								New lesson
+							</button>
+						</div>
 						<SessionGroups chats={chats} compact />
 					</nav>
 				)}
 			</div>
-			<Link className={`ri ${active === "knowledge" ? "on" : ""}`} href="/knowledge" aria-label="Knowledge">
-				<KnowledgeIcon size={18} />
-				<span className="tip">Knowledge</span>
+			<Link className={`ri ${active === "knowledge" ? "on" : ""}`} href="/knowledge" aria-label="Knowledge" aria-current={active === "knowledge" ? "page" : undefined}>
+				<Icon name="knowledge" size="lg" />
+				<Tip label="Knowledge" />
 			</Link>
-			<Link className={`ri ${active === "practice" ? "on" : ""}`} href="/practice" aria-label="Practice">
-				<PracticeIcon size={18} />
-				<span className="tip">Practice</span>
+			<Link className={`ri ${active === "practice" ? "on" : ""}`} href="/practice" aria-label="Practice" aria-current={active === "practice" ? "page" : undefined}>
+				<Icon name="practice" size="lg" />
+				<Tip label="Practice" />
 			</Link>
-			<button type="button" className="ri ink" aria-label="New lesson" onClick={() => {
-					router.push("/");
-					window.setTimeout(() => window.dispatchEvent(new CustomEvent("lh:focus-omnibar")), 150);
-				}} style={{ marginTop: 8 }}>
-				<PlusIcon />
-				<span className="tip">New lesson ⌘N</span>
+			{panel && (
+				<div className="ri-wrap" {...extra.wrap}>
+					<button type="button" className={`ri ${extra.open ? "open" : ""}`} aria-label={panel.label} aria-haspopup="true" aria-expanded={extra.open} onClick={() => extra.setOpen((v) => !v)}>
+						<Icon name="outline" size="lg" />
+						{!extra.open && <Tip label={panel.label} />}
+					</button>
+					{extra.open && (
+						<div className="fly pop settle" role="group" aria-label={panel.label}>
+							{panel.content}
+						</div>
+					)}
+				</div>
+			)}
+			<span className="rail-sep" aria-hidden="true" />
+			<button type="button" className="ri new" aria-label="New lesson" onClick={newLesson}>
+				<Icon name="plus" size="lg" />
+				<Tip label="New lesson" keys="⌘N" />
 			</button>
-			<button type="button" className="ri" aria-label="Settings" onClick={() => openSettings()} style={{ marginTop: "auto" }} data-testid="settings-entry">
-				<SettingsIcon size={18} />
-				<span className="tip">Settings</span>
+			<button type="button" className="ri foot" aria-label="Settings" onClick={() => openSettings()} data-testid={embedded ? undefined : "settings-entry"}>
+				<Icon name="settings" size="lg" />
+				<Tip label="Settings" />
 			</button>
 		</nav>
 	);

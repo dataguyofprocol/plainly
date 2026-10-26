@@ -171,7 +171,7 @@ describe("practice display surfaces", () => {
 		let expanded = "";
 		assert.doesNotThrow(() => { expanded = renderToStaticMarkup(dock(input)); });
 		const { document } = parseHTML(expanded);
-		assert.equal(document.querySelector(".lh-prose")!.innerHTML,
+		assert.equal(document.querySelector(".pcard-read")!.innerHTML,
 			parseHTML(renderToStaticMarkup(<MessageResponse>{input.statement}</MessageResponse>)).document.firstElementChild!.outerHTML,
 			"non-string values pass through exactly as before, without string coercion or a new fallback");
 		assert.deepEqual(messages, before);

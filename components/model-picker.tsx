@@ -4,12 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatSettings, ModelCatalogEntry, ModelCatalogResponse, ModelsSettings, UserSettings } from "@/src/core";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { prettyModel } from "@/components/usage-format";
-import { ModelMenuList, ThinkingMenuList } from "@/components/settings/model-menu";
+import { levelName, ModelMenuList, ThinkingMenuList } from "@/components/settings/model-menu";
+import { Icon } from "@/components/ui/icon";
 import { composeSlotModel } from "@/components/settings/agent-section";
 import { MenuShell } from "@/components/menu-shell";
 import { Hint } from "@/components/ui/hint";
 import { notifySettingsSaved, onSettingsSaved, useSettingsSaved } from "@/components/settings-signal";
 import { defaultOrderLevel, populateLevel, THINKING_LABEL } from "@/components/thinking-default";
+
+/** The thinking seg's compact labels (the full name rides the tooltip). */
+const SHORT_LEVEL: Record<string, string> = { minimal: "Min", medium: "Med", xhigh: "X-high" };
 
 /** GET /api/models is cached per page load for instant menu opens, but
  *  the federation is LIVE per call — keys saved mid-session widen the
@@ -326,11 +330,25 @@ export function ModelControl({
 		if (kind === "model") refresh();
 	};
 
+	const menuFooter =
+		catalog && catalog.models.length === 0
+			? "No models yet. Add a provider key in Settings."
+			: chatId
+				? "Changes the model for this session only"
+				: "The default for new sessions";
+
 	if (variant === "chip") {
-		const levelLabel = effectiveLevel === undefined ? null : (THINKING_LABEL[effectiveLevel] ?? effectiveLevel).toLowerCase();
+		const levelLabel = effectiveLevel === undefined ? null : levelName(THINKING_LABEL[effectiveLevel] ?? effectiveLevel);
+		const name = effectiveId ? prettyModel(effectiveId) : "Choose a model";
 		return (
-			<div ref={containerRef} style={{ position: "relative" }} data-testid="model-control">
-				<Hint label="Model and thinking" action="open-model-picker" side="bottom">
+			<div ref={containerRef} className="relative" data-testid="model-control">
+				{/* The chip truncates long ids; the tooltip carries the full
+				    provider · id · thinking level. */}
+				<Hint
+					label={effectiveId ? `${effectiveProvider} · ${effectiveId}${levelLabel ? ` · ${levelLabel} thinking` : ""}` : "Model and thinking"}
+					action="open-model-picker"
+					side="bottom"
+				>
 					<button
 						type="button"
 						data-testid="stats-model"
@@ -339,49 +357,40 @@ export function ModelControl({
 						aria-expanded={open === "model"}
 						onClick={() => openMenu("model")}
 					>
-						<span className="dot" style={{ background: "var(--v-accent)", width: 6, height: 6 }} />
-						<span>{effectiveId ? prettyModel(effectiveId) : "Choose a model"}</span>
-						{levelLabel && <span style={{ color: "var(--faint)" }}>· {levelLabel}</span>}
-						<span aria-hidden style={{ fontSize: 10 }}>▾</span>
+						<span className={effectiveId ? "mchip-dot" : "mchip-dot off"} aria-hidden />
+						<span className="mchip-t">{name}</span>
+						{levelLabel && <span className="mchip-l">· {levelLabel}</span>}
+						<Icon name="chevron-down" size="xs" />
 					</button>
 				</Hint>
 				{open === "model" && (
-					<MenuShell
-						anchorRef={containerRef}
-						testid="model-menu"
-						preferredSide="down"
-						menuClass="pop flex w-[22rem] flex-col rounded-[14px] p-2 text-xs"
-					>
-						{error && <div className="mb-1.5 text-destructive">{error}</div>}
+					<MenuShell anchorRef={containerRef} testid="model-menu" preferredSide="down" menuClass="pop lh-menu mm">
+						{error && <div className="mm-err">{error}</div>}
 						<ModelMenuList
 							models={catalog?.models}
 							effectiveId={effectiveId}
 							effectiveProvider={effectiveProvider}
 							onPick={pickModel}
-							footer={
-								catalog && catalog.models.length === 0
-									? "No models — add a provider key in Keys"
-									: chatId
-										? "This session's model"
-										: "Strong tier — the default for new sessions"
-							}
+							footer={levels.length > 0 ? undefined : menuFooter}
 						/>
 						{levels.length > 0 && (
-							<>
-								<div style={{ padding: "8px 10px 4px", fontSize: 11.5, fontWeight: 600, color: "var(--faint)" }}>Thinking</div>
-								<div className="seg" style={{ margin: "0 6px 4px" }} data-testid="thinking-seg">
+							<div className="mm-think">
+								<span className="over">Thinking</span>
+								<div className="seg sm" data-testid="thinking-seg">
 									{levels.map((level) => (
 										<button
 											key={level}
 											type="button"
 											className={level === effectiveLevel ? "on" : ""}
+											title={levelName(level)}
 											onClick={() => apply(effectiveProvider ?? "", effectiveId ?? "", level as ThinkingLevel)}
 										>
-											{THINKING_LABEL[level] ?? level}
+											{SHORT_LEVEL[level] ?? levelName(level)}
 										</button>
 									))}
 								</div>
-							</>
+								<div className="mm-foot">{menuFooter}</div>
+							</div>
 						)}
 					</MenuShell>
 				)}
@@ -408,10 +417,11 @@ export function ModelControl({
 				// view's floating top-right buttons (import notes, gear,
 				// coverage) — blurred, fuller opacity, shadowed — so the
 				// graph no longer bleeds through these pills.
-				className="flex items-center gap-1.5 rounded-full border bg-card/85 px-2.5 py-1 shadow-lg backdrop-blur transition-colors hover:border-border hover:bg-muted"
+				title={effectiveId ? `${effectiveProvider} · ${effectiveId}` : undefined}
+				className="flex h-7 max-w-56 items-center gap-1.5 rounded-full bg-surface/90 px-2.5 text-xs font-semibold whitespace-nowrap text-foreground shadow-[inset_0_0_0_1px_var(--line-strong),var(--e1)] backdrop-blur transition-shadow hover:shadow-[inset_0_0_0_1px_rgb(25_28_26/0.24),var(--e1)]"
 			>
-				<span className="text-card-foreground">{effectiveId ? prettyModel(effectiveId) : "—"}</span>
-				<span aria-hidden className="text-xs text-muted-foreground">▾</span>
+				<span className="truncate">{effectiveId ? prettyModel(effectiveId) : "—"}</span>
+				<Icon name="chevron-down" size="xs" className="text-faint" />
 			</button>
 			</Hint>
 			<Hint
@@ -436,14 +446,12 @@ export function ModelControl({
 				// view's floating top-right buttons (import notes, gear,
 				// coverage) — blurred, fuller opacity, shadowed — so the
 				// graph no longer bleeds through these pills.
-				className="flex items-center gap-1.5 rounded-full border bg-card/85 px-2.5 py-1 shadow-lg backdrop-blur transition-colors hover:border-border hover:bg-muted"
+				className="flex h-7 items-center gap-1.5 rounded-full bg-surface/90 px-2.5 text-xs font-semibold whitespace-nowrap text-foreground shadow-[inset_0_0_0_1px_var(--line-strong),var(--e1)] backdrop-blur transition-shadow hover:shadow-[inset_0_0_0_1px_rgb(25_28_26/0.24),var(--e1)]"
 			>
 				{/* Just the level — the button reads like the model button reads
 				   the model name (owner, stats-control round 1). */}
-				<span className="text-card-foreground">
-					{effectiveLevel === undefined ? "—" : (THINKING_LABEL[effectiveLevel] ?? effectiveLevel)}
-				</span>
-				<span aria-hidden className="text-xs text-muted-foreground">▾</span>
+				<span>{effectiveLevel === undefined ? "—" : levelName(THINKING_LABEL[effectiveLevel] ?? effectiveLevel)}</span>
+				<Icon name="chevron-down" size="xs" className="text-faint" />
 			</button>
 			</Hint>
 
@@ -455,21 +463,15 @@ export function ModelControl({
 					anchorRef={containerRef}
 					testid="model-menu"
 					preferredSide="up"
-					menuClass="flex w-[22rem] flex-col rounded-xl border bg-card p-2 text-xs shadow-xl"
+					menuClass="pop lh-menu mm"
 				>
-					{error && <div className="mb-1.5 text-destructive">{error}</div>}
+					{error && <div className="mm-err">{error}</div>}
 					<ModelMenuList
 						models={catalog?.models}
 						effectiveId={effectiveId}
 						effectiveProvider={effectiveProvider}
 						onPick={pickModel}
-						footer={
-							catalog && catalog.models.length === 0
-								? "No models — add a provider key in Keys"
-								: chatId
-									? "This session's model"
-									: "Strong tier — the default for new sessions"
-						}
+						footer={menuFooter}
 					/>
 				</MenuShell>
 			)}
@@ -479,16 +481,16 @@ export function ModelControl({
 					anchorRef={containerRef}
 					testid="thinking-menu"
 					preferredSide="up"
-					menuClass="flex w-44 flex-col gap-0.5 rounded-xl border bg-card p-2 text-xs shadow-xl"
+					menuClass="pop lh-menu mm narrow"
 				>
 					<ThinkingMenuList
 						levels={catalog ? levels : []}
 						effectiveLevel={effectiveLevel}
 						onPick={(level) => apply(effectiveProvider ?? "", effectiveId ?? "", level as ThinkingLevel)}
 						empty={catalog ? (effectiveId ? `${prettyModel(effectiveId)} has no thinking levels.` : "Pick a model first.") : "Loading…"}
-						footer="Levels this model actually supports"
+						footer="Levels this model supports"
 					/>
-					{error && <div className="mt-1 text-destructive">{error}</div>}
+					{error && <div className="mm-err">{error}</div>}
 				</MenuShell>
 			)}
 		</div>

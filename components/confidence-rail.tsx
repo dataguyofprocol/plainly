@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
-import { CONFIDENCE_STOPS } from "@/src/core";
+import { CONFIDENCE_LEVEL_COLORS } from "@/components/confidence-colors";
+import { CONFIDENCE_LEVELS, CONFIDENCE_STOPS } from "@/src/core";
 
 /**
  * The confidence RAIL — the slider's paint, shared by two surfaces so they
@@ -57,5 +58,65 @@ export function ConfidenceRail({ value, className }: { value: number; className?
 			className={cn("h-1.5 w-full rounded-full border border-border", className)}
 			style={confidenceRailStyle(value)}
 		/>
+	);
+}
+
+/**
+ * THE CONFIDENCE LADDER (finesse pass, 2026-10-26) — "How sure?" as four
+ * rungs, shared by the question dock and the practice dock so the two can
+ * never drift. Each rung wears its level's colour (confidence-colors.ts,
+ * passed as --lvl / --lvl-soft): the chosen rung takes a soft tint with
+ * coloured text, and the bars up to it light in their own colours, so the
+ * row reads as a scale climbing from guessing to certain. `value` is a
+ * level value (25/50/75/95) or null when nothing is chosen yet.
+ */
+export function ConfidenceLadder({
+	value,
+	onChange,
+	disabled = false,
+	labelledBy,
+	title,
+	testid,
+	stopTestids = false,
+}: {
+	value: number | null;
+	onChange: (value: number) => void;
+	disabled?: boolean;
+	labelledBy: string;
+	title?: string;
+	testid?: string;
+	/** The question dock's per-rung testids (confidence-stop-<value>). */
+	stopTestids?: boolean;
+}) {
+	const at = value === null || disabled ? -1 : CONFIDENCE_LEVELS.findIndex((l) => l.value === value);
+	return (
+		<div
+			className={cn("conf", disabled && "off")}
+			role="radiogroup"
+			aria-labelledby={labelledBy}
+			aria-disabled={disabled}
+			title={title}
+			data-testid={testid}
+		>
+			{CONFIDENCE_LEVELS.map((level, i) => {
+				const c = CONFIDENCE_LEVEL_COLORS[level.value]!;
+				return (
+					<button
+						key={level.value}
+						type="button"
+						role="radio"
+						aria-checked={i === at}
+						disabled={disabled}
+						onClick={() => onChange(level.value)}
+						data-testid={stopTestids ? `confidence-stop-${level.value}` : undefined}
+						className={cn(i === at && "on", i <= at && "lit")}
+						style={{ "--lvl": c.ink, "--lvl-soft": c.soft } as CSSProperties}
+					>
+						<i aria-hidden="true" />
+						{level.label}
+					</button>
+				);
+			})}
+		</div>
 	);
 }

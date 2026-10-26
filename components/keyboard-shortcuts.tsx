@@ -24,6 +24,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { KeyChips } from "@/components/settings/keyboard-section";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { useRouter } from "next/navigation";
 import {
@@ -158,45 +159,36 @@ function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 	if (!open) return null;
 	const scopes = ["global", "chat", "graph"] as const;
 	const scopeLabels: Record<(typeof scopes)[number], string> = {
-		global: "Global",
-		chat: "Chat",
-		graph: "Graph view",
+		global: "Everywhere",
+		chat: "In a lesson",
+		graph: "On the graph",
 	};
 	return (
-		<div
-			data-testid="cheat-sheet"
-			className="fixed inset-0 z-50 flex items-center justify-center lh-scrim"
-			{...backdropDismiss}
-		>
-			<div
-				className="max-h-[80vh] w-full max-w-[36rem] overflow-y-auto rounded-xl border bg-card p-5 shadow-2xl"
-				onClick={(e) => e.stopPropagation()}
-			>
-				<div className="mb-4 flex items-baseline justify-between">
-					<span className="text-sm font-medium text-card-foreground">Keyboard shortcuts</span>
-					<span className="text-xs text-muted-foreground">Esc to close</span>
-				</div>
-				{scopes.map((scope) => {
-					const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
-					if (actions.length === 0) return null;
-					return (
-						<div key={scope} className="mb-4">
-							<div className="mb-1.5 text-xs text-muted-foreground/70">
-								{scopeLabels[scope]}
-							</div>
-							<div className="flex flex-col gap-1">
+		<div className="v4 scope">
+			<div data-testid="cheat-sheet" className="overlay" {...backdropDismiss}>
+				<div role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" className="dialog pad cs" onClick={(e) => e.stopPropagation()}>
+					<div className="dlg-head">
+						<h2 className="dlg-title">Keyboard shortcuts</h2>
+						<span className="cs-esc">
+							<kbd className="kbd">esc</kbd> to close
+						</span>
+					</div>
+					{scopes.map((scope) => {
+						const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
+						if (actions.length === 0) return null;
+						return (
+							<div key={scope} className="cs-group">
+								<span className="over">{scopeLabels[scope]}</span>
 								{actions.map((a) => (
-									<div key={a.id} className="flex items-center justify-between gap-4 text-sm">
-										<span className="text-muted-foreground">{a.label}</span>
-										<kbd className="rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-xs text-card-foreground">
-											{formatBinding(bindingForAction(a.id))}
-										</kbd>
+									<div key={a.id} className="cs-row">
+										<span>{a.label}</span>
+										<KeyChips text={formatBinding(bindingForAction(a.id))} />
 									</div>
 								))}
 							</div>
-						</div>
-					);
-				})}
+						);
+					})}
+				</div>
 			</div>
 		</div>
 	);

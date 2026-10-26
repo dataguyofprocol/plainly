@@ -18,7 +18,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { ArrowRightIcon, DumbbellIcon, MessageSquareIcon, SettingsIcon, SparklesIcon, WaypointsIcon } from "lucide-react";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { useGraphIndex, type IndexedIdea } from "@/components/graph-index";
 import { SetupDialog } from "@/components/setup-dialog";
@@ -26,6 +25,10 @@ import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { OPEN_CONNECT_EVENT } from "@/components/connect-provider";
 import { createSession, useStartReadiness } from "@/components/start-session";
 import { cn } from "@/lib/utils";
+import { Icon, type IconName } from "@/components/ui/icon";
+import { displayTitle, displayTopic } from "@/components/ui/format";
+import { EmptyState } from "@/components/ui/empty-state";
+import { bindingParts } from "@/components/settings/keyboard-section";
 import { fuzzyScore, kbdEventForAction, type ChatListItem } from "@/src/core";
 
 export type PaletteMode = "teach" | "practice";
@@ -42,7 +45,7 @@ export interface PaletteRow {
 	key: string;
 	label: string;
 	hint: string;
-	icon: "learn" | "practice" | "session" | "idea" | "graph" | "settings";
+	icon: "learn" | "practice" | "session" | "idea" | "graph" | "settings" | "connect";
 	action: PaletteAction;
 }
 
@@ -57,7 +60,7 @@ const IDEA_LIMIT = 5;
 const COMMANDS: PaletteRow[] = [
 	{ key: "cmd-graph", label: "Open the knowledge graph", hint: "⌘G", icon: "graph", action: { kind: "route", href: "/knowledge" } },
 	{ key: "cmd-practice", label: "New practice set", hint: "mixed from your graph", icon: "practice", action: { kind: "route", href: "/chat/new?mode=practice" } },
-	{ key: "cmd-connect", label: "Connect a provider", hint: "API keys and endpoints", icon: "settings", action: { kind: "connect" } },
+	{ key: "cmd-connect", label: "Connect a provider", hint: "API keys and endpoints", icon: "connect", action: { kind: "connect" } },
 	{ key: "cmd-settings", label: "Settings", hint: "models and keys", icon: "settings", action: { kind: "settings" } },
 ];
 
@@ -122,14 +125,43 @@ export function paletteResults(
 	].filter((g) => g.rows.length > 0);
 }
 
-const ICONS = {
-	learn: SparklesIcon,
-	practice: DumbbellIcon,
-	session: MessageSquareIcon,
-	idea: WaypointsIcon,
-	graph: WaypointsIcon,
-	settings: SettingsIcon,
-} as const;
+/** Each row kind's glyph — the app's semantic icon names (Practice is
+ *  always a target, Knowledge always a network). */
+const ROW_ICON: Record<PaletteRow["icon"], IconName> = {
+	learn: "learn",
+	practice: "practice",
+	session: "lesson",
+	idea: "idea",
+	graph: "knowledge",
+	settings: "settings",
+	connect: "provider",
+};
+
+/** Display-only: titles and hints in sentence case; a session that waits
+ *  on you gets the warn pill; a shortcut renders as key chips. */
+function RowHint({ row, group }: { row: PaletteRow; group: string }) {
+	if (row.hint === "waiting on you") {
+		// Under its own "Waiting on you" overline the pill would repeat it.
+		return group === "Waiting on you" ? <span className="dot warn" aria-hidden /> : <span className="pill warn">Waiting on you</span>;
+	}
+	if (/^[⌘⇧⌥⌃]/.test(row.hint)) {
+		return (
+			<span className="keys" aria-label={row.hint}>
+				{bindingParts(row.hint).map((k, i) => (
+					<kbd key={i} className="kbd">
+						{k}
+					</kbd>
+				))}
+			</span>
+		);
+	}
+	const text = row.icon === "idea" ? displayTopic(row.hint) : row.hint.charAt(0).toUpperCase() + row.hint.slice(1);
+	return <span className="pal-hint">{text}</span>;
+}
+
+function rowLabel(row: PaletteRow): string {
+	return row.action.kind === "open-session" ? displayTitle(row.label) : row.label;
+}
 
 /** Mounted once in the AppShell; opens on ⌘K (open-omnibar) and ⇧⌘F
  *  (sessions-search). A start that isn't ready yet (no models, no key)
@@ -218,18 +250,11 @@ function PaletteDialog({
 	}, [onClose]);
 
 	return createPortal(
-		<div
-			data-testid="command-palette"
-			className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[14vh] lh-scrim"
-			{...backdropDismiss}
-		>
-			<div
-				role="dialog"
-				aria-modal="true"
-				aria-label="Search and start"
-				className="settings-dialog-pop flex max-h-[70vh] w-full max-w-[40rem] flex-col overflow-hidden rounded-2xl border border-border bg-popover shadow-[0_24px_60px_var(--shadow)]"
-			>
-				<Omnibar variant="dialog" initial={initial} ready={ready} onDone={onClose} onNeedSetup={onNeedSetup} />
+		<div className="v4 scope">
+			<div data-testid="command-palette" className="overlay high" {...backdropDismiss}>
+				<div role="dialog" aria-modal="true" aria-label="Search and start" className="dialog pal">
+					<Omnibar variant="dialog" initial={initial} ready={ready} onDone={onClose} onNeedSetup={onNeedSetup} />
+				</div>
 			</div>
 		</div>,
 		document.body,
@@ -336,18 +361,21 @@ export function Omnibar({
 	const results = (
 		<div
 			ref={listRef}
-			className={cn("overflow-y-auto py-1.5", inline && "absolute inset-x-0 top-[calc(100%+6px)] z-20 max-h-[50vh] rounded-2xl border border-border bg-popover shadow-[0_20px_50px_var(--shadow)]")}
+			className={cn("pal-list", inline && "pop pal-drop")}
 			role="listbox"
 			aria-label="Results"
 		>
-			{groups.length === 0 && <p className="px-5 py-4 text-sm text-muted-foreground">Nothing yet.</p>}
+			{groups.length === 0 && (
+				<EmptyState icon="search" title="Nothing yet" className="pal-empty">
+					Type a topic to start a lesson, or a word to find a session.
+				</EmptyState>
+			)}
 			{groups.map((g) => (
-				<div key={g.name} className="pb-1">
-					<div className="px-5 pb-1 pt-2 text-xs font-semibold text-faint">{g.name}</div>
+				<div key={g.name} className="pal-group" role="group" aria-label={g.name}>
+					<span className="over">{g.name}</span>
 					{g.rows.map((row) => {
 						index += 1;
 						const i = index;
-						const Icon = ICONS[row.icon];
 						return (
 							<button
 								key={row.key}
@@ -360,15 +388,14 @@ export function Omnibar({
 								// closes on blur).
 								onMouseDown={(e) => e.preventDefault()}
 								onClick={() => void run(row)}
-								className={cn(
-									"flex w-full items-center gap-3 px-5 py-2 text-left text-sm transition-colors",
-									i === active ? "bg-accent text-foreground" : "text-foreground",
-								)}
+								className="pal-row"
 							>
-								<Icon className={cn("size-4 shrink-0", row.icon === "learn" ? "text-brand" : "text-muted-foreground")} aria-hidden />
-								<span className={cn("min-w-0 flex-1 truncate", row.icon === "idea" && "font-prose text-[15px]")}>{row.label}</span>
-								<span className="max-w-[40%] shrink-0 truncate text-xs text-muted-foreground">{row.hint}</span>
-								{i === active && <ArrowRightIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />}
+								<span className={cn("pal-ic", (row.icon === "learn" || row.icon === "practice") && row.icon)}>
+									<Icon name={ROW_ICON[row.icon]} size="sm" />
+								</span>
+								<span className={cn("pal-label", row.icon === "idea" && "is-idea")}>{rowLabel(row)}</span>
+								<RowHint row={row} group={g.name} />
+								<Icon name="enter" size="sm" className="pal-go" />
 							</button>
 						);
 					})}
@@ -378,7 +405,7 @@ export function Omnibar({
 	);
 
 	const modeSwitch = (
-		<div role="radiogroup" aria-label="Start as" className="flex rounded-lg bg-muted p-0.5">
+		<div role="radiogroup" aria-label="Start as" className="seg sm">
 			{(["teach", "practice"] as const).map((m) => (
 				<button
 					key={m}
@@ -390,11 +417,9 @@ export function Omnibar({
 						setMode(m);
 						inputRef.current?.focus();
 					}}
-					className={cn(
-						"h-7 rounded-md px-3 text-sm font-medium transition-colors",
-						mode === m ? "bg-popover font-semibold text-foreground shadow-[0_1px_2px_var(--shadow)]" : "text-muted-foreground hover:text-foreground",
-					)}
+					className={mode === m ? "on" : undefined}
 				>
+					<Icon name={m === "teach" ? "learn" : "practice"} size="xs" />
 					{m === "teach" ? "Learn" : "Practice"}
 				</button>
 			))}
@@ -402,19 +427,15 @@ export function Omnibar({
 	);
 
 	return (
-		<div className={cn(inline && "relative")}>
+		<div className={cn(inline ? "pal-inline" : "pal-body")}>
 			<form
 				onSubmit={(e) => {
 					e.preventDefault();
 					startNow();
 				}}
-				className={cn(
-					"flex flex-col gap-2",
-					inline
-						? "rounded-2xl border border-border bg-popover px-5 pb-2.5 pt-1.5 shadow-[0_10px_30px_var(--shadow)] transition-shadow focus-within:border-brand focus-within:shadow-[0_0_0_1px_var(--brand),0_14px_40px_var(--shadow)]"
-						: "border-b border-border px-5 pb-3 pt-2",
-				)}
+				className={cn("pal-field", inline && "glass")}
 			>
+				<Icon name="search" size="md" />
 				<input
 					ref={inputRef}
 					value={query}
@@ -446,30 +467,41 @@ export function Omnibar({
 					data-testid={inline ? "home-omnibar" : undefined}
 					spellCheck={false}
 					autoComplete="off"
-					className="h-13 w-full border-0 bg-transparent font-prose text-[19px] text-foreground outline-none placeholder:text-faint"
+					className="pal-input"
 				/>
-				<div className="flex items-center gap-2">
-					{modeSwitch}
-					{extraActions}
-					{inline ? (
-						<>
-							<span className="ml-auto hidden text-xs text-faint sm:inline">
-								<kbd className="rounded border border-border px-1 font-mono">⌘K</kbd> from anywhere
-							</span>
-							<button
-								type="submit"
-								disabled={starting}
-								className="ml-2 flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-							>
-								{submitLabel} <ArrowRightIcon className="size-4" aria-hidden />
-							</button>
-						</>
-					) : (
-						<span className="ml-auto text-xs text-faint">↑↓ to move · ↵ to open · esc to close</span>
-					)}
-				</div>
+				{modeSwitch}
+				{extraActions}
+				{inline && (
+					<button type="submit" disabled={starting} className="btn">
+						{submitLabel}
+						<Icon name="arrow-right" size="sm" />
+					</button>
+				)}
 			</form>
 			{showResults && results}
+			{!inline && (
+				<div className="pal-foot" aria-hidden>
+					<span>
+						<kbd className="kbd">↑</kbd>
+						<kbd className="kbd">↓</kbd>
+						to move
+					</span>
+					<span>
+						<kbd className="kbd">↵</kbd>
+						to open
+					</span>
+					<span>
+						<kbd className="kbd">esc</kbd>
+						to close
+					</span>
+					{starting && (
+						<span className="pal-starting">
+							<span className="wave"><i /><i /><i /><i /></span>
+							Starting…
+						</span>
+					)}
+				</div>
+			)}
 		</div>
 	);
 }

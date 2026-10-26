@@ -6,6 +6,7 @@ import { usePopoverDismiss } from "@/components/popover-dismiss";
 import { useSettingsSaved } from "@/components/settings-signal";
 import { formatTokens } from "@/components/usage-format";
 import { Hint } from "@/components/ui/hint";
+import { Icon } from "@/components/ui/icon";
 import { timeAgo } from "@/components/sidebar";
 import { resolveSettings } from "@/src/core";
 
@@ -186,31 +187,26 @@ export function CoverageMenuBody({
 	const busy = coverage.running || extracting;
 	const complete = coverage.uncoveredTokens === 0 && coverage.uncoveredCount === 0;
 	return (
-		<div data-testid="ctx-coverage" className="flex flex-col gap-1 px-2.5 pt-1 pb-2">
+		<div data-testid="ctx-coverage" className="ctx-coverage kcov">
 			{busy ? (
-				<span className="flex items-center gap-1.5 text-muted-foreground" data-testid="ctx-coverage-running">
-					<span className="size-1.5 animate-pulse rounded-full bg-foreground/70" aria-hidden />
+				<span className="kcov-line" data-testid="ctx-coverage-running">
+					<span className="dot brand kcov-pulse" aria-hidden />
 					extracting…
 				</span>
 			) : complete ? (
-				<span className="text-muted-foreground">fully extracted</span>
+				<span className="kcov-line">
+					<Icon name="status-ok" size="xs" className="kcov-ok" />
+					fully extracted
+				</span>
 			) : (
-				<span className="flex flex-col">
-					<span className="tabular-nums text-foreground">
-						{formatTokens(coverage.uncoveredTokens)} tok uncovered
-					</span>
-					<span className="tabular-nums text-muted-foreground">
+				<span className="kcov-stats">
+					<span className="num kcov-strong">{formatTokens(coverage.uncoveredTokens)} tok uncovered</span>
+					<span className="num">
 						{coverage.uncoveredCount} message{coverage.uncoveredCount === 1 ? "" : "s"} unextracted
 					</span>
 				</span>
 			)}
-			<button
-				type="button"
-				data-testid="ctx-extract"
-				onClick={onExtract}
-				disabled={busy || complete}
-				className="flex items-center justify-center rounded-lg border px-2 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent"
-			>
+			<button type="button" data-testid="ctx-extract" onClick={onExtract} disabled={busy || complete} className="ghost sm kcov-btn">
 				{busy ? "Running" : "Extract"}
 			</button>
 		</div>

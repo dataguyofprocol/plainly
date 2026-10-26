@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
-import { ChevronDownIcon, ChevronUpIcon, SearchIcon, XIcon } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import { kbdEventForAction, stepSessionMatch } from "@/src/core";
 import {
 	sameSessionRange, sessionFindRanges, sessionRangeIdentity, type SessionRangeIdentity,
@@ -21,8 +21,8 @@ export function injectFindStyles(): void {
 	const style = document.createElement("style");
 	style.id = FIND_STYLE_ID;
 	style.textContent = `
-::highlight(${SESSION_FIND_HIGHLIGHT}) { background-color: color-mix(in oklab, var(--primary) 25%, transparent); }
-::highlight(${SESSION_FIND_ACTIVE_HIGHLIGHT}) { background-color: var(--primary); color: var(--primary-foreground); }`;
+::highlight(${SESSION_FIND_HIGHLIGHT}) { background-color: var(--warn-soft); }
+::highlight(${SESSION_FIND_ACTIVE_HIGHLIGHT}) { background-color: var(--brand); color: var(--on-ink); }`;
 	document.head.appendChild(style);
 }
 
@@ -159,13 +159,12 @@ export function SessionFind({ scopeRef, scrollContextRef }: {
 	};
 
 	if (!open) return null;
-	const buttonClass = "flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40";
 	return (
 		<div
 			role="search"
 			aria-label="Session Find"
 			data-testid="session-find"
-			className="lh-no-drag flex h-10 shrink-0 items-center gap-2 border-b border-border px-6 font-ui text-sm"
+			className="ls-find pop lh-no-drag"
 			onKeyDown={(event) => {
 				if (event.key === "Enter") {
 					event.stopPropagation(); // NEVER reach question/global Enter submits.
@@ -179,29 +178,29 @@ export function SessionFind({ scopeRef, scrollContextRef }: {
 				}
 			}}
 		>
-			<SearchIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+			<Icon name="search" size="md" />
 			<input
 				ref={inputRef}
 				aria-label="Find in session"
-				placeholder="Find in session…"
+				placeholder="Find in this session"
 				value={query}
 				onChange={(event) => setQuery(event.target.value)}
 				spellCheck={false}
-				className="lh-input min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
 			/>
-			<output aria-live="polite" data-testid="session-find-count" className="shrink-0 text-xs tabular-nums text-muted-foreground">
-				{query ? `${result.index + 1}/${result.count}` : ""}
+			<output aria-live="polite" data-testid="session-find-count">
+				{query ? (result.count ? `${result.index + 1} of ${result.count}` : "No matches") : ""}
 			</output>
-			<button type="button" aria-label="Previous match" title="Previous match (Shift+Enter)" className={buttonClass}
+			<span className="sep" aria-hidden="true" />
+			<button type="button" aria-label="Previous match" title="Previous match (Shift+Enter)" className="ib sm"
 				disabled={!result.count} onMouseDown={(event) => event.preventDefault()} onClick={() => step(-1)}>
-				<ChevronUpIcon className="size-4" aria-hidden />
+				<Icon name="chevron-up" size="sm" />
 			</button>
-			<button type="button" aria-label="Next match" title="Next match (Enter)" className={buttonClass}
+			<button type="button" aria-label="Next match" title="Next match (Enter)" className="ib sm"
 				disabled={!result.count} onMouseDown={(event) => event.preventDefault()} onClick={() => step(1)}>
-				<ChevronDownIcon className="size-4" aria-hidden />
+				<Icon name="chevron-down" size="sm" />
 			</button>
-			<button type="button" aria-label="Close Find" title="Close Find (Esc)" className={buttonClass} onClick={close}>
-				<XIcon className="size-4" aria-hidden />
+			<button type="button" aria-label="Close Find" title="Close Find (Esc)" className="ib sm" onClick={close}>
+				<Icon name="close" size="sm" />
 			</button>
 		</div>
 	);

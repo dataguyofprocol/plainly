@@ -70,6 +70,8 @@ import { FileTextIcon, ListTreeIcon, Loader2Icon, SearchIcon, SettingsIcon, Uplo
 import { incrementalLayout, propositionSessionHref, type GraphChain, type GraphCostSummary, type GraphNode, type GraphSnapshot } from "@/src/core";
 import { cn } from "@/lib/utils";
 import { topicColor } from "@/components/v4/data";
+import { displayTopic } from "@/components/ui/format";
+import { Icon } from "@/components/ui/icon";
 import { planCostLabel } from "@/components/usage-format";
 import { GraphCanvasRenderer, type GraphRenderSettings } from "./graph-canvas.ts";
 import { usePopoverDismiss } from "@/components/popover-dismiss";
@@ -246,6 +248,11 @@ function cssColorToHex(css: string): string {
 function tokenHex(cssVar: string): string {
 	const value = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
 	return value ? cssColorToHex(value) : "#888888";
+}
+
+/** A token's raw CSS colour, alpha kept (canvas takes modern rgb() syntax). */
+function tokenRaw(cssVar: string): string {
+	return getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim() || "transparent";
 }
 
 // ---- Component ------------------------------------------------------------
@@ -1002,6 +1009,8 @@ export function GraphView({
 	onSelectIdea,
 	apiRef,
 	highlight,
+	topicNames,
+	focusIds,
 }: {
 	/** "v4" (rebuild, 2026-10-26): the canvas alone — the Knowledge4 page
 	 *  owns the search, the detail card, the zoom controls and the topic
@@ -1015,6 +1024,11 @@ export function GraphView({
 	apiRef?: React.Ref<GraphViewApi>;
 	/** v4: the selected idea's chain to draw in the accent. */
 	highlight?: { ids: ReadonlySet<string>; selected: string | null } | null;
+	/** v4: the topic names (cluster id → name) the canvas labels wear, so
+	 *  the map and the topic list always say the same thing. */
+	topicNames?: ReadonlyMap<string, string> | null;
+	/** v4: a picked topic's ideas, brought forward (the rest steps back). */
+	focusIds?: ReadonlySet<string> | null;
 	/** An idea to bring forward on arrival (/knowledge?idea=…, from the home
 	 *  page or the omnibar): the search is seeded with its name. */
 	focusIdeaId?: string;
@@ -1296,7 +1310,7 @@ export function GraphView({
 			if (typeof id !== "string" || typeof title !== "string" || id === "" || title === "") return;
 			const snap = snapshotRef.current;
 			if (snap != null) renameSessionsPatch(snap, id, title);
-			rendererRef.current?.setClusterLabels(new Map([[id, title]]));
+			rendererRef.current?.setClusterLabels(new Map([[id, v4Ref.current ? displayTopic(title) : title]]));
 			setLabelTick((t) => t + 1);
 		};
 		window.addEventListener("lh:chat-renamed", onRenamed);
@@ -1497,6 +1511,16 @@ export function GraphView({
 		// stable colour the topic list and the home page use).
 		const colorOf = new Map<string, string>();
 		if (v4) for (const c of snapshot.clusters) for (const m of c.members) colorOf.set(m, topicColor(c.id));
+		// v4 edges: one quiet ink at low alpha — the topic colour lives in
+		// the discs and the wash; the brand is kept for the lit chain.
+		const v4Edge = v4 ? `${tokenHex("--graph-edge")}8c` : undefined;
+		// v4 topic labels read like the topic list beside them: its names
+		// (every topic, not only the file-born ones), display-cased.
+		const clusterLabel = (c: { id: string; label: string | null }) => {
+			if (!v4) return c.label;
+			const name = topicNames?.get(c.id) ?? c.label;
+			return name ? displayTopic(name) : null;
+		};
 		renderer.setData({
 			nodes: snapshot.nodes.map((n) => ({
 				id: n.id,
@@ -1508,26 +1532,34 @@ export function GraphView({
 			edges: snapshot.edges.map((e) => ({
 				from: e.from,
 				to: e.to,
-				color: v4 ? `${colorOf.get(e.from) ?? colorOf.get(e.to) ?? "#8a918c"}66` : undefined,
+				color: v4Edge,
 			})),
 			logicalEdges: snapshot.logicalEdges.map((e) => ({ from: e.from, to: e.to })),
 			impLinks: snapshot.impLinks,
-			clusters: snapshot.clusters.map((c) => ({ id: c.id, label: c.label, members: c.members, color: v4 ? topicColor(c.id) : undefined })),
+			clusters: snapshot.clusters.map((c) => ({ id: c.id, label: clusterLabel(c), members: c.members, color: v4 ? topicColor(c.id) : undefined })),
 			colors: {
 				node: tokenHex(NODE_COLOR_TOKEN),
 				edge: tokenHex("--graph-edge"),
 				label: tokenHex("--muted-foreground"),
 				hoverText: tokenHex("--foreground"),
+				...(v4 ? { halo: tokenHex("--surface"), line: tokenRaw("--line-strong") } : {}),
 			},
-			// Match the app typography (Geist via the body's stack).
+			// Match the app typography (Manrope via the body's stack).
 			fontFamily: getComputedStyle(document.body).fontFamily,
+			style: v4 ? "v4" : undefined,
 		});
-	}, [snapshot, isEmpty, v4]);
+		// topicNames: the page memoizes it by content, so this re-feeds only
+		// when a topic is actually renamed or born.
+	}, [snapshot, isEmpty, v4, topicNames]);
+
 
 	// v4 feeds: the chain highlight, and the page's camera handle.
 	useEffect(() => {
 		rendererRef.current?.setHighlight(highlight?.ids ?? null, highlight?.selected ?? null);
 	}, [highlight, isEmpty]);
+	useEffect(() => {
+		rendererRef.current?.setFocus(focusIds ?? null);
+	}, [focusIds, isEmpty]);
 	useImperativeHandle(
 		apiRef,
 		() => ({
@@ -1601,7 +1633,7 @@ export function GraphView({
 
 	return (
 		<div className="relative h-full w-full">
-			{isEmpty ? (
+			{isEmpty && v4 ? null /* v4: the page draws the empty state, with its actions */ : isEmpty ? (
 				// The empty graph keeps the first action clear without zero-valued statistics.
 				<div className="flex h-full w-full items-center justify-center px-4">
 					<div className="flex flex-col items-center gap-3 text-center text-muted-foreground">
@@ -1638,7 +1670,7 @@ export function GraphView({
 					anchorRef={ctxAnchorRef}
 					testid="node-context-menu"
 					preferredSide="down"
-					menuClass="flex w-fit flex-col gap-0.5 rounded-xl border bg-card p-2 text-xs shadow-xl"
+					menuClass={v4 ? "v4 scope kmenu" : "flex w-fit flex-col gap-0.5 rounded-xl border bg-card p-2 text-xs shadow-xl"}
 				>
 					<button
 						type="button"
@@ -1647,9 +1679,10 @@ export function GraphView({
 							setDeletingNode({ id: ctxNode.id, name: ctxNode.name });
 							setCtxNode(null);
 						}}
-						className="flex items-center rounded-lg px-2.5 py-1.5 text-left text-muted-foreground/80 transition-colors hover:bg-accent hover:text-foreground"
+						className={v4 ? "mrow danger" : "flex items-center rounded-lg px-2.5 py-1.5 text-left text-muted-foreground/80 transition-colors hover:bg-accent hover:text-foreground"}
 					>
-						Delete
+						{v4 && <Icon name="delete" size="sm" />}
+						{v4 ? "Delete…" : "Delete"}
 					</button>
 				</MenuShell>
 			)}

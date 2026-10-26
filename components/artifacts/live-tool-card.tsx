@@ -1,10 +1,10 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { toolActivityLabel } from "@/src/core";
 import { toolHeadline } from "@/components/artifacts/tool-headline";
+import { TOOL_ICON, ToolRow } from "@/components/artifacts/tool-call-card";
 import type { ArtifactPartProps } from "@/src/core";
 
 /**
@@ -43,20 +43,19 @@ export function LiveToolCard({ part }: ArtifactPartProps) {
 
 	const head = toolHeadline(tool, p.input);
 	return (
-		<details data-testid="live-tool-card" data-tool={tool} className="group my-0.5 w-full max-w-2xl select-none">
-			<summary className="inline-flex max-w-full cursor-pointer list-none items-center gap-2 rounded-lg border border-border bg-card/70 px-2.5 py-1 text-xs text-muted-foreground [&::-webkit-details-marker]:hidden">
-				<BrailleSpinner label={`${toolActivityLabel(tool)} — live`} />
-				<Shimmer duration={1} className="text-xs">
-					{toolActivityLabel(tool)}
-				</Shimmer>
-				{(head.detail ?? arg) && <span className="min-w-0 truncate font-mono text-[11px]">{head.detail ?? arg}</span>}
-				<ChevronRight className="size-3 shrink-0 opacity-50 transition-transform group-open:rotate-90" aria-hidden />
-			</summary>
-			<div className="mt-1.5 rounded-xl border bg-card p-3 text-xs">
-				<div className="mb-1 font-medium text-muted-foreground">Input (streaming)</div>
-				<pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed">
-					{hasInput ? JSON.stringify(p.input, null, 2) : "…"}
-				</pre>
+		<details data-testid="live-tool-card" data-tool={tool} className="ls-tool">
+			<ToolRow
+				icon={TOOL_ICON[head.icon]}
+				status="running"
+				leading={<BrailleSpinner label={`${toolActivityLabel(tool)} — live`} />}
+				label={<Shimmer duration={1} as="span">{toolActivityLabel(tool)}</Shimmer>}
+				detail={head.detail ?? (arg || null)}
+			/>
+			<div className="ls-tool-body">
+				<div>
+					<span className="over">Input (streaming)</span>
+					<pre className="short">{hasInput ? JSON.stringify(p.input, null, 2) : "…"}</pre>
+				</div>
 			</div>
 		</details>
 	);

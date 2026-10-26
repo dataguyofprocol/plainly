@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowRightIcon, SquareIcon } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
+import { Hint } from "@/components/ui/hint";
 
 /**
  * The session composer — Lesson4's steer row (see the render below).
@@ -77,17 +78,17 @@ export function Composer({
 		else if (action === "send") onSend();
 		else if (action === "next") onNext?.();
 	};
-	// Lesson4's steer row (v4 rebuild, 2026-10-26): one glass row — the
-	// field, a quiet line saying what Enter will do, and a text button. The
-	// behaviour is unchanged: send, steer mid-turn ("Queue" — answered after
-	// this step), stop on an empty field mid-turn, next problem in the pause.
+	// The composer (finesse pass, 2026-10-26): one polished field — the
+	// auto-growing textarea, a quiet line saying what Enter will do, the
+	// trailing mic, and one round action button. Behaviour is unchanged:
+	// send, steer mid-turn (queued — answered after this step), stop on an
+	// empty field mid-turn, next problem in the practice pause.
 	const action = enterAction({ busy, canSend, nextProblem });
-	const hint = busy && canSend ? "answered after this step" : busy ? "↵ stops the reply" : null;
+	const hint = busy && canSend ? "Answered after this step" : busy ? "stops the reply" : null;
 	return (
 		<form
 			data-testid="composer"
-			className="glass"
-			style={{ display: "flex", alignItems: "flex-end", gap: 6, padding: "4px 4px 4px 14px", borderRadius: 12 }}
+			className="ls-composer"
 			onSubmit={(e) => {
 				e.preventDefault();
 				act();
@@ -117,27 +118,30 @@ export function Composer({
 				autoFocus={autoFocus}
 				rows={1}
 				aria-label="Ask about this step, or steer the lesson"
-				className="field-sizing-content"
-				style={{ flex: 1, minWidth: 0, minHeight: 36, maxHeight: 192, padding: "8px 0", border: 0, background: "transparent", outline: "none", resize: "none", fontSize: 13.5, lineHeight: "20px" }}
 			/>
 			{hint && (
-				<span className="hide-sm" style={{ alignSelf: "center", fontSize: 11.5, color: "var(--faint)", whiteSpace: "nowrap" }}>
+				<span className="ls-hint hide-sm">
+					{action === "stop" && <span className="kbd">↵</span>}
 					{hint}
 				</span>
 			)}
 			{trailing}
 			{nextProblem && !busy && !canSend ? (
-				<button type="submit" data-testid="next-problem-button" aria-label="Next problem" className="btn" style={{ height: 30, padding: "0 12px", background: "var(--good)" }}>
-					Next problem <ArrowRightIcon className="size-3.5" />
+				<button type="submit" data-testid="next-problem-button" aria-label="Next problem" className="btn brand ls-next">
+					Next problem <Icon name="arrow-right" size="sm" />
 				</button>
 			) : action === "stop" ? (
-				<button type="submit" aria-label="Stop" className="ghost" style={{ height: 30 }}>
-					<SquareIcon className="size-3" /> Stop
-				</button>
+				<Hint label="Stop the reply" side="top">
+					<button type="submit" aria-label="Stop" className="ls-send stop">
+						<Icon name="stop" size="sm" />
+					</button>
+				</Hint>
 			) : (
-				<button type="submit" aria-label="Send" disabled={!busy && !canSend} className="btn" style={{ height: 30, padding: "0 12px" }}>
-					{busy ? "Queue" : "Send"}
-				</button>
+				<Hint label={busy ? "Queue for after this step" : "Send"} binding="enter" side="top">
+					<button type="submit" aria-label="Send" disabled={!busy && !canSend} className="ls-send">
+						<Icon name="send" size="md" />
+					</button>
+				</Hint>
 			)}
 		</form>
 	);

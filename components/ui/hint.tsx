@@ -44,11 +44,21 @@ export function hintText(label: string, action?: KeyAction, binding?: string): s
 }
 
 export function Hint({ label, action, binding, side = "top", children }: HintProps) {
+	const live = action ? formatBinding(bindingForAction(action)) : binding ? formatBinding(binding) : ""
 	return (
 		<TooltipProvider>
 			<Tooltip>
 				<TooltipTrigger asChild>{children}</TooltipTrigger>
-				<TooltipContent side={side}>{hintText(label, action, binding)}</TooltipContent>
+				{/* Rendered as label + a key chip; the accessible text keeps
+				    hintText's "Label (⌘D)" composition. */}
+				<TooltipContent side={side} aria-label={hintText(label, action, binding)}>
+					{label}
+					{live && (
+						<kbd className="inline-flex h-4 min-w-4 items-center justify-center rounded-[4px] bg-primary-foreground/15 px-1 font-sans text-xs leading-none font-semibold text-primary-foreground/85">
+							{live}
+						</kbd>
+					)}
+				</TooltipContent>
 			</Tooltip>
 		</TooltipProvider>
 	)

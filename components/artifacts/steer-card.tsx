@@ -1,12 +1,14 @@
 "use client";
 
-import { CheckIcon, CircleX } from "lucide-react";
 import type { PdfResult, ResearchResult, SubagentArtifactData } from "@/src/core";
 import type { LhViewMessage } from "@/src/core";
 import { isSubagentFailure } from "@/src/core";
 import { DemoOutputCard } from "@/components/artifacts/demo-card";
 import { PdfBriefCard, ResearchBriefCard } from "@/components/artifacts/job-card";
 import { VisualOutputCard } from "@/components/artifacts/visual-card";
+import { ToolRow } from "@/components/artifacts/tool-call-card";
+import { KIND_ICON, jobLabel } from "@/components/artifacts/dispatch-card";
+import { Icon } from "@/components/ui/icon";
 
 /**
  * The sub-agent result delivery card (contracts.ts "THE ASYNC PROTOCOL" §4).
@@ -37,8 +39,8 @@ export function SubagentSteerCard({ message }: { message: LhViewMessage }) {
 			| undefined;
 		if (aborted?.data) return <AbortedBadge kind={aborted.data.kind ?? "job"} />;
 		return (
-				<div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
-				A sub-agent finished, but its result could not be displayed.
+			<div className="ls-card">
+				<div className="ls-card-b">A helper finished, but its result could not be displayed.</div>
 			</div>
 		);
 	}
@@ -62,65 +64,60 @@ export function SubagentSteerCard({ message }: { message: LhViewMessage }) {
 	}
 }
 
-/** The aborted-job chip: mirrors the complete-badge one-liner — the
- * teacher's wake turn acknowledges the abort in the lesson itself,
- * this just marks what happened. */
+/** The aborted-job row: the teacher's wake turn acknowledges the abort in
+ * the lesson itself — this just marks what happened. */
 function AbortedBadge({ kind }: { kind: string }) {
 	return (
-		<div data-testid="job-aborted-badge" className="flex items-center gap-2 text-xs text-muted-foreground">
-			<CircleX className="size-3.5" />
-			<span className="font-medium">{kind}</span>
-			<span>aborted by the learner</span>
+		<div data-testid="job-aborted-badge" data-kind={kind} className="ls-tool">
+			<ToolRow
+				as="div"
+				icon={KIND_ICON[kind as keyof typeof KIND_ICON] ?? "agent"}
+				label={jobLabel(kind)}
+				note="stopped by you"
+				status="info"
+				expandable={false}
+				trailing={<Icon name="status-paused" size="sm" className="ls-kind" />}
+			/>
 		</div>
 	);
 }
 
-/** Quiet one-liner, the research-badge idiom ported to PDF: the brief is
- * too long to inline by default and the teacher's wake turn weaves it in;
- * the badge marks delivery, the collapsed details carries the full text
- * + consulted pages. */
+/** The PDF delivery row: the brief is too long to inline and the
+ * teacher's wake turn weaves it in; the row marks delivery, the collapsed
+ * details carries the full text + read pages. */
 function PdfCompleteBadge({ result }: { result: PdfResult }) {
 	// The honest count is READ pages (extract/render — sources v1 split);
 	// the ?? is runtime tolerance for pre-split persisted steers.
 	const readPages = result.pagesRead ?? result.pagesConsulted;
 	return (
-		<details data-testid="pdf-complete-badge" className="group w-full text-xs text-muted-foreground">
-			<summary className="flex cursor-pointer select-none list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
-				<CheckIcon className="size-3.5" />
-				<span className="font-medium">PDF</span>
-				<span>reading complete</span>
-				{readPages.length > 0 && (
-					<span>
-						· read {readPages.length} page{readPages.length === 1 ? "" : "s"}
-					</span>
-				)}
-				<span className="ml-1 text-xs text-muted-foreground/70 group-open:hidden">view brief</span>
-				<span className="ml-1 hidden text-xs text-muted-foreground/70 group-open:inline">hide brief</span>
-			</summary>
-			<div className="mt-2">
+		<details data-testid="pdf-complete-badge" className="ls-tool">
+			<ToolRow
+				icon="pdf"
+				label="PDF"
+				note={`reading complete${readPages.length > 0 ? ` · read ${readPages.length} page${readPages.length === 1 ? "" : "s"}` : ""}`}
+				status="done"
+			/>
+			<div className="ls-tool-body">
 				<PdfBriefCard output={result} />
 			</div>
 		</details>
 	);
 }
 
-/** Quiet one-liner, the dispatch-settled idiom — the lesson lives in the
- * teacher's wake turn; the badge just marks delivery. The persisted brief
- * rides along in a collapsed <details> (the wave-1 "view full research"
- * affordance): full markdown + sources, one click away, no extra fetch —
- * the artifact part in the record is the single source of truth. */
+/** The research delivery row: the lesson lives in the teacher's wake
+ * turn; the row marks delivery. The persisted brief rides along in a
+ * collapsed <details> — full markdown + sources, one click away, no extra
+ * fetch (the artifact part in the record is the single source of truth). */
 function ResearchCompleteBadge({ result }: { result: ResearchResult }) {
 	return (
-		<details data-testid="research-complete-badge" className="group w-full text-xs text-muted-foreground">
-			<summary className="flex cursor-pointer select-none list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
-				<CheckIcon className="size-3.5" />
-				<span className="font-medium">Research</span>
-				<span>complete</span>
-				{result.sources.length > 0 && <span>· {result.sources.length} sources</span>}
-				<span className="ml-1 text-xs text-muted-foreground/70 group-open:hidden">view brief</span>
-				<span className="ml-1 hidden text-xs text-muted-foreground/70 group-open:inline">hide brief</span>
-			</summary>
-			<div className="mt-2">
+		<details data-testid="research-complete-badge" className="ls-tool">
+			<ToolRow
+				icon="research"
+				label="Research"
+				note={`complete${result.sources.length > 0 ? ` · ${result.sources.length} sources` : ""}`}
+				status="done"
+			/>
+			<div className="ls-tool-body">
 				<ResearchBriefCard output={result} />
 			</div>
 		</details>

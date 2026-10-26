@@ -42,20 +42,23 @@ import { ModelMenuList } from "@/components/settings/model-menu";
 import { MenuShell } from "@/components/menu-shell";
 import { notifySettingsSaved, useSettingsSaved } from "@/components/settings-signal";
 import { Hint } from "@/components/ui/hint";
+import { EmptyState } from "@/components/ui/empty-state";
 import { type ProviderKeyInfo } from "@/components/settings/keys-section";
 import { ConnectProviderBody } from "@/components/connect-provider";
 import { ChatGPTBackgroundAccess } from "@/components/settings/chatgpt-connection";
 import { NativeSubscriptionBackgroundAccess, SubscriptionConnections } from "@/components/settings/subscription-connections";
-import { defaultOrderLevel, populateLevel, THINKING_LABEL } from "@/components/thinking-default";
-import { ThinkingMenuList } from "@/components/settings/model-menu";
+import { populateLevel, THINKING_LABEL } from "@/components/thinking-default";
+import { levelName, ThinkingMenuList } from "@/components/settings/model-menu";
+import { SelectTrigger } from "@/components/settings/controls";
+import { Icon } from "@/components/ui/icon";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 
 /** The pickers' slot identity — same roster language as the Agent
  *  section's slot rows. */
 const SLOT_META: Record<ModelSlotName, { label: string; roster: string }> = {
-	strong: { label: "Strong", roster: "Prober, teacher" },
-	cheap: { label: "Cheap", roster: "Researcher, demo builder, extractor, auditor" },
-	vision: { label: "Vision", roster: "Visual maker + PDF reader" },
+	strong: { label: "Main model", roster: "Teaches your lessons" },
+	cheap: { label: "Helper model", roster: "Researches, builds demos, grades answers" },
+	vision: { label: "Vision model", roster: "Draws figures and reads PDFs" },
 };
 const SLOT_ORDER: readonly ModelSlotName[] = ["strong", "cheap", "vision"];
 
@@ -124,13 +127,13 @@ export function SetupKeysBody({
 	connected: readonly string[];
 }) {
 	return (
-		<div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+		<>
 			<ConnectProviderBody providers={providers} connected={connected} />
-			<div style={{ borderTop: "1px solid var(--line)", paddingTop: 16 }}>
-				<span className="flabel" style={{ display: "block", marginBottom: 10 }}>Or use a subscription</span>
+			<div className="su-or">
+				<span className="flabel">Or use a plan you already pay for</span>
 				<SubscriptionConnections setup />
 			</div>
-		</div>
+		</>
 	);
 }
 
@@ -169,17 +172,23 @@ export function SetupDialog({
 	// re-runs on it, so saving a key flips the stage to the pickers with
 	// the widened catalog — no restart, no Settings round-trip.
 	const [keysTick, setKeysTick] = useState(0);
+	// The success beat: a key just landed, so step 2 opens with a confirmation.
+	const [justConnected, setJustConnected] = useState(false);
 	useSettingsSaved((section) => {
 		if (section === "keys") {
 			setKeysTick((t) => t + 1);
 			setAddingProvider(false);
+			setJustConnected(true);
 		}
 	});
 
 	// Fresh /api/models per open AND per keys change — a key saved a
 	// moment ago (stage 1's own screen) widens the pickers immediately.
 	useEffect(() => {
-		if (open) setAddingProvider(connect);
+		if (open) {
+			setAddingProvider(connect);
+			setJustConnected(false);
+		}
 	}, [open, connect]);
 
 	useEffect(() => {
@@ -284,197 +293,189 @@ export function SetupDialog({
 		onDone(models);
 	}
 
-	return createPortal(
-		<div
-			className="fixed inset-0 z-50 flex items-center justify-center lh-scrim"
-			data-testid="setup-backdrop"
-			{...backdropDismiss}
-		>
-			<div
-				role="dialog"
-				aria-modal="true"
-				aria-label={stage === "keys" ? "Connect a provider" : "Pick your models"}
-				data-testid="setup-dialog"
-				className="v4 scope settings-dialog-pop flex max-h-[85vh] w-[600px] max-w-[92vw] flex-col overflow-hidden rounded-[22px] border border-border shadow-[0_24px_60px_var(--shadow)]"
-				style={{ background: "#fff" }}
-				onClick={(e) => e.stopPropagation()}
-			>
-				<header className="flex shrink-0 items-start gap-3 px-7 pt-6 pb-1">
-					<div className="flex min-w-0 flex-col gap-1">
-						<h2 className="serif text-[26px] leading-tight tracking-tight">
-							{stage === "keys" ? "Connect a provider" : "Pick your models"}
-						</h2>
-						{stage === "keys" && (
-							<p className="text-[13px] text-muted-foreground">Your tutor runs on your own model account. You’ll pick models next.</p>
-						)}
-					</div>
-					<Hint label="Close" binding="escape" side="left">
-						<button
-							type="button"
-							aria-label="Close setup"
-							data-testid="setup-close"
-							onClick={onClose}
-							className="ib ml-auto shrink-0"
-						>
-							✕
-						</button>
-					</Hint>
-				</header>
+	const steps = (
+		<div className="su-steps" aria-label={stage === "keys" ? "Step 1 of 2" : "Step 2 of 2"}>
+			<span className={stage === "keys" ? "su-step on" : "su-step done"}>
+				<i>{stage === "keys" ? "1" : <Icon name="check" size="xs" />}</i>
+				Connect
+			</span>
+			<span className="bar" />
+			<span className={stage === "keys" ? "su-step" : "su-step on"}>
+				<i>2</i>
+				Choose models
+			</span>
+		</div>
+	);
 
-				{stage === "keys" ? (
-					<div className="flex flex-col overflow-y-auto px-7 pt-4 pb-6">
-						{failed ? (
-							<p className="text-sm text-foreground">
-								Model catalog could not be loaded. Check the connection and retry.
+	return createPortal(
+		<div className="v4 scope">
+			<div className="overlay" data-testid="setup-backdrop" {...backdropDismiss}>
+				<div
+					role="dialog"
+					aria-modal="true"
+					aria-label={stage === "keys" ? "Connect a provider" : "Pick your models"}
+					data-testid="setup-dialog"
+					className="dialog su"
+					onClick={(e) => e.stopPropagation()}
+				>
+					<header className="su-head">
+						<div>
+							{steps}
+							<h2 className="t-title">{stage === "keys" ? "Connect a provider" : "Choose your models"}</h2>
+							<p>
+								{stage === "keys"
+									? "Your tutor runs on your own model account. You’ll pick models next."
+									: "Each job gets its own model. You can change them any time in Settings."}
 							</p>
-						) : (
-							<SetupKeysBody providers={keyProviders} connected={connected} />
-						)}
-					</div>
-				) : (
-					<div className="flex flex-col gap-4 overflow-y-auto px-7 pt-4 pb-6" data-testid="setup-stage-pickers">
-						<p className="text-[13px] text-muted-foreground">
-							Pick the model for each tier. All three are required before chats can start.
-						</p>
-						{SLOT_ORDER.map((slot) => {
-							const entry = picked[slot];
-							const level = levels[slot];
-							const levelsForEntry = entry?.supportedLevels ?? [];
-							const catalog =
-								slot === "vision" ? body?.models.filter((m) => m.input.includes("image")) : body?.models;
-							return (
-								<div key={slot} data-testid={`setup-slot-${slot}`} className="flex flex-col gap-1.5">
-									<span className="flex items-center gap-1.5">
-										<span className="font-ui text-sm text-foreground">{SLOT_META[slot].label}</span>
-										{!body?.slots?.[slot]?.model && !picked[slot] && (
-											<span
-												data-testid={`setup-needed-${slot}`}
-												className="rounded-sm border border-border px-1 py-0.5 text-[10px] font-normal text-muted-foreground"
-											>
-												needed
-											</span>
-										)}
-									</span>
-									<span className="text-xs text-muted-foreground/70">{SLOT_META[slot].roster}</span>
-									{slot !== "strong" && <><ChatGPTBackgroundAccess provider={entry?.provider} /><NativeSubscriptionBackgroundAccess provider={entry?.provider} /></>}
-									<div className="flex items-center gap-2">
-										<div className="relative flex-1">
-											<button
-												type="button"
-												aria-label={`${SLOT_META[slot].label} model`}
-												data-testid={`setup-trigger-${slot}`}
-												aria-expanded={openMenu?.slot === slot && openMenu.kind === "model"}
-												onClick={() => setOpenMenu(openMenu?.slot === slot && openMenu.kind === "model" ? null : { slot, kind: "model" })}
-												className="flex h-7 min-w-40 w-full items-center gap-1 rounded-sm border border-border bg-background px-1.5 font-ui text-xs text-foreground transition-colors hover:border-muted-foreground/50"
-											>
-												<span className="min-w-0 flex-1 truncate">{entry ? prettyModel(entry.id) : "Pick a model…"}</span>
-												<span aria-hidden className="text-muted-foreground">
-													▾
-												</span>
-											</button>
-											{/* Anchor by TESTID, not a ref (the settings-section pattern):
-											    React attaches a host element's ref AFTER its descendants'
-											    layout effects run, so a ref freshly attached in this same
-											    commit (menu opening = the ref condition turning true) is
-											    still null when MenuShell measures — place() gives up, the
-											    menu stays invisible, and only a window resize (which re-runs
-											    place()) shows it. querySelector at place time has no such
-											    ordering hazard. Live-caught by the owner 2026-10-09: every
-											    setup picker opened dead until a window resize. */}
-											{openMenu?.slot === slot && openMenu.kind === "model" && (
-												<MenuShell
-													anchorTestid={`setup-trigger-${slot}`}
-													testid={`setup-menu-${slot}`}
-													preferredSide="down"
-													align="left"
-													menuClass="flex w-[22rem] flex-col rounded-xl border border-border bg-card p-2 text-xs shadow-xl"
-												>
-													<ModelMenuList
-														models={catalog}
-														effectiveId={entry?.id}
-														effectiveProvider={entry?.provider}
-														onPick={(m) => {
-															setPicked((prev) => ({ ...prev, [slot]: m }));
-															// Auto-populate (chunk 2, owner: "populate
-															// everywhere"): no explicit level → the
-															// ordering's level for the fresh pick; an
-															// explicit one rides (Save clamps server-side).
-															setLevels((prev) => ({
-																...prev,
-																[slot]: populateLevel(prev[slot], m.supportedLevels),
-															}));
-															setOpenMenu(null);
-														}}
-														footer={catalog && catalog.length === 0 ? "No image-capable models. Add a provider key with access to a vision model." : undefined}
-													/>
-												</MenuShell>
-											)}
-										</div>
-										{/* Thinking selector (chunk 2): editable, pre-populated from
-										    the ordering per picked model — no model, no levels. */}
-										<div className="relative">
-											<button
-												type="button"
-												aria-label={`${SLOT_META[slot].label} thinking`}
-												data-testid={`setup-thinking-${slot}`}
-												aria-expanded={openMenu?.slot === slot && openMenu.kind === "thinking"}
-												disabled={!entry}
-												onClick={() => setOpenMenu(openMenu?.slot === slot && openMenu.kind === "thinking" ? null : { slot, kind: "thinking" })}
-												className="flex h-7 w-24 items-center gap-1 rounded-sm border border-border bg-background px-1.5 font-ui text-xs text-foreground transition-colors hover:border-muted-foreground/50 disabled:cursor-not-allowed disabled:opacity-40"
-											>
-												<span className="min-w-0 flex-1 truncate text-left">
-													{entry ? (level ? THINKING_LABEL[level] ?? level : "…") : "—"}
-												</span>
-												<span aria-hidden className="text-muted-foreground">
-													▾
-												</span>
-											</button>
-											{openMenu?.slot === slot && openMenu.kind === "thinking" && (
-												<MenuShell
-													anchorTestid={`setup-thinking-${slot}`}
-													testid={`setup-thinking-menu-${slot}`}
-													preferredSide="down"
-													align="left"
-													menuClass="flex w-44 flex-col gap-0.5 rounded-xl border border-border bg-card p-2 text-xs shadow-xl"
-												>
-													<ThinkingMenuList
-														levels={levelsForEntry.map(String)}
-														effectiveLevel={level}
-														onPick={(lv) => {
-															setLevels((prev) => ({ ...prev, [slot]: lv as ThinkingLevel }));
-															setOpenMenu(null);
-														}}
-													/>
-												</MenuShell>
-											)}
-										</div>
-									</div>
-								</div>
-							);
-						})}
-						<div className="flex items-center gap-3">
-							<button
-								type="button"
-								data-testid="setup-save"
-								disabled={!allPicked || saving}
-								onClick={() => void save()}
-								className="btn tall"
-								style={{ borderRadius: 999 }}
-							>
-								{saving ? "Saving…" : "Save models"}
-							</button>
-							{error && <p className="text-xs text-danger">{error}</p>}
-							<button
-								type="button"
-								data-testid="setup-add-provider"
-								onClick={() => setAddingProvider(true)}
-								className="ml-auto text-[12.5px] font-semibold text-[var(--v-accent)] hover:underline"
-							>
-								Connect another provider
-							</button>
 						</div>
-					</div>
-				)}
+						<Hint label="Close" binding="escape" side="left">
+							<button type="button" aria-label="Close setup" data-testid="setup-close" onClick={onClose} className="ib">
+								<Icon name="close" size="md" />
+							</button>
+						</Hint>
+					</header>
+
+					{stage === "keys" ? (
+						<div className="su-body">
+							{failed ? (
+								<EmptyState icon="status-warn" title="Couldn’t load your models">
+									Model catalog could not be loaded. Check the connection and retry.
+								</EmptyState>
+							) : (
+								<SetupKeysBody providers={keyProviders} connected={connected} />
+							)}
+						</div>
+					) : (
+						<>
+							<div className="su-body" data-testid="setup-stage-pickers">
+								{justConnected && (
+									<span className="su-done settle" role="status">
+										<Icon name="status-ok" size="sm" />
+										Provider connected. Now choose a model for each job.
+									</span>
+								)}
+								<p className="fhint">Pick the model for each tier. All three are required before chats can start.</p>
+								<div className="su-slots">
+									{SLOT_ORDER.map((slot) => {
+										const entry = picked[slot];
+										const level = levels[slot];
+										const levelsForEntry = entry?.supportedLevels ?? [];
+										const catalog =
+											slot === "vision" ? body?.models.filter((m) => m.input.includes("image")) : body?.models;
+										const modelOpen = openMenu?.slot === slot && openMenu.kind === "model";
+										const thinkingOpen = openMenu?.slot === slot && openMenu.kind === "thinking";
+										return (
+											<div key={slot} data-testid={`setup-slot-${slot}`} className="su-slot">
+												<span className="st-text">
+													<span className="st-label">
+														{SLOT_META[slot].label}
+														{!body?.slots?.[slot]?.model && !picked[slot] && (
+															<span data-testid={`setup-needed-${slot}`} className="pill muted">
+																Required
+															</span>
+														)}
+													</span>
+													<span className="st-desc">{SLOT_META[slot].roster}</span>
+													{slot !== "strong" && <><ChatGPTBackgroundAccess provider={entry?.provider} /><NativeSubscriptionBackgroundAccess provider={entry?.provider} /></>}
+												</span>
+												<SelectTrigger
+													value={entry ? prettyModel(entry.id) : ""}
+													emptyLabel="Choose…"
+													ariaLabel={`${SLOT_META[slot].label}`}
+													testid={`setup-trigger-${slot}`}
+													title={entry ? `${entry.provider} · ${entry.id}` : undefined}
+													open={modelOpen}
+													onClick={() => setOpenMenu(modelOpen ? null : { slot, kind: "model" })}
+												/>
+												{/* Anchor by TESTID, not a ref (the settings-section pattern):
+												    React attaches a host element's ref AFTER its descendants'
+												    layout effects run, so a ref freshly attached in this same
+												    commit is still null when MenuShell measures — the menu
+												    stayed invisible until a window resize (owner, 2026-10-09). */}
+												{modelOpen && (
+													<MenuShell
+														anchorTestid={`setup-trigger-${slot}`}
+														testid={`setup-menu-${slot}`}
+														preferredSide="down"
+														menuClass="pop lh-menu mm"
+													>
+														<ModelMenuList
+															models={catalog}
+															effectiveId={entry?.id}
+															effectiveProvider={entry?.provider}
+															onPick={(m) => {
+																setPicked((prev) => ({ ...prev, [slot]: m }));
+																// Auto-populate (chunk 2, owner: "populate
+																// everywhere"): no explicit level → the
+																// ordering's level for the fresh pick; an
+																// explicit one rides (Save clamps server-side).
+																setLevels((prev) => ({
+																	...prev,
+																	[slot]: populateLevel(prev[slot], m.supportedLevels),
+																}));
+																setOpenMenu(null);
+															}}
+															footer={catalog && catalog.length === 0 ? "No image-capable models. Add a provider key with access to a vision model." : undefined}
+														/>
+													</MenuShell>
+												)}
+												{/* Thinking selector (chunk 2): editable, pre-populated from
+												    the ordering per picked model — no model, no levels. */}
+												<button
+													type="button"
+													aria-label={`${SLOT_META[slot].label} thinking`}
+													data-testid={`setup-thinking-${slot}`}
+													aria-expanded={thinkingOpen}
+													disabled={!entry}
+													onClick={() => setOpenMenu(thinkingOpen ? null : { slot, kind: "thinking" })}
+													className="selectbtn st-select narrow disabled:cursor-not-allowed disabled:opacity-40"
+												>
+													<span className={entry ? undefined : "ph"}>
+														{entry ? (level ? levelName(THINKING_LABEL[level] ?? level) : "…") : "—"}
+													</span>
+													<Icon name="chevrons-up-down" size="sm" />
+												</button>
+												{thinkingOpen && (
+													<MenuShell
+														anchorTestid={`setup-thinking-${slot}`}
+														testid={`setup-thinking-menu-${slot}`}
+														preferredSide="down"
+														menuClass="pop lh-menu mm narrow"
+													>
+														<ThinkingMenuList
+															levels={levelsForEntry.map(String)}
+															effectiveLevel={level}
+															onPick={(lv) => {
+																setLevels((prev) => ({ ...prev, [slot]: lv as ThinkingLevel }));
+																setOpenMenu(null);
+															}}
+														/>
+													</MenuShell>
+												)}
+											</div>
+										);
+									})}
+								</div>
+							</div>
+							<footer className="su-foot">
+								<button type="button" data-testid="setup-add-provider" onClick={() => setAddingProvider(true)} className="btn sm quiet">
+									<Icon name="plus" size="sm" />
+									Connect another provider
+								</button>
+								<span className="grow">{error && <span className="su-err" role="alert">{error}</span>}</span>
+								<button
+									type="button"
+									data-testid="setup-save"
+									disabled={!allPicked || saving}
+									onClick={() => void save()}
+									className="btn brand"
+								>
+									{saving ? "Saving…" : "Save models"}
+								</button>
+							</footer>
+						</>
+					)}
+				</div>
 			</div>
 		</div>,
 		document.body,

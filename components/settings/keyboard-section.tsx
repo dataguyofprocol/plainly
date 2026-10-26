@@ -26,12 +26,13 @@ import {
 	type KeyAction,
 	type KeyScope,
 } from "@/src/core";
-import { SettingsRow } from "./controls.tsx";
+import { SettingsGroup, SettingsRow } from "./controls.tsx";
+import { Icon } from "@/components/ui/icon";
 
 const SCOPES: { scope: KeyScope; label: string }[] = [
-	{ scope: "global", label: "Global" },
-	{ scope: "chat", label: "Chat" },
-	{ scope: "graph", label: "Graph" },
+	{ scope: "global", label: "Everywhere" },
+	{ scope: "chat", label: "In a lesson" },
+	{ scope: "graph", label: "On the graph" },
 ];
 
 /** The overrides map after ONE change (pure — exported for tests):
@@ -45,6 +46,33 @@ export function nextOverrides(
 	if (binding === null) delete next[id];
 	else next[id] = binding;
 	return next;
+}
+
+/** A formatted binding split into its keys: "⌘⇧F" → ⌘ ⇧ F, "Ctrl+K" →
+ *  Ctrl K. Pure — exported for the cheat sheet. */
+export function bindingParts(text: string): string[] {
+	if (text.includes("+") && text.length > 1) return text.split("+").filter(Boolean);
+	const parts: string[] = [];
+	let rest = text;
+	while (rest.length > 1 && "⌘⇧⌥⌃".includes(rest[0]!)) {
+		parts.push(rest[0]!);
+		rest = rest.slice(1);
+	}
+	if (rest) parts.push(rest);
+	return parts;
+}
+
+/** A shortcut as .kbd chips (the settings rows and the ? cheat sheet). */
+export function KeyChips({ text, listening }: { text: string; listening?: boolean }) {
+	return (
+		<span className={listening ? "keys listening" : "keys"} aria-label={text}>
+			{bindingParts(text).map((k, i) => (
+				<kbd key={i} className="kbd">
+					{k}
+				</kbd>
+			))}
+		</span>
+	);
 }
 
 export function KeyboardSection() {
@@ -100,68 +128,63 @@ export function KeyboardSection() {
 				const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
 				if (!actions.length) return null;
 				return (
-					<div key={scope} data-testid={`kbd-scope-${scope}`}>
-						<p className="mb-1 text-xs text-muted-foreground/70">{label}</p>
-						<div className="flex flex-col gap-2">
-							{actions.map((def) => {
-								const effective = overrides[def.id] ?? def.binding;
-								return (
-									<SettingsRow
-										key={def.id}
-										label={def.label}
-										hint={def.displayOnly ? "Fixed — part of this screen" : undefined}
-										testid={`kbd-row-${def.id}`}
-									>
-										<span className="flex items-center gap-2">
-											<kbd className="rounded-sm border border-border bg-muted px-1.5 py-0.5 font-ui text-xs">
-												{rebinding === def.id ? "Press keys…" : formatBinding(effective)}
-											</kbd>
-											{def.displayOnly ? null : rebinding === def.id ? (
+					<SettingsGroup key={scope} label={label} testid={`kbd-scope-${scope}`}>
+						{actions.map((def) => {
+							const effective = overrides[def.id] ?? def.binding;
+							const listening = rebinding === def.id;
+							return (
+								<SettingsRow
+									key={def.id}
+									label={def.label}
+									hint={def.displayOnly ? "Fixed — part of this screen" : listening ? "Press the new shortcut, or Esc to cancel" : undefined}
+									testid={`kbd-row-${def.id}`}
+								>
+									{def.displayOnly ? null : listening ? (
+										<button type="button" onClick={() => setRebinding(null)} className="btn sm quiet">
+											Cancel
+										</button>
+									) : (
+										<>
+											{overridden(def.id) && (
 												<button
 													type="button"
-													onClick={() => setRebinding(null)}
-													className="text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
+													onClick={() => resetOne(def.id)}
+													data-testid={`kbd-reset-${def.id}`}
+													className="btn sm quiet"
 												>
-													Cancel
+													Reset
 												</button>
-											) : (
-												<>
-													<button
-														type="button"
-														onClick={() => setRebinding(def.id)}
-														data-testid={`kbd-rebind-${def.id}`}
-														className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-													>
-														Rebind
-													</button>
-													{overridden(def.id) && (
-														<button
-															type="button"
-															onClick={() => resetOne(def.id)}
-															data-testid={`kbd-reset-${def.id}`}
-															className="text-xs text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
-														>
-															Reset
-														</button>
-													)}
-												</>
 											)}
+											<button
+												type="button"
+												onClick={() => setRebinding(def.id)}
+												data-testid={`kbd-rebind-${def.id}`}
+												className="btn sm quiet"
+											>
+												Change
+											</button>
+										</>
+									)}
+									{listening ? (
+										<span className="keys listening">
+											<kbd className="kbd">Press keys…</kbd>
 										</span>
-									</SettingsRow>
-								);
-							})}
-						</div>
-					</div>
+									) : (
+										<KeyChips text={formatBinding(effective)} />
+									)}
+								</SettingsRow>
+							);
+						})}
+					</SettingsGroup>
 				);
 			})}
-			<div className="mt-1 flex items-center justify-between">
-				<span className="text-xs text-muted-foreground/70">Stored on this device (lh:keymap) — overrides only.</span>
-				<button
-					type="button"
-					onClick={resetAll}
-					data-testid="kbd-reset-all"
-					className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-				>
+			<div className="st-foot">
+				<span>
+					<Icon name="info" size="xs" />
+					Saved on this device. Only your changes are stored.
+				</span>
+				<button type="button" onClick={resetAll} data-testid="kbd-reset-all" className="btn sm quiet">
+					<Icon name="retry" size="xs" />
 					Reset all to defaults
 				</button>
 			</div>

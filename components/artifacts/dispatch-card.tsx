@@ -1,11 +1,13 @@
 "use client";
 
 import { useContext } from "react";
-import { CheckIcon, SettingsIcon, XIcon } from "lucide-react";
 import { JobsContext } from "@/components/jobs-context";
 import { ChatActionsContext } from "@/components/chat";
 import { isModelsRefusal, isProviderKeyRefusal, type JobKind, type JobRecord } from "@/src/core";
 import { BrailleSpinner } from "@/components/braille-spinner";
+import { Shimmer } from "@/components/ai-elements/shimmer";
+import type { IconName } from "@/components/ui/icon";
+import { ToolRow } from "@/components/artifacts/tool-call-card";
 
 /**
  * The dispatch card (contracts.ts "THE ASYNC PROTOCOL" §4): the tool-call
@@ -26,13 +28,27 @@ const KIND_LABEL: Record<JobKind, string> = {
 	pdf: "PDF reader",
 };
 
+/** Each job kind's glyph — shared with the steer card's delivery rows. */
+export const KIND_ICON: Record<JobKind, IconName> = {
+	research: "research",
+	demo: "demo",
+	visual: "figure",
+	pdf: "pdf",
+};
+
+/** A job kind's learner-facing name ("Figure agent"); unknown kinds keep
+ *  their own word. */
+export function jobLabel(kind: string): string {
+	return KIND_LABEL[kind as JobKind] ?? kind;
+}
+
 export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: JobKind }) {
 	const jobs = useContext(JobsContext);
 	const job = jobs.find((j) => j.toolCallId === toolCallId) ?? null;
 	const label = KIND_LABEL[kind];
 
 	if (!job || job.status === "running") {
-		return <DispatchActivityCard job={job} label={label} />;
+		return <DispatchActivityCard job={job} label={label} icon={KIND_ICON[kind]} />;
 	}
 	// BYOK (owner, 2026-09-22): a job refused for missing models is INFO,
 	// not scary-error — gray glyph + "needs model setup" + the deep-link
@@ -41,78 +57,77 @@ export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: J
 	// whose key is gone reads as the key being needed — the deep-link
 	// lands on the SetupDialog's first-key stage on its own.
 	if (isModelsRefusal(job.error)) {
-		return <DispatchRefusedCard label={label} line="needs model setup" button="Set up models" />;
+		return <DispatchRefusedCard label={label} icon={KIND_ICON[kind]} line="needs model setup" button="Set up models" />;
 	}
 	if (isProviderKeyRefusal(job.error)) {
-		return <DispatchRefusedCard label={label} line="needs a provider key" button="Add a key" />;
+		return <DispatchRefusedCard label={label} icon={KIND_ICON[kind]} line="needs a provider key" button="Add a key" />;
 	}
 	const failed = job.status === "error";
 	return (
-		<div
-			className="flex items-center gap-2 text-xs text-muted-foreground"
-			data-testid="dispatch-settled"
-		>
-			{failed ? <XIcon className="size-3.5 text-danger" /> : <CheckIcon className="size-3.5" />}
-			<span className="font-medium">{label}</span>
-			<span>{failed ? "failed" : "delivered"}</span>
+		<div className="ls-tool">
+			<ToolRow
+				as="div"
+				testId="dispatch-settled"
+				icon={KIND_ICON[kind]}
+				label={label}
+				note={failed ? "failed" : "delivered"}
+				status={failed ? "failed" : "done"}
+				expandable={false}
+			/>
 		</div>
 	);
 }
 
 /** The refused card: quiet info tone — nothing red, nothing "failed". */
-function DispatchRefusedCard({ label, line, button }: { label: string; line: string; button: string }) {
+function DispatchRefusedCard({ label, icon, line, button }: { label: string; icon: IconName; line: string; button: string }) {
 	const ctx = useContext(ChatActionsContext);
 	return (
-		<div
-			className="flex items-center gap-2 text-xs text-muted-foreground"
-			data-testid="dispatch-refused"
-		>
-			<SettingsIcon className="size-3.5" />
-			<span className="font-medium">{label}</span>
-			<span>{line}</span>
-			{ctx && (
-				<button
-					type="button"
-					data-testid="dispatch-setup-link"
-					onClick={ctx.openSetup}
-					className="ml-1 rounded-sm border border-border bg-card px-2 py-0.5 font-ui normal-case tracking-normal text-foreground transition-colors hover:border-muted-foreground/50"
-				>
-					{button}
-				</button>
-			)}
+		<div className="ls-tool">
+			<ToolRow
+				as="div"
+				testId="dispatch-refused"
+				icon={icon}
+				label={label}
+				note={line}
+				status="info"
+				expandable={false}
+				trailing={
+					ctx && (
+						<button type="button" data-testid="dispatch-setup-link" onClick={ctx.openSetup} className="ls-mini">
+							{button}
+						</button>
+					)
+				}
+			/>
 		</div>
 	);
 }
 
-function DispatchActivityCard({ job, label }: { job: JobRecord | null; label: string }) {
+/** A job in flight: the live row — spinner, the agent's name, its latest
+ *  activity in mono, and the elapsed seconds. */
+function DispatchActivityCard({ job, label, icon }: { job: JobRecord | null; label: string; icon: IconName }) {
 	// Elapsed from createdAt — jobs appear here only via the jobs feed (post-mount),
 	// so no SSR/hydration mismatch.
 	const elapsed =
 		job && job.createdAt ? Math.max(0, Math.round((Date.now() - Date.parse(job.createdAt)) / 1000)) : null;
 	return (
-		<div
-			className="rounded-xl border bg-card p-4 text-card-foreground"
-			data-testid="dispatch-card"
-		>
-			<div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-				{/* The working-state grammar (owner, streaming round 2026-10-01):
-				    the Braille spinner replaces the pulsing dot — one indicator
-				    everywhere. This is the ONLY dispatch-card change; the card's
-				    shape is untouched. */}
-				<BrailleSpinner label={`${label} running`} />
-				{label}
-				{elapsed !== null && <span className="font-normal">· {elapsed}s</span>}
-			</div>
-			{job?.activity && (
-				<div className="mt-1 truncate text-sm text-muted-foreground" data-testid="dispatch-activity-line">
-					{job.activity}
-				</div>
-			)}
-			{!job && (
-				<div className="mt-1 text-sm text-muted-foreground" data-testid="dispatch-pending">
-					Dispatched…
-				</div>
-			)}
+		<div className="ls-tool" data-testid="dispatch-card">
+			<ToolRow
+				as="div"
+				icon={icon}
+				status="running"
+				expandable={false}
+				leading={<BrailleSpinner label={`${label} running`} />}
+				label={<Shimmer duration={1} as="span">{label}</Shimmer>}
+				note={
+					job?.activity ? (
+						<span className="mono" data-testid="dispatch-activity-line">{job.activity}</span>
+					) : !job ? (
+						<span data-testid="dispatch-pending">Dispatched…</span>
+					) : null
+				}
+				trailing={elapsed !== null && <span className="ls-time">{elapsed}s</span>}
+			/>
 		</div>
 	);
 }

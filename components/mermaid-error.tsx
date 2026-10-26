@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import type { MermaidErrorComponentProps } from "streamdown";
 
@@ -16,29 +16,19 @@ export const MermaidError = ({
 	retry,
 	className,
 }: MermaidErrorComponentProps & { className?: string }) => (
-	<div
-		className={cn(
-			"my-4 rounded-xl border border-destructive/40 bg-destructive/5 p-4",
-			className,
-		)}
-		data-streamdown="mermaid-error"
-	>
-		<p className="text-sm font-medium text-destructive">
-			Diagram failed to render
-		</p>
-		<p className="mt-1 font-mono text-xs break-words text-muted-foreground">
-			{error}
-		</p>
-		<details className="mt-3">
-			<summary className="cursor-pointer text-xs text-muted-foreground">
-				Show diagram source
-			</summary>
-			<pre className="mt-2 overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs text-foreground">
-				{chart}
-			</pre>
-		</details>
-		<Button className="mt-3" onClick={retry} size="sm" variant="outline">
+	<div className={cn("ls-callout my-4", className)} data-streamdown="mermaid-error" role="alert">
+		<Icon name="status-warn" size="sm" />
+		<div className="ls-callout-b">
+			<b>Diagram failed to render</b>
+			<span className="mono" title={error}>{error}</span>
+			<details className="mt-1">
+				<summary className="cursor-pointer text-muted-foreground">Show diagram source</summary>
+				<pre className="mt-2 overflow-x-auto rounded-lg bg-surface p-3 font-mono text-xs text-foreground">{chart}</pre>
+			</details>
+		</div>
+		<button type="button" className="btn sm secondary" onClick={retry}>
+			<Icon name="retry" size="sm" />
 			Retry
-		</Button>
+		</button>
 	</div>
 );

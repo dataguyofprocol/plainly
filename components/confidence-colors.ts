@@ -3,15 +3,16 @@
  * cool ramp, so "how sure" reads at a glance — guessing in amber through
  * certain in green. One table for the live switch (question dock) and the
  * record (answered card). Old six-stop values map to the nearest level.
+ * The values are tokens (app/globals.css --conf-1..4), so a theme owns them.
  */
 
 import { CONFIDENCE_LEVELS } from "@/src/core";
 
 export const CONFIDENCE_LEVEL_COLORS: Record<number, { ink: string; soft: string }> = {
-	25: { ink: "#a2601f", soft: "rgba(214, 145, 66, 0.16)" },
-	50: { ink: "#8a6d1c", soft: "rgba(201, 170, 64, 0.18)" },
-	75: { ink: "#2f7a6b", soft: "rgba(47, 143, 127, 0.15)" },
-	95: { ink: "#21633f", soft: "rgba(33, 99, 63, 0.15)" },
+	25: { ink: "var(--conf-1)", soft: "var(--conf-1-soft)" },
+	50: { ink: "var(--conf-2)", soft: "var(--conf-2-soft)" },
+	75: { ink: "var(--conf-3)", soft: "var(--conf-3-soft)" },
+	95: { ink: "var(--conf-4)", soft: "var(--conf-4-soft)" },
 };
 
 /** Pure: the level a confidence value reads as (exact for the four

@@ -18,7 +18,6 @@ import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-e
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { LiveToolCard } from "@/components/artifacts/live-tool-card";
-import { Separator } from "@/components/ui/separator";
 import { AnsweredCard } from "@/components/answered-card";
 import { artifactRenderers } from "@/components/artifacts";
 import { SubagentSteerCard } from "@/components/artifacts/steer-card";
@@ -44,7 +43,6 @@ import {
 import { PlanBlock, PlanPopup, latestTree } from "@/components/plan-block";
 import { MermaidOverlay, SessionMermaidContext } from "@/components/session-overlay";
 import { AbortTurnDialog, type AbortMode } from "@/components/abort-turn-dialog";
-import { ArrowRightIcon } from "lucide-react";
 import type { PlanBlockData } from "@/src/core";
 import { SessionFind } from "@/components/session-find";
 import { SessionMessageNavigation } from "@/components/session-navigation";
@@ -70,7 +68,9 @@ import {
 } from "@/src/core";
 import { LessonPanel, PracticePanel, planProgress, practiceSet, stepFold } from "@/components/lesson-panel";
 import { ModelControl } from "@/components/model-picker";
-import { CheckIcon, MicIcon, PlanMapIcon } from "@/components/v4/icons";
+import { Icon } from "@/components/ui/icon";
+import { EmptyState } from "@/components/ui/empty-state";
+import { displayTitle } from "@/components/ui/format";
 import { Field, Rail } from "@/components/v4/shell";
 import { currentUserThinkingOpen, setAllUserThinkingOpen } from "@/components/thinking-block";
 import { PRACTICE_SET_SIZE, practiceHintsUsed, slotsConfigured, type HintRung, type ModelsSettings } from "@/src/core";
@@ -134,10 +134,7 @@ export function parseProviderKeyRefusal(message: string | undefined): boolean {
  *  scaffolding). */
 function SystemLine({ children, testId }: { children: React.ReactNode; testId?: string }) {
 	return (
-		<div
-			data-testid={testId}
-			className="flex items-center justify-center gap-1.5 py-1 text-xs text-muted-foreground"
-		>
+		<div data-testid={testId} className="ls-sys">
 			{children}
 		</div>
 	);
@@ -1162,15 +1159,15 @@ export function Chat({
 												return <ThinkingCard key={pi} data={part.data as PracticeThinkingData} />;
 											case "data-practice-next":
 												// The learner's move-on signal (owner round 16): a compact
-												// centered mono-caps line — chrome, the dismissal register.
+												// centered hairline divider — chrome, the dismissal register.
 												return (
-													<div
-														key={pi}
-														data-testid="practice-next-line"
-														className="my-4 flex items-center justify-center gap-1.5 font-ui text-xs font-medium text-muted-foreground"
-													>
-														<ArrowRightIcon className="size-3" />
-														Next problem
+													<div key={pi} data-testid="practice-next-line" className="ls-divider quiet">
+														<i aria-hidden="true" />
+														<span>
+															<Icon name="arrow-right" size="xs" />
+															Next problem
+														</span>
+														<i aria-hidden="true" />
 													</div>
 												);
 											default:
@@ -1206,37 +1203,17 @@ export function Chat({
 										<PhaseDivider key={`teach-${m.id || `m-${mi}`}`} phase="teach" />
 									) : null}
 									{m.role === "user" ? (
-										/* THE DOCUMENT ROW (owner round, 2026-10-05): no right-aligned
-										    bubble — the transcript reads as a document. User text is a
-										    full-width quote block: muted "You" label, muted rail,
-										    FULL-opacity text (learner words are content, not whisper).
-										    Distinguished from user thinking at a glance: thinking is
-										    collapsed + 50% italic; this is upright and present.
-										    User text renders plain — the model's LaTeX pipeline is not
-										    applied to learner-authored text ($ stays $, no surprises).
-										    Rendered WITHOUT the Message wrapper — that is the bubble. */
-											<div
-										data-testid="user-message"
-										/* THE DOCUMENT, ALL-IN (owner rounds two+three, 2026-10-07):
-										    no chat side — the user message is a full-width card-color
-										    BAND, the IDENTICAL geometry as the thinking rows: 5px band
-										    padding, the left gap matches it, the rail fills the 3ch
-										    inset (the band is the authorship mark against the agent's
-										    transparent prose). The "You" label stays — one register
-										    with the thinking labels. */
-										className="my-2 w-full border-l-[calc(3ch-14px)] border-muted-foreground/30 bg-card py-1 pl-[14px] pr-4 font-ui text-xs"
-									>
-												{/* The rail GROUPS (owner round 4, 2026-10-05): the YOU heading
-												    sits INSIDE the rail, same mono-xs register and same 1ch
-												    rail as the thinking rows — one quote geometry. */}
-												<div className="font-medium text-muted-foreground">You</div>
-												<div className="lh-prose whitespace-pre-wrap text-foreground">
-													{m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")}
-												</div>
-											</div>
+										/* The learner's own words: a right-aligned bubble in the UI
+										    voice (owner, finesse pass 2026-10-26 — the full-width
+										    quote band read as a citation). No label: the side is the
+										    authorship mark. Plain text — the model's LaTeX pipeline is
+										    not applied to learner-authored text ($ stays $). */
+										<div data-testid="user-message" className="ls-user">
+											{m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")}
+										</div>
 									) : (
 									<Message from="assistant" className="max-w-full">
-									<MessageContent className="w-full">
+									<MessageContent className="ls-turn">
 											{m.parts.map((part, pi) => {
 												const isLastPart = mi === messages.length - 1 && pi === m.parts.length - 1;
 												// The step boundary where teaching begins (round 8): when
@@ -1278,7 +1255,7 @@ export function Chat({
 													}
 													case "reasoning":
 														return (
-															<Reasoning key={pi} isStreaming={status === "streaming" && isLastPart} className="mb-2">
+															<Reasoning key={pi} isStreaming={status === "streaming" && isLastPart}>
 																<ReasoningTrigger />
 																<ReasoningContent>{part.text ?? ""}</ReasoningContent>
 															</Reasoning>
@@ -1286,7 +1263,9 @@ export function Chat({
 													case "step-start":
 														if (teachBoundary)
 															return <PhaseDivider key={`teach-step-${pi}`} phase="teach" />;
-														return pi > 0 ? <Separator key={pi} className="my-3" /> : null;
+														// A step boundary: breathing room, no rule (the thinking
+														// row that follows already marks the new step).
+														return pi > 0 ? <div key={pi} className="ls-stepgap" aria-hidden="true" /> : null;
 													case "data-plan-block":
 														// The plan in the chat (wave 4): a frozen snapshot
 														// block — rendered as carried, never re-derived.
@@ -1376,7 +1355,7 @@ export function Chat({
 		    chip) spans from the left sidebar's edge to the panel's edge. The
 		    dock overlays the column bottom (outside the scroller); a spacer in
 		    the transcript reserves its height. */}
-		<div className={`v4 ${kind === "practice" ? "warm" : ""}`} style={{ height: "100vh", overflow: "hidden" }}>
+		<div className={`v4 ls-root ${kind === "practice" ? "warm" : ""}`}>
 		<Field variant={kind === "practice" ? "warm" : "home"} />
 		<div className="lshell">
 			<Rail active={kind === "practice" ? "practice" : undefined} />
@@ -1409,98 +1388,104 @@ export function Chat({
 							onBlur={() => void commitRename(titleDraft)}
 							spellCheck={false}
 							aria-label="Session title"
-							style={{ minWidth: "8ch", maxWidth: "50%", border: 0, borderBottom: "1px solid var(--line2)", background: "transparent", outline: "none", fontSize: 14, fontWeight: 700, fieldSizing: "content" } as React.CSSProperties}
+							className="ls-rename"
 						/>
 					) : (
 						<Hint label="Rename session" action="rename-session" side="bottom">
 							<button
 								type="button"
+								className="ls-title"
 								onClick={() => {
 									setTitleDraft(titleText);
 									setRenaming(true);
 								}}
-								style={{ minWidth: 0, border: 0, background: "transparent", padding: 0, cursor: "text" }}
 							>
-								<h1 style={{ margin: 0, fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{titleText}</h1>
+								<h1>{displayTitle(titleText)}</h1>
 							</button>
 						</Hint>
 					)}
-					<span className="hide-sm" style={{ fontSize: 12, color: "var(--v-muted)", whiteSpace: "nowrap" }} data-testid="session-position">
-						{kind === "practice"
-							? setProgress && setProgress.length > 0
-								? `Practice · problem ${Math.min(setProgress.length, PRACTICE_SET_SIZE)} of ${PRACTICE_SET_SIZE}`
-								: "Practice"
-							: lessonProgress && lessonProgress.currentIndex !== null
-								? `Lesson · step ${lessonProgress.currentIndex}/${lessonProgress.total}`
-								: (phases.at(-1) ?? "probe") === "probe"
-									? "Lesson · check-in"
-									: "Lesson"}
+					{/* Where the session stands: one compact group — the position
+					    in words, then the step ticks or the practice set bar. */}
+					<span className="ls-pos hide-sm">
+						<span data-testid="session-position">
+							{kind === "practice"
+								? setProgress && setProgress.length > 0
+									? `Problem ${Math.min(setProgress.length, PRACTICE_SET_SIZE)} of ${PRACTICE_SET_SIZE}`
+									: "Practice"
+								: lessonProgress && lessonProgress.currentIndex !== null
+									? `Step ${lessonProgress.currentIndex} of ${lessonProgress.total}`
+									: (phases.at(-1) ?? "probe") === "probe"
+										? "Check-in"
+										: "Lesson"}
+						</span>
+						{kind === "practice" && setProgress && setProgress.length > 0 && (
+							<span className="set" role="img" aria-label={`${setProgress.filter((p) => p.outcome).length} of ${PRACTICE_SET_SIZE} problems done`}>
+								{Array.from({ length: Math.max(PRACTICE_SET_SIZE, setProgress.length) }, (_, i) => {
+									const p = setProgress[i];
+									const cls = !p ? "" : p.outcome === null ? "now" : p.outcome === "solved" ? "solid" : p.outcome === "solvedWithHints" ? "help" : "";
+									return <i key={i} className={cls} />;
+								})}
+							</span>
+						)}
+						{kind !== "practice" && lessonProgress && (
+							<span className="ticks" role="img" aria-label={`${lessonProgress.visited} of ${lessonProgress.total} steps visited`}>
+								{lessonProgress.steps.map((st) => (
+									<i key={st.id} className={st.status === "current" ? "c" : st.status === "visited" ? "d" : ""} />
+								))}
+							</span>
+						)}
 					</span>
-					{kind === "practice" && setProgress && setProgress.length > 0 && (
-						<span className="set" role="img" aria-label={`${setProgress.filter((p) => p.outcome).length} of ${PRACTICE_SET_SIZE} problems done`}>
-							{Array.from({ length: Math.max(PRACTICE_SET_SIZE, setProgress.length) }, (_, i) => {
-								const p = setProgress[i];
-								const cls = !p ? "" : p.outcome === null ? "now" : p.outcome === "solved" ? "solid" : p.outcome === "solvedWithHints" ? "help" : "";
-								return <i key={i} className={cls} />;
-							})}
-						</span>
-					)}
-					{kind !== "practice" && lessonProgress && (
-						<span className="ticks lg hide-md" role="img" aria-label={`${lessonProgress.visited} of ${lessonProgress.total} steps visited`}>
-							{lessonProgress.steps.map((st) => (
-								<i key={st.id} className={st.status === "current" ? "c" : st.status === "visited" ? "d" : ""} />
-							))}
-						</span>
-					)}
-					<span style={{ marginLeft: "auto" }} />
-					{kind === "practice" && activeProblem && <ProblemClock key={activeProblem.toolCallId} problemId={activeProblem.toolCallId} />}
-					{kind !== "practice" && planTree && (
-						<button type="button" className="ib tipb" aria-label="Plan map" data-tip="Plan map" data-testid="plan-chip" onClick={() => setPlanOpen(true)}>
-							<PlanMapIcon />
-						</button>
-					)}
-					{kind !== "practice" && <ModelControl variant="chip" className="mchip" chatId={chatId} />}
+					<span className="ls-actions">
+						{kind === "practice" && activeProblem && <ProblemClock key={activeProblem.toolCallId} problemId={activeProblem.toolCallId} />}
+						{kind !== "practice" && planTree && (
+							<Hint label="Plan map" side="bottom">
+								<button type="button" className="ib" aria-label="Plan map" data-testid="plan-chip" onClick={() => setPlanOpen(true)}>
+									<Icon name="plan" size="md" />
+								</button>
+							</Hint>
+						)}
+						{kind !== "practice" && <ModelControl variant="chip" className="mchip" chatId={chatId} />}
+						<DockToggle attention={Boolean(pending) || Boolean(activeProblem)} label={kind === "practice" ? "Your working" : "Question and path"} />
+					</span>
 				</header>
 
 				<SessionFind scopeRef={sessionFindScopeRef} scrollContextRef={scrollContextRef} />
-				<div ref={sessionFindScopeRef} style={{ position: "relative", display: "flex", flex: 1, minHeight: 0 }}>
-				<Conversation className="min-w-0" style={{ flex: 1 }} initial="instant" contextRef={scrollContextRef}>
+				<div ref={sessionFindScopeRef} className="ls-scope">
+				<Conversation className="ls-conv" initial="instant" contextRef={scrollContextRef}>
 					<SessionMessageNavigation />
-					<ConversationContent className="scroll" style={{ gap: 0, minHeight: "100%" }}>
-						<div data-session-find-root="" className="col" style={{ paddingTop: 4, paddingBottom: 24 }}>
+					<ConversationContent className="scroll">
+						<div data-session-find-root="" className="col">
 							{messages.length === 0 && !busy && (
-								<ConversationEmptyState
-									title="New session"
-									description="The teacher will open by probing what you already know."
-								/>
+								<ConversationEmptyState>
+									<EmptyState icon={kind === "practice" ? "practice" : "lesson"} title="New session">
+										{kind === "practice"
+											? "Your first problem arrives in a moment."
+											: "Your teacher opens by checking what you already know."}
+									</EmptyState>
+								</ConversationEmptyState>
 							)}
 
 							{/* Lesson4's reading mode: only the current step is on the
 							    page — earlier steps fold into the "Steps 1–k" bar above,
 							    and Review unfolds them in place. */}
 							{fold && fold.startIndex > 0 && (
-								<div className="past rise" data-testid="past-steps">
-									<CheckIcon className="" />
-									<span>
-										Steps 1–{fold.steps}
-										{fold.answers.total > 0 && ` · ${fold.answers.firstTry} of ${fold.answers.total} answers right first time`}
+								<div className="ls-past rise" data-testid="past-steps">
+									<Icon name="status-ok" size="md" />
+									<span className="ls-past-t">
+										<b>Steps 1–{fold.steps}</b>
+										{fold.answers.total > 0 && ` · ${fold.answers.firstTry} of ${fold.answers.total} right first time`}
 									</span>
-									<button
-										type="button"
-										onClick={() => setReviewOpen((v) => !v)}
-										style={{ marginLeft: "auto", border: 0, background: "transparent", fontWeight: 600, color: "var(--v-muted)" }}
-									>
+									<button type="button" className="ls-quiet" aria-expanded={reviewOpen} onClick={() => setReviewOpen((v) => !v)}>
 										{reviewOpen ? "Hide" : "Review"}
+										<Icon name="chevron-down" size="sm" />
 									</button>
 								</div>
 							)}
 							{(!fold || reviewOpen) && messages.slice(0, fold?.startIndex ?? 0).map((m, i) => renderMessage(m, i))}
 							{fold?.heading && (
-								<div className="rise" style={{ display: "flex", flexDirection: "column", gap: 2, animationDelay: "40ms" }} data-testid="step-heading">
-									<span style={{ fontSize: 12, fontWeight: 600, color: "var(--v-accent)" }}>Step {fold.heading.number}</span>
-									<h2 className="serif" style={{ margin: 0, fontSize: 28, lineHeight: "34px", fontWeight: 500, letterSpacing: "-0.01em" }}>
-										{fold.heading.title}
-									</h2>
+								<div className="ls-step-h rise" data-testid="step-heading">
+									<span className="over">Step {fold.heading.number}</span>
+									<h2 className="t-display">{fold.heading.title}</h2>
 								</div>
 							)}
 							{messages.slice(fold?.startIndex ?? 0).map((m, i) => renderMessage(m, i + (fold?.startIndex ?? 0)))}
@@ -1509,15 +1494,13 @@ export function Chat({
 							{pending && !busy && (
 								<button type="button" className="nudge" data-testid="your-turn" onClick={() => window.dispatchEvent(new CustomEvent("lh:focus-question"))}>
 									<span className="ping" aria-hidden="true" />
-									<span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-										<b style={{ fontWeight: 700 }}>Your turn</b>
-										<span style={{ fontSize: 12.5, color: "var(--v-muted)" }}>
-											{requiresReveal ? "When you’ve read this step, open the check on the right." : "The tutor asked you something — answer on the right."}
+									<span className="ls-nudge-t">
+										<b>Your turn</b>
+										<span>
+											{requiresReveal ? "When you’ve read this step, open the check in the panel." : "Your teacher asked you something — answer it in the panel."}
 										</span>
 									</span>
-									<span className="arrow" aria-hidden="true">
-										→
-									</span>
+									<Icon name="arrow-right" size="md" className="ls-nudge-go" />
 								</button>
 							)}
 
@@ -1531,33 +1514,31 @@ export function Chat({
 							    the thinking ROW (view.ts projects one empty reasoning
 							    part), so submitted ⟺ placeholder and streaming ⟺ a
 							    rendered row, mutually exclusive by construction.
-							    Protocol events (agent_start) apply nothing and release
-							    nothing — the placeholder covers the whole
-							    provider-connect gap. turnInFlight: the same state
-							    entered by external discovery (wake) / the poll
-							    fallback. Never collapsible itself. */}
+							    turnInFlight: the same state entered by external
+							    discovery (wake) / the poll fallback. Never collapsible. */}
 							{/* Compaction (owner round 15): the same register as the
-						    thinking placeholder — a visible session-wide state while
-						    the summarizer holds the model gate. Mutually exclusive with
-						    the THINKING placeholder by construction (the gate sits
-						    BEFORE beginTurn; the settle kick runs after endTurn). */}
+							    thinking placeholder — mutually exclusive with it by
+							    construction (the gate sits BEFORE beginTurn; the settle
+							    kick runs after endTurn). */}
 							{compacting && (
-								<span className="flex items-center gap-2 font-ui text-xs font-medium text-muted-foreground">
+								<span className="ls-working">
 									<BrailleSpinner label="Compacting context" />
-									<Shimmer duration={1}>Compacting context…</Shimmer>
+									<Shimmer duration={1} as="span">Compacting context…</Shimmer>
 								</span>
 							)}
 							{(status === "submitted" || turnInFlight) && (
-								<span className="flex items-center gap-2 font-ui text-xs font-medium text-muted-foreground">
+								<span className="ls-working">
 									<BrailleSpinner label="Thinking" />
-									<Shimmer duration={1}>
-										Thinking…
-									</Shimmer>
+									<Shimmer duration={1} as="span">Thinking…</Shimmer>
 								</span>
 							)}
 							{error && (
-								<div className="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm">
-									Something went wrong: {error.message}
+								<div className="ls-error" role="alert">
+									<Icon name="status-error" size="md" />
+									<div>
+										<b>Something went wrong</b>
+										<span>{error.message}</span>
+									</div>
 								</div>
 							)}
 						</div>
@@ -1586,13 +1567,13 @@ export function Chat({
 				{/* Lesson4's steer composer: questions and redirections queue
 				    and are answered after the current step. */}
 				<div className="composer">
-					<div style={{ maxWidth: 680, margin: "0 auto", display: "flex", flexDirection: "column", gap: 6 }}>
+					<div className="ls-dock">
 						{zeroKeys ? (
 							<ZeroKeysPill onOpen={() => setSetupOpen(true)} />
 						) : (
 							!configured && (
-								<div style={{ display: "flex", justifyContent: "center" }}>
-									<button type="button" className="ghost" data-testid="setup-cta" onClick={() => setSetupOpen(true)}>
+								<div className="ls-setup">
+									<button type="button" className="btn brand" data-testid="setup-cta" onClick={() => setSetupOpen(true)}>
 										Set up your models
 									</button>
 								</div>
@@ -1612,13 +1593,13 @@ export function Chat({
 							nextProblem={nextReady}
 							onNext={sendNext}
 							trailing={
+								<Hint label={dictation.active ? "Stop dictation" : "Dictate"} action={dictation.active ? undefined : "toggle-dictation"} side="top">
 								<button
 									type="button"
 									className={`ib ${dictation.active ? "on" : ""}`}
 									aria-label={dictation.active ? "Stop dictation" : "Dictate"}
 									aria-pressed={dictation.active}
 									onClick={() => (dictation.active ? void dictation.finish() : dictation.toggle())}
-									style={{ width: 30, height: 30 }}
 								>
 									{dictation.active ? (
 										<span className="wave" aria-hidden="true">
@@ -1628,23 +1609,25 @@ export function Chat({
 											<i />
 										</span>
 									) : (
-										<MicIcon />
+										<Icon name="mic" size="md" />
 									)}
 								</button>
+								</Hint>
 							}
 							placeholder={
 								nextReady
-									? "Ask anything, or press Enter for the next one."
+									? "Ask anything, or press Enter for the next problem"
 									: pending
-										? "Ask about this step, or steer the lesson… (answer the check on the right)"
+										? "Ask a question — the check waits in the panel"
 										: kind === "practice"
-											? "Ask about the problem, or steer the set…"
-											: "Ask about this step, or steer the lesson…"
+											? "Ask about the problem, or steer the set"
+											: "Ask about this step, or steer the lesson"
 							}
 						/>
 					</div>
 				</div>
 			</div>
+			<DockSlot>
 			{kind === "practice" ? (
 				<PracticePanel
 					messages={messages}
@@ -1674,6 +1657,7 @@ export function Chat({
 					chatId={chatId}
 				/>
 			)}
+			</DockSlot>
 		</div>
 		</div>
 		</JobsContext.Provider>
@@ -1757,8 +1741,79 @@ function ProblemClock({ problemId }: { problemId: string }) {
 	}, [problemId]);
 	const secs = Math.floor((now - start) / 1000);
 	return (
-		<span className="mono" style={{ fontSize: 12, color: "var(--v-muted)" }} key={problemId}>
-			{Math.floor(secs / 60)}:{String(secs % 60).padStart(2, "0")} on this one
+		<span className="ls-clock" key={problemId} title="Time on this problem">
+			<Icon name="time" size="xs" />
+			<span className="mono num">
+				{Math.floor(secs / 60)}:{String(secs % 60).padStart(2, "0")}
+			</span>
+			on this one
 		</span>
+	);
+}
+
+/**
+ * The dock as a slide-over (finesse pass, 2026-10-26): between 800 and
+ * 1023px the right-hand dock leaves the grid and slides in from the right
+ * edge; a header button (and the "Your turn" card, via lh:focus-question)
+ * opens it, the scrim, the close button or Esc closes it. At ≥1024 the slot
+ * is `display: contents` and the dock sits in its grid column as always.
+ * Self-contained UI state — the session's own state never sees it.
+ */
+const DOCK_SLIDE_EVENT = "lh:dock-slide";
+
+function DockToggle({ attention, label }: { attention: boolean; label: string }) {
+	return (
+		<Hint label={label} side="bottom">
+			<button
+				type="button"
+				className="ib ls-dock-toggle"
+				aria-label={label}
+				onClick={() => window.dispatchEvent(new CustomEvent(DOCK_SLIDE_EVENT))}
+			>
+				<Icon name="panel" size="md" />
+				{attention && <span className="ping" aria-hidden="true" />}
+			</button>
+		</Hint>
+	);
+}
+
+function DockSlot({ children }: { children: React.ReactNode }) {
+	const [open, setOpen] = useState(false);
+	useEffect(() => {
+		const narrow = () => window.matchMedia("(min-width: 800px) and (max-width: 1023px)").matches;
+		const toggle = () => setOpen((o) => !o);
+		const show = () => {
+			if (narrow()) setOpen(true);
+		};
+		window.addEventListener(DOCK_SLIDE_EVENT, toggle);
+		window.addEventListener("lh:focus-question", show);
+		return () => {
+			window.removeEventListener(DOCK_SLIDE_EVENT, toggle);
+			window.removeEventListener("lh:focus-question", show);
+		};
+	}, []);
+	useEffect(() => {
+		if (!open) return;
+		// An open slide-over CLAIMS Esc (the layered-Esc law): capture phase,
+		// so the abort chain underneath never sees it.
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key !== "Escape") return;
+			e.preventDefault();
+			e.stopPropagation();
+			setOpen(false);
+		};
+		window.addEventListener("keydown", onKey, true);
+		return () => window.removeEventListener("keydown", onKey, true);
+	}, [open]);
+	return (
+		<>
+			<div className={`ls-dockscrim ${open ? "open" : ""}`} aria-hidden="true" onClick={() => setOpen(false)} />
+			<div className={`ls-dockslot ${open ? "open" : ""}`}>
+				<button type="button" className="ib ls-dockclose pop" aria-label="Close panel" onClick={() => setOpen(false)}>
+					<Icon name="close" size="md" />
+				</button>
+				{children}
+			</div>
+		</>
 	);
 }
