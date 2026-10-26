@@ -180,7 +180,7 @@ export function Home({ initialConfigured, initialMode = "teach" }: { initialConf
 						)}
 						<LearnField chats={chats} now={now} mode={mode} onMode={setMode} focusOnArrival={initialMode === "practice"} ready={readiness.ready} onNeedSetup={needSetup} />
 						<ContinueCard chats={chats} now={now} />
-						<ProgressLine ideaCount={ideas?.length ?? null} />
+						<WeekStrip ideaCount={ideas?.length ?? null} />
 					</div>
 				</main>
 			</div>
@@ -563,26 +563,94 @@ function ContinueCard({ chats, now }: { chats: V4Chat[] | null; now: Date | null
 	);
 }
 
-// ─── Progress ─────────────────────────────────────────────────────────────
+// ─── This week ────────────────────────────────────────────────────────────
 
-function ProgressLine({ ideaCount }: { ideaCount: number | null }) {
+function fmtMin(m: number): string {
+	return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60 ? `${m % 60} min` : ""}`.trim();
+}
+
+/** The week at a glance: minutes against the weekly goal with the seven
+ *  days drawn, then lessons, ideas and practice. Zeros read as a next step,
+ *  never as "+0". Every number is the server's (useStats / useDaily). */
+function WeekStrip({ ideaCount }: { ideaCount: number | null }) {
 	const stats = useStats("week");
 	const daily = useDaily();
-	if (!stats || !daily) return <p className="hm-progress" aria-hidden="true">&nbsp;</p>;
+	if (!stats || !daily) {
+		return (
+			<section className="hm-week glass" aria-hidden="true">
+				{[0, 1, 2, 3].map((i) => (
+					<div key={i} className="hm-cell">
+						<i className="skel hm-sk-l" />
+						<i className="skel hm-sk-v" />
+						<i className="skel hm-sk-s" />
+					</div>
+				))}
+			</section>
+		);
+	}
 	const minutes = Math.round(stats.time.seconds / 60);
+	const goalWeek = daily.goalMinutes * daily.days.length;
+	const heights = barHeights(daily);
+	const top = Math.max(...daily.days.map((d) => d.minutes), daily.goalMinutes * 1.5, 1);
+	const goalPct = Math.round((daily.goalMinutes / top) * 100);
+	const todayIdx = daily.days.findIndex((d) => d.today);
+	const ideasAdded = stats.ideas.added;
+	const graph = ideaCount ?? stats.ideas.total;
 	return (
-		<p className="hm-progress rise">
-			<span>{minutes > 0 ? `${minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`} learned this week` : "Nothing learned yet this week"}</span>
-			<span aria-hidden="true">·</span>
-			<span>goal {daily.goalMinutes} min a day</span>
-			{ideaCount !== null && ideaCount > 0 && (
-				<>
-					<span aria-hidden="true">·</span>
-					<Link href="/knowledge" className="hm-progress-link">
-						{ideaCount} {ideaCount === 1 ? "idea" : "ideas"} in your graph
-					</Link>
-				</>
-			)}
-		</p>
+		<section className="hm-week glass rise" aria-labelledby="week">
+			<div className="hm-cell hm-cell-week">
+				<span className="hm-cell-l" id="week">
+					This week
+				</span>
+				<span className="hm-cell-v num">
+					{fmtMin(minutes)}
+					<small>of {fmtMin(goalWeek)}</small>
+				</span>
+				<div
+					className="hm-bars"
+					role="img"
+					aria-label={`Minutes per day: ${daily.days.map((d) => `${d.label} ${d.minutes}`).join(", ")}. Goal ${daily.goalMinutes} a day.`}
+				>
+					<span className="hm-goal" style={{ bottom: `${goalPct}%` }} aria-hidden="true" />
+					{daily.days.map((d, i) => {
+						const future = todayIdx !== -1 && i > todayIdx;
+						return (
+							<i
+								key={d.date}
+								className={d.today ? "today" : future ? "future" : d.minutes >= daily.goalMinutes ? "met" : ""}
+								style={future ? undefined : { height: `${Math.max(heights[i] ?? 0, d.minutes > 0 ? 8 : 4)}%` }}
+								title={`${d.label}: ${d.minutes} min`}
+							/>
+						);
+					})}
+				</div>
+				<div className="hm-days" aria-hidden="true">
+					{daily.days.map((d) => (
+						<span key={d.date} className={d.today ? "today" : ""} title={d.today ? "Today" : d.label}>
+							{d.label.slice(0, 1)}
+						</span>
+					))}
+				</div>
+			</div>
+			<div className="hm-cell">
+				<span className="hm-cell-l">Lessons</span>
+				<span className="hm-cell-v num">{stats.lessons.active}</span>
+				<span className="hm-cell-s">
+					{stats.lessons.waiting > 0 ? `${stats.lessons.waiting} waiting on you` : stats.lessons.active > 0 ? "In progress" : "Start one above"}
+				</span>
+			</div>
+			<Link href="/knowledge" className="hm-cell hm-cell-link">
+				<span className="hm-cell-l">Ideas</span>
+				<span className="hm-cell-v num">{ideasAdded > 0 ? `+${ideasAdded}` : graph}</span>
+				<span className="hm-cell-s">{ideasAdded > 0 ? `${graph} in your graph` : graph > 0 ? "in your graph" : "Grows as you learn"}</span>
+			</Link>
+			<div className="hm-cell">
+				<span className="hm-cell-l">Practice</span>
+				<span className="hm-cell-v num">{stats.practice.problems}</span>
+				<span className="hm-cell-s">
+					{stats.practice.problems > 0 ? `${stats.practice.solid} solid` : "Switch to Practice above"}
+				</span>
+			</div>
+		</section>
 	);
 }

@@ -11,7 +11,15 @@
  */
 
 /* ── Frame ─────────────────────────────────────────────────────────── */
-.v4 .lshell { position: relative; z-index: 1; display: grid; grid-template-columns: 60px minmax(0, 1fr) 400px; height: 100vh; }
+/* The right panel is fluid (about 28% of the window, 340–520px) until the
+   learner drags its edge (--dock-w, set by DockResizer in chat.tsx). */
+.v4 .lshell { --dock-w-eff: var(--dock-w, clamp(340px, 28vw, 520px)); position: relative; z-index: 1; display: grid; grid-template-columns: 60px minmax(0, 1fr) var(--dock-w-eff); height: 100vh; }
+.v4 .ls-resize { position: absolute; z-index: 6; top: 12px; bottom: 12px; right: calc(var(--dock-w-eff) - 6px); width: 12px; cursor: col-resize; touch-action: none; display: flex; align-items: center; justify-content: center; }
+.v4 .ls-resize i { width: 3px; height: 40px; border-radius: 2px; background: var(--line-strong); opacity: 0; transition: opacity var(--dur-1), background var(--dur-1), height var(--dur-2) var(--ease-out); }
+.v4 .ls-resize:hover i, .v4 .ls-resize:focus-visible i { opacity: 1; }
+.v4 .ls-resize.drag i { opacity: 1; height: 64px; background: var(--brand); }
+.v4 .ls-resize:focus-visible { outline: none; }
+.v4 .lshell:has(.ls-resize.drag) { cursor: col-resize; user-select: none; }
 .v4 .center { position: relative; grid-column: 2; display: flex; flex-direction: column; min-width: 0; height: 100vh; }
 .v4.ls-root { height: 100vh; overflow: hidden; }
 .v4 .ls-scope { position: relative; display: flex; flex: 1; min-height: 0; }
@@ -296,7 +304,6 @@
 
 /* ── Responsive ────────────────────────────────────────────────────── */
 @media (max-width: 1180px) {
-	.v4 .lshell { grid-template-columns: 60px minmax(0, 1fr) 360px; }
 	.v4 .ls-pos .ticks { display: none; }
 }
 @media (max-width: 1100px) {
@@ -311,6 +318,9 @@
 .v4 .ls-dock-toggle .ping { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; }
 /* 800–1023: the rail stays, the reading column takes the width, and the
    dock becomes a slide-over from the right edge (header toggle). */
+@media (max-width: 1023px) {
+	.v4 .ls-resize { display: none; }
+}
 @media (min-width: 800px) and (max-width: 1023px) {
 	.v4 .lshell { grid-template-columns: 60px minmax(0, 1fr); }
 	.v4 .ls-dock-toggle { display: inline-flex; }

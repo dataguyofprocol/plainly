@@ -19,6 +19,7 @@
  */
 
 import { useContext, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { MessageResponse } from "@/components/ai-elements/message";
 import { finishDictation, useDictationTarget, joinDictation } from "@/components/dictation";
 import { JobsContext } from "@/components/jobs-context";
 import { CONFIDENCE_LEVEL_COLORS, nearestLevel } from "@/components/confidence-colors";
@@ -595,6 +596,84 @@ function hintsOn(messages: readonly PopupMessage[], problemId: string): number {
 	return n;
 }
 
+export interface OpenedHint {
+	rung: HintRung;
+	label: string;
+	/** The tutor's reply to the request (its plain text), or null while it
+	 *  hasn't arrived yet. */
+	text: string | null;
+}
+
+/** Pure: the hints opened on one problem, each paired with the tutor's
+ *  reply. A hint request is a practice-thinking marker carrying a rung; the
+ *  hint itself is the text of the assistant message(s) that follow it, up
+ *  to the learner's next message. Thinking and tool parts are skipped.
+ *  Exported for tests. */
+export function practiceHints(messages: readonly PopupMessage[], problemId: string): OpenedHint[] {
+	const out: OpenedHint[] = [];
+	let open: OpenedHint | null = null;
+	for (const m of messages) {
+		const role = (m as { role?: string }).role;
+		if (role === "assistant") {
+			if (!open) continue;
+			const text = m.parts
+				.filter((p) => p.type === "text")
+				.map((p) => (p as { text?: string }).text ?? "")
+				.join("\n\n")
+				.trim();
+			if (text) open.text = open.text ? `${open.text}\n\n${text}` : text;
+			continue;
+		}
+		open = null;
+		for (const part of m.parts) {
+			if (part.type !== "data-practice-thinking") continue;
+			const d = (part as { data?: { problemCallId?: unknown; hint?: unknown } }).data;
+			if (d?.problemCallId !== problemId || (d.hint !== 1 && d.hint !== 2 && d.hint !== 3)) continue;
+			const rung = d.hint as HintRung;
+			open = { rung, label: HINT_RUNGS[rung - 1]!.label, text: null };
+			out.push(open);
+		}
+	}
+	return out;
+}
+
+const HINT_ASK: Record<HintRung, string> = { 1: "Show a nudge", 2: "Show a bigger hint", 3: "Show the first step" };
+
+/** One opened hint: a quiet card, clamped until "Show more". */
+function HintCard({ hint }: { hint: OpenedHint }) {
+	const [more, setMore] = useState(false);
+	const long = (hint.text?.length ?? 0) > 220;
+	return (
+		<div className={cn("hcard", more && "more")} data-testid="practice-hint-card">
+			<span className="hcard-l">{hint.label}</span>
+			{hint.text === null ? (
+				<span className="hcard-wait" aria-label="The hint is on its way">
+					<i className="skel" />
+					<i className="skel" />
+				</span>
+			) : (
+				<div className="hcard-t">
+					<MessageResponse>{hint.text}</MessageResponse>
+				</div>
+			)}
+			{long && (
+				<button type="button" className="hcard-more" onClick={() => setMore((v) => !v)}>
+					{more ? "Show less" : "Show more"}
+				</button>
+			)}
+		</div>
+	);
+}
+
+/** Pure: the set footer's square for one problem slot. */
+function slotOf(p: SetProblem | undefined): { cls: string; title: string } {
+	if (!p) return { cls: "next", title: "Not started" };
+	if (p.outcome === null) return { cls: "now", title: "Working on it" };
+	if (p.outcome === "solved") return { cls: "ok", title: "Solved" };
+	if (p.outcome === "solvedWithHints") return { cls: "hint", title: "Solved with hints" };
+	return { cls: "miss", title: p.outcome === "dismissed" ? "Skipped" : "Moved on" };
+}
+
 /**
  * THE PRACTICE DOCK (Practice4): your working for the open problem — the
  * field (with dictation), how sure, the hint ladder, submit — and then the
@@ -655,13 +734,14 @@ export function PracticePanel({
 	};
 	const tokens = sumTokens(turns);
 	const outOfHints = hintsUsed >= HINT_RUNGS.length;
+	const hints = useMemo(() => (problemId ? practiceHints(messages, problemId) : []), [messages, problemId]);
 	const last = set.at(-1);
 	const lastStatus = setStatus(last);
 	// The set's window: the latest five (a second set starts a fresh list).
 	const base = Math.floor(Math.max(0, set.length - 1) / PRACTICE_SET_SIZE) * PRACTICE_SET_SIZE;
 
 	return (
-		<aside className="dock pdock" aria-label="Your working" data-testid="practice-panel">
+		<aside className="dock pdock full" aria-label="Your working" data-testid="practice-panel">
 			<div className="dockin glass">
 				<div className="pane">
 					{practice ? (
@@ -695,28 +775,31 @@ export function PracticePanel({
 								</div>
 							</div>
 							<div className="qfield">
-								<span id="sure" className="flabel">
-									How sure?
+								<span className="qfield-h">
+									<span id="sure" className="flabel">
+										How sure are you?
+									</span>
+									<span className="t-meta faint">optional</span>
 								</span>
 								<ConfidenceLadder value={conf} onChange={setConf} labelledBy="sure" />
 							</div>
 							<div className="hints">
-								<div className="hints-h">
-									<span className="flabel">Hints</span>
-									<span className="t-meta faint">{hintsUsed === 0 ? "none used" : `${hintsUsed} of ${HINT_RUNGS.length} used`}</span>
+								{hints.map((h) => (
+									<HintCard key={h.rung} hint={h} />
+								))}
+								<div className="hints-row">
+									{outOfHints ? (
+										<span className="hints-all">All {HINT_RUNGS.length} hints used</span>
+									) : (
+										<>
+											<button type="button" className="hintlink" disabled={compactionRunning} onClick={askHint} data-testid="practice-hint">
+												<Icon name="idea" size="sm" />
+												{HINT_ASK[nextRung]}
+											</button>
+											<span className="t-meta faint">{hintsUsed === 0 ? "3 hints, each says a bit more" : `${hintsUsed} of ${HINT_RUNGS.length} hints used`}</span>
+										</>
+									)}
 								</div>
-								<ol className="rungs" aria-hidden="true">
-									{HINT_RUNGS.map((r, i) => (
-										<li key={r.rung} className={cn(i < hintsUsed && "on", i === hintsUsed && "next")}>
-											<i />
-											{r.label}
-										</li>
-									))}
-								</ol>
-								<button type="button" className="btn secondary hintbtn" disabled={compactionRunning || outOfHints} onClick={askHint} data-testid="practice-hint">
-									<Icon name="hint" size="sm" />
-									{outOfHints ? "No more hints" : `Ask for a ${HINT_RUNGS[nextRung - 1]!.label.toLowerCase()}`}
-								</button>
 							</div>
 							<button type="button" className="btn brand lg psubmit" disabled={!draft.trim() || compactionRunning} onClick={submit} data-testid="practice-send">
 								Submit answer
@@ -747,26 +830,21 @@ export function PracticePanel({
 						</EmptyState>
 					)}
 
-					<section className="pset" data-testid="practice-set">
-						<span className="over">This set</span>
-						<ul>
-							{Array.from({ length: PRACTICE_SET_SIZE }, (_, i) => {
-								const s = setStatus(set[base + i]);
-								return (
-									<li key={i} className="prob" data-state={s ? (s.label === "Working" ? "now" : "done") : "next"}>
-										<span className="prob-t">Problem {i + 1}</span>
-										{s ? <span className={cn("pill", s.tone)}>{s.label}</span> : <span className="prob-x">—</span>}
-									</li>
-								);
-							})}
-						</ul>
-					</section>
-					{tokens > 0 && (
-						<span className="pfoot">
-							<span className="mono num">{formatTokens(tokens)}</span> tokens this session
-						</span>
-					)}
 				</div>
+				<footer className="pset" data-testid="practice-set">
+					<span className="pset-l">This set</span>
+					<ol className="pset-sq" aria-label="Problems in this set">
+						{Array.from({ length: PRACTICE_SET_SIZE }, (_, i) => {
+							const slot = slotOf(set[base + i]);
+							return (
+								<li key={i} className={slot.cls} title={`Problem ${i + 1} · ${slot.title}`} aria-label={`Problem ${i + 1}: ${slot.title}`}>
+									{slot.cls === "ok" || slot.cls === "hint" ? <Icon name="check" size="xs" strokeWidth={3} /> : slot.cls === "miss" ? <Icon name="minus" size="xs" strokeWidth={3} /> : i + 1}
+								</li>
+							);
+						})}
+					</ol>
+					{tokens > 0 && <span className="pset-tok mono num" title="Tokens used in this session">{formatTokens(tokens)} tok</span>}
+				</footer>
 			</div>
 		</aside>
 	);

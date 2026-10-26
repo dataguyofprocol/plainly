@@ -110,17 +110,17 @@
 
 /* How sure — a four-rung ladder (components/confidence-rail.tsx). Each
    rung wears its level's colour as --lvl / --lvl-soft. */
-.v4 .conf { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
-.v4 .conf button { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 4px 7px; border: 0; border-radius: 9px; background: transparent; box-shadow: 0 0 0 1px var(--line) inset; color: var(--muted-foreground); font-size: 12px; line-height: 16px; font-weight: 600; white-space: nowrap; transition: background var(--dur-2) var(--ease-out), color var(--dur-2), box-shadow var(--dur-2), transform var(--dur-1) var(--ease-out); }
-.v4 .conf button i { display: block; width: 100%; max-width: 44px; height: 3px; border-radius: 2px; background: var(--line-strong); transition: background var(--dur-3) var(--ease-out); }
-.v4 .conf button:hover:not(:disabled) { background: var(--hover); color: var(--ink); }
-.v4 .conf button:hover:not(:disabled):not(.lit) i { background: var(--lvl-soft); }
+/* How sure: one slim four-way switch (the composer's switch, in the
+   level's own colour). */
+.v4 .conf { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; padding: 3px; border-radius: 11px; background: var(--press); }
+.v4 .conf button { min-width: 0; height: 30px; padding: 0 4px; border: 0; border-radius: 8px; background: transparent; color: var(--muted-foreground); font-size: 12.5px; line-height: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background var(--dur-2) var(--ease-out), color var(--dur-2), box-shadow var(--dur-2), transform var(--dur-1) var(--ease-out); }
+.v4 .conf button:hover:not(:disabled):not(.on) { color: var(--ink); }
 .v4 .conf button:active:not(:disabled) { transform: scale(0.97); }
-.v4 .conf button.lit i { background: var(--lvl); }
-.v4 .conf button.on { background: var(--lvl-soft); color: var(--lvl); box-shadow: 0 0 0 1px color-mix(in srgb, var(--lvl) 35%, transparent) inset; }
-.v4 .conf button.on:hover { background: var(--lvl-soft); color: var(--lvl); }
+.v4 .conf button.on { background: var(--surface); color: var(--lvl); box-shadow: 0 1px 2px rgb(25 28 26 / 0.12), 0 0 0 0.5px rgb(25 28 26 / 0.06); }
+.v4 .conf button:focus-visible { outline: 2px solid var(--lvl); outline-offset: 1px; }
 .v4 .conf.off { opacity: 0.4; }
 .v4 .conf button:disabled { cursor: not-allowed; }
+.v4 .qfield-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .v4 .pill.lvl { background: var(--lvl-soft); color: var(--lvl); }
 
 /* Reading-thinking: a compact field that grows. */
@@ -179,17 +179,26 @@
 /* ── Practice dock ─────────────────────────────────────────────────── */
 .v4 .pwork { display: flex; flex-direction: column; gap: 16px; }
 .v4 .pwork-in { min-height: 168px; font-size: 14px; line-height: 21px; }
-.v4 .hints { display: flex; flex-direction: column; gap: 8px; padding-top: 16px; border-top: 1px solid var(--line); }
-.v4 .hints-h { display: flex; align-items: baseline; justify-content: space-between; }
-.v4 .rungs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
-.v4 .rungs li { display: flex; flex-direction: column; gap: 6px; font-size: 12px; line-height: 16px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v4 .rungs li i { display: block; height: 4px; border-radius: 2px; background: var(--line-strong); transition: background 0.5s var(--ease-out); }
-.v4 .rungs li.on { color: var(--practice); font-weight: 600; }
-.v4 .rungs li.on i { background: var(--practice); }
-.v4 .rungs li.next { color: var(--muted-foreground); }
-.v4 .hintbtn { width: 100%; margin-top: 4px; }
-.v4 .hintbtn .ic { color: var(--practice); }
-.v4 .hintbtn:disabled .ic { color: inherit; }
+/* Hints: each opened hint is a quiet card (the tutor's reply, inline);
+   below them one quiet line asks for the next. */
+.v4 .hints { display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line); }
+.v4 .hcard { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 8px 12px 9px; border-radius: 0 10px 10px 0; background: var(--tint); box-shadow: inset 2px 0 0 var(--practice); animation: v4-settle 0.4s var(--ease-expo) both; }
+.v4 .hcard-l { font-size: 12px; line-height: 16px; font-weight: 700; color: var(--practice); }
+.v4 .hcard-t { font-size: 13.5px; line-height: 20px; color: var(--muted-foreground); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.v4 .hcard.more .hcard-t { display: block; -webkit-line-clamp: unset; }
+.v4 .hcard-t .lh-prose { font-size: 13.5px; line-height: 20px; }
+.v4 .hcard-t :where(p, ul, ol) { margin: 0 0 6px; }
+.v4 .hcard-t :where(p, ul, ol):last-child { margin-bottom: 0; }
+.v4 .hcard-more { align-self: flex-start; margin-top: 2px; padding: 0; border: 0; background: transparent; font-size: 12px; font-weight: 600; color: var(--practice); }
+.v4 .hcard-more:hover { color: var(--practice-hover); }
+.v4 .hcard-wait { display: flex; flex-direction: column; gap: 6px; padding: 4px 0 2px; }
+.v4 .hcard-wait i { height: 10px; width: 90%; }
+.v4 .hcard-wait i + i { width: 60%; }
+.v4 .hints-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; }
+.v4 .hintlink { display: inline-flex; align-items: center; gap: 6px; height: 28px; margin-left: -6px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--practice); font-size: 13px; font-weight: 600; transition: background var(--dur-1), color var(--dur-1); }
+.v4 .hintlink:hover:not(:disabled) { background: var(--practice-soft); color: var(--practice-hover); }
+.v4 .hintlink:disabled { opacity: 0.4; cursor: not-allowed; }
+.v4 .hints-all { font-size: 12px; line-height: 16px; color: var(--faint); }
 .v4 .psubmit { width: 100%; }
 
 /* Between problems: the outcome, compact. */
@@ -205,16 +214,18 @@
 .v4 .pdone-next .kbd { vertical-align: 1px; }
 
 /* The set. */
-.v4 .pset { display: flex; flex-direction: column; gap: 4px; }
-.v4 .pset ul { list-style: none; margin: 0 -8px; padding: 0; }
-.v4 .prob { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 8px; border-radius: 8px; font-size: 13px; color: var(--ink); }
-.v4 .prob + .prob { box-shadow: 0 -1px 0 var(--line); }
-.v4 .prob[data-state="now"] { background: var(--brand-soft); box-shadow: none; font-weight: 600; }
-.v4 .prob[data-state="now"] + .prob { box-shadow: none; }
-.v4 .prob[data-state="next"] { color: var(--muted-foreground); }
-.v4 .prob-t { flex: 1; min-width: 0; }
-.v4 .prob-x { color: var(--faint); font-size: 12px; }
-.v4 .pfoot { margin-top: auto; padding-top: 4px; font-size: 12px; line-height: 16px; color: var(--faint); }
+/* The set, pinned to the bottom of the full-height practice dock. */
+.v4 .dock.full { align-self: stretch; height: 100vh; }
+.v4 .dock.full .dockin { height: 100%; }
+.v4 .pset { flex: none; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--line); background: var(--glass-strong); }
+.v4 .pset-l { font-size: 12px; line-height: 16px; font-weight: 600; color: var(--muted-foreground); }
+.v4 .pset-sq { list-style: none; margin: 0; padding: 0; display: inline-flex; gap: 5px; }
+.v4 .pset-sq li { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: 7px; font-size: 11px; font-weight: 700; color: var(--faint); box-shadow: 0 0 0 1px var(--line-strong) inset; transition: background var(--dur-2), color var(--dur-2); }
+.v4 .pset-sq li.now { background: var(--ink); color: var(--on-ink); box-shadow: none; }
+.v4 .pset-sq li.ok { background: var(--good-soft); color: var(--good); box-shadow: none; }
+.v4 .pset-sq li.hint { background: var(--practice-soft); color: var(--practice); box-shadow: none; }
+.v4 .pset-sq li.miss { background: var(--hover); color: var(--muted-foreground); box-shadow: none; }
+.v4 .pset-tok { margin-left: auto; font-size: 12px; line-height: 16px; color: var(--faint); }
 
 /* ── Practice transcript cards ─────────────────────────────────────── */
 /* One card language with the lesson's answered cards: a flat white card,

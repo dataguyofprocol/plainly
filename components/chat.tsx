@@ -1627,6 +1627,7 @@ export function Chat({
 					</div>
 				</div>
 			</div>
+			<DockResizer />
 			<DockSlot>
 			{kind === "practice" ? (
 				<PracticePanel
@@ -1774,6 +1775,117 @@ function DockToggle({ attention, label }: { attention: boolean; label: string })
 				{attention && <span className="ping" aria-hidden="true" />}
 			</button>
 		</Hint>
+	);
+}
+
+/** The right panel's width bounds (px). Unset, the panel is fluid: about
+ *  28% of the window, clamped to these (app/ui/lesson.css). */
+const DOCK_MIN = 340;
+const DOCK_MAX = 520;
+const DOCK_WIDTH_KEY = "lh:dock-width";
+
+/** Pure: a dragged/stepped width, clamped and rounded. Exported for tests. */
+export function clampDockWidth(px: number): number {
+	return Math.round(Math.min(DOCK_MAX, Math.max(DOCK_MIN, px)));
+}
+
+/**
+ * The right panel's resize edge (≥1024px): drag to set the panel's width,
+ * double-click to return to fluid, ←/→ to step. The width rides the
+ * frame as --dock-w and is remembered per browser (localStorage).
+ */
+function DockResizer() {
+	const ref = useRef<HTMLDivElement>(null);
+	const [width, setWidth] = useState<number | null>(null);
+	const [dragging, setDragging] = useState(false);
+	// The last still click (no drag), to read a double-click inside the
+	// pointer flow — a native dblclick races the drag's own save.
+	const lastTap = useRef(0);
+	const apply = useCallback((w: number | null, save: boolean) => {
+		const frame = ref.current?.parentElement;
+		if (!frame) return;
+		if (w === null) frame.style.removeProperty("--dock-w");
+		else frame.style.setProperty("--dock-w", `${w}px`);
+		setWidth(w);
+		if (!save) return;
+		try {
+			if (w === null) localStorage.removeItem(DOCK_WIDTH_KEY);
+			else localStorage.setItem(DOCK_WIDTH_KEY, String(w));
+		} catch {
+			// Storage unavailable (private window): the width lasts the visit.
+		}
+	}, []);
+	useEffect(() => {
+		let saved: number | null = null;
+		try {
+			const raw = Number(localStorage.getItem(DOCK_WIDTH_KEY));
+			if (raw > 0) saved = clampDockWidth(raw);
+		} catch {
+			// Storage unavailable: stay fluid.
+		}
+		if (saved !== null) apply(saved, false);
+	}, [apply]);
+	const current = () => {
+		const dock = ref.current?.parentElement?.querySelector<HTMLElement>(".dock");
+		return width ?? (dock ? Math.round(dock.getBoundingClientRect().width) : DOCK_MIN);
+	};
+	return (
+		<div
+			ref={ref}
+			className={`ls-resize ${dragging ? "drag" : ""}`}
+			role="separator"
+			aria-orientation="vertical"
+			aria-label="Resize the panel"
+			aria-valuemin={DOCK_MIN}
+			aria-valuemax={DOCK_MAX}
+			aria-valuenow={width ?? undefined}
+			tabIndex={0}
+			title="Drag to resize · double-click to reset"
+			onPointerDown={(e) => {
+				if (e.button !== 0) return;
+				e.preventDefault();
+				const el = e.currentTarget;
+				el.setPointerCapture(e.pointerId);
+				const startX = e.clientX;
+				const startW = current();
+				let last = startW;
+				let moved = false;
+				setDragging(true);
+				const move = (ev: PointerEvent) => {
+					if (Math.abs(ev.clientX - startX) < 3 && !moved) return;
+					moved = true;
+					last = clampDockWidth(startW + (startX - ev.clientX));
+					apply(last, false);
+				};
+				const up = () => {
+					el.removeEventListener("pointermove", move);
+					el.removeEventListener("pointerup", up);
+					el.removeEventListener("pointercancel", up);
+					setDragging(false);
+					if (moved) {
+						lastTap.current = 0;
+						apply(last, true);
+						return;
+					}
+					// A still click: two within 400ms reset the panel to fluid.
+					const now = Date.now();
+					if (now - lastTap.current < 400) {
+						lastTap.current = 0;
+						apply(null, true);
+					} else lastTap.current = now;
+				};
+				el.addEventListener("pointermove", move);
+				el.addEventListener("pointerup", up);
+				el.addEventListener("pointercancel", up);
+			}}
+			onKeyDown={(e) => {
+				if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+				e.preventDefault();
+				apply(clampDockWidth(current() + (e.key === "ArrowLeft" ? 20 : -20)), true);
+			}}
+		>
+			<i aria-hidden="true" />
+		</div>
 	);
 }
 

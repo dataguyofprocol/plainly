@@ -62,13 +62,12 @@ export function ConfidenceRail({ value, className }: { value: number; className?
 }
 
 /**
- * THE CONFIDENCE LADDER (finesse pass, 2026-10-26) — "How sure?" as four
- * rungs, shared by the question dock and the practice dock so the two can
- * never drift. Each rung wears its level's colour (confidence-colors.ts,
- * passed as --lvl / --lvl-soft): the chosen rung takes a soft tint with
- * coloured text, and the bars up to it light in their own colours, so the
- * row reads as a scale climbing from guessing to certain. `value` is a
- * level value (25/50/75/95) or null when nothing is chosen yet.
+ * HOW SURE (owner, 2026-10-27: the compact switch) — "How sure are you?"
+ * as one slim four-way switch, shared by the question dock and the
+ * practice dock so the two can never drift. The chosen level is a white
+ * chip whose text wears that level's colour (confidence-colors.ts, passed
+ * as --lvl). `value` is a level value (25/50/75/95) or null when nothing
+ * is chosen yet.
  */
 export function ConfidenceLadder({
 	value,
@@ -109,10 +108,9 @@ export function ConfidenceLadder({
 						disabled={disabled}
 						onClick={() => onChange(level.value)}
 						data-testid={stopTestids ? `confidence-stop-${level.value}` : undefined}
-						className={cn(i === at && "on", i <= at && "lit")}
+						className={cn(i === at && "on")}
 						style={{ "--lvl": c.ink, "--lvl-soft": c.soft } as CSSProperties}
 					>
-						<i aria-hidden="true" />
 						{level.label}
 					</button>
 				);

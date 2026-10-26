@@ -41,27 +41,27 @@ const part = (over: Partial<ArtifactPartProps["part"]>): ArtifactPartProps["part
 describe("PracticePanel", () => {
 	const problem = { toolCallId: "call_p1", input: { statement: "Show that the sum is even." } };
 
-	it("an open problem: your working, how sure, the hint ladder, submit, the set", () => {
+	it("an open problem: your working, how sure, the hint link, submit, the set", () => {
 		const html = renderToStaticMarkup(
 			<PracticePanel messages={[]} practice={problem} onSubmitThinking={() => {}} compactionRunning={false} turns={[]} hintsUsed={1} />,
 		);
 		assert.match(html, /Your working/);
-		assert.match(html, /How sure\?/);
+		assert.match(html, /How sure are you\?/);
 		for (const level of ["Guessing", "Unsure", "Fairly sure", "Certain"]) assert.match(html, new RegExp(level));
-		assert.match(html, /1 of 3 used/, "the ladder counts the rungs asked for");
-		assert.match(html, /Ask for a bigger hint/, "the next rung names itself");
+		assert.match(html, /1 of 3 hints used/, "the hints asked for are counted");
+		assert.match(html, /Show a bigger hint/, "the next rung names itself");
 		assert.match(html, /data-testid="practice-send"/);
 		assert.match(html, /This set/);
-		assert.equal((html.match(/class="prob"/g) ?? []).length, 5, "a set of five");
+		assert.equal((html.match(/aria-label="Problem \d: /g) ?? []).length, 5, "a set of five");
 		// The statement lives on the problem card, not in the dock.
 		assert.ok(!html.includes("Show that the sum is even."));
 	});
 
-	it("the ladder runs out after the third rung", () => {
+	it("the hints run out after the third rung", () => {
 		const html = renderToStaticMarkup(
 			<PracticePanel messages={[]} practice={problem} onSubmitThinking={() => {}} compactionRunning={false} turns={[]} hintsUsed={3} />,
 		);
-		assert.match(html, /No more hints/);
+		assert.match(html, /All 3 hints used/);
 	});
 
 	it("between problems: the set and a pointer to the next one", () => {

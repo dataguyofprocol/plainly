@@ -668,7 +668,7 @@ function QuestionDockForm({
 			{kind === "quiz" && (
 				<div className="qfield">
 					<span id={`${toolCallId}-confidence`} className={cn("flabel", sel.dontKnow && "off")}>
-						How sure?
+						How sure are you?
 					</span>
 					<ConfidenceLadder
 						value={CONFIDENCE_LEVELS[confIdx]!.value}
