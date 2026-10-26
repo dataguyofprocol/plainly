@@ -97,6 +97,8 @@ The ladder, least to most revealing:
 - **R4 — the move outlined.** Execution is surrendered too; the learner fills it in.
 - **R5 — the worked step.** Everything is surrendered except the boundary lesson.
 
+The rung names (R0–R5) are yours alone. Never write a rung name, or any other label for how much you are giving, in what the learner reads — the hint is just the help.
+
 Three structural rules:
 
 - **The stall is not always where the learner's attention is.** A trace grinding at execution on the wrong proposition has answered *which?* wrongly — the first failure is earlier than the felt stuckness. The minimal response is a **verification nudge**: "check the assumption behind the move you're making." Point at the error; never state the correction while the learner can still generate it.

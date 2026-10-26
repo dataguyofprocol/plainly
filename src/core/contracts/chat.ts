@@ -236,6 +236,13 @@ export function hintRequestText(rung: HintRung): string {
 	return `[Hint request — rung ${rung} of 3: ${HINT_REQUEST_ASK[rung]}]`;
 }
 
+/** The learner-facing transcript line for a hint request (owner,
+ *  2026-10-27): hints live in the practice panel; the transcript keeps
+ *  only this — "Asked for a bigger hint". */
+export function hintRequestLine(rung: HintRung): string {
+	return `Asked for ${HINT_REQUEST_ASK[rung]}`;
+}
+
 /** Narrow an unknown value to a hint rung (the input parser's gate). */
 export function isHintRung(value: unknown): value is HintRung {
 	return value === 1 || value === 2 || value === 3;

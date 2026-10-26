@@ -637,6 +637,27 @@ export function practiceHints(messages: readonly PopupMessage[], problemId: stri
 	return out;
 }
 
+/** Pure: the indices of assistant messages that answer a hint request (any
+ *  problem) — the same walk as practiceHints(). Hints live in the panel,
+ *  so the transcript folds these replies' text and thinking. Exported for
+ *  tests. */
+export function hintReplyIndices(messages: readonly PopupMessage[]): Set<number> {
+	const out = new Set<number>();
+	let open = false;
+	messages.forEach((m, i) => {
+		if ((m as { role?: string }).role === "assistant") {
+			if (open) out.add(i);
+			return;
+		}
+		open = m.parts.some((part) => {
+			if (part.type !== "data-practice-thinking") return false;
+			const hint = (part as { data?: { hint?: unknown } }).data?.hint;
+			return hint === 1 || hint === 2 || hint === 3;
+		});
+	});
+	return out;
+}
+
 const HINT_ASK: Record<HintRung, string> = { 1: "Show a nudge", 2: "Show a bigger hint", 3: "Show the first step" };
 
 /** One opened hint: a quiet card, clamped until "Show more". */

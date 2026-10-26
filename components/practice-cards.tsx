@@ -54,6 +54,8 @@ export interface PracticeThinkingData {
 	/** Legacy records (pre 2026-10-05) carry the old two-lane flag; ignored. */
 	commit?: boolean;
 	text: string;
+	/** The hint rung when the submission was a hint request (1 | 2 | 3). */
+	hint?: number;
 }
 
 export function ProblemCard({ part }: ArtifactPartProps) {

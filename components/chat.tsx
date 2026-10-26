@@ -66,14 +66,14 @@ import {
 	toolQuestionKind,
 	questionNeedsReveal,
 } from "@/src/core";
-import { LessonPanel, PracticePanel, planProgress, practiceSet, stepFold } from "@/components/lesson-panel";
+import { LessonPanel, PracticePanel, hintReplyIndices, planProgress, practiceSet, stepFold } from "@/components/lesson-panel";
 import { ModelControl } from "@/components/model-picker";
 import { Icon } from "@/components/ui/icon";
 import { EmptyState } from "@/components/ui/empty-state";
 import { displayTitle } from "@/components/ui/format";
 import { Field, Rail } from "@/components/v4/shell";
 import { currentUserThinkingOpen, setAllUserThinkingOpen } from "@/components/thinking-block";
-import { PRACTICE_SET_SIZE, practiceHintsUsed, slotsConfigured, type HintRung, type ModelsSettings } from "@/src/core";
+import { PRACTICE_SET_SIZE, hintRequestLine, isHintRung, practiceHintsUsed, slotsConfigured, type HintRung, type ModelsSettings } from "@/src/core";
 import { useSettingsSaved } from "@/components/settings-signal";
 
 /**
@@ -473,6 +473,7 @@ export function Chat({
 	const fold = useMemo(() => (kind === "practice" ? null : stepFold(messages, lessonProgress)), [kind, messages, lessonProgress]);
 	const [reviewOpen, setReviewOpen] = useState(false);
 	const hintsUsed = activeProblem ? practiceHintsUsed(nativeMessages, activeProblem.toolCallId).length : 0;
+	const hintReplies = useMemo(() => (kind === "practice" ? hintReplyIndices(messages) : new Set<number>()), [kind, messages]);
 
 	/* The READING-THINKING channel (owner 2026-10-03): a draft field for
 	 * thinking while reading the teaching prose, mounted while a check waits
@@ -1121,7 +1122,9 @@ export function Chat({
 	// One transcript message → its rendering (the reading column's unit;
 	// called for the folded earlier steps and for the current step alike).
 	const renderMessage = (m: (typeof messages)[number], mi: number) =>
-								m.role === "user" && isSubagentSteer(m) ? (
+								// A hint reply with nothing but text and thinking: the hint
+								// lives in the practice panel, so the transcript draws nothing.
+								hintReplies.has(mi) && !m.parts.some((p) => p.type.startsWith("tool-") || p.type.startsWith("data-")) ? null : m.role === "user" && isSubagentSteer(m) ? (
 									// Sub-agent delivery (wake-pipeline steer): NO message bubble — the
 									// artifact card sits in the transcript column directly, full width
 									// and centered like the teacher's artifacts (contracts.ts "THE ASYNC
@@ -1155,8 +1158,22 @@ export function Chat({
 												return <CompactionMomentDivider key={pi} data={part.data as CompactionDividerData} />;
 											case "data-compaction-cut":
 												return <CompactionCutDivider key={pi} data={part.data as CompactionDividerData} />;
-											case "data-practice-thinking":
-												return <ThinkingCard key={pi} data={part.data as PracticeThinkingData} />;
+											case "data-practice-thinking": {
+												// A hint request (owner, 2026-10-27): the working row only
+												// when there is working, then one quiet line — the hint
+												// itself is in the practice panel.
+												const data = part.data as PracticeThinkingData;
+												if (!isHintRung(data.hint)) return <ThinkingCard key={pi} data={data} />;
+												return (
+													<Fragment key={pi}>
+														{data.text.trim() && <ThinkingCard data={data} />}
+														<SystemLine testId="practice-hint-line">
+															<Icon name="hint" size="xs" />
+															{hintRequestLine(data.hint)}
+														</SystemLine>
+													</Fragment>
+												);
+											}
 											case "data-practice-next":
 												// The learner's move-on signal (owner round 16): a compact
 												// centered hairline divider — chrome, the dismissal register.
@@ -1215,6 +1232,8 @@ export function Chat({
 									<Message from="assistant" className="max-w-full">
 									<MessageContent className="ls-turn">
 											{m.parts.map((part, pi) => {
+												// A hint reply keeps only its tool and artifact parts.
+												if (hintReplies.has(mi) && (part.type === "text" || part.type === "reasoning" || part.type === "step-start")) return null;
 												const isLastPart = mi === messages.length - 1 && pi === m.parts.length - 1;
 												// The step boundary where teaching begins (round 8): when
 												// the teach flip happens in a LATER step, its PhaseDivider

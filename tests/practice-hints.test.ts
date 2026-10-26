@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { clampDockWidth } from "../components/chat.tsx";
-import { practiceHints } from "../components/lesson-panel.tsx";
+import { hintReplyIndices, practiceHints } from "../components/lesson-panel.tsx";
 
 const ask = (problemCallId: string, hint?: number) => ({
 	role: "user",
@@ -45,6 +45,29 @@ describe("practiceHints", () => {
 	it("a reply ends at the learner's next message", () => {
 		const hints = practiceHints([ask("p1", 1), reply({ type: "text", text: "hint" }), { role: "user", parts: [{ type: "text", text: "my answer" }] }, reply({ type: "text", text: "feedback" })] as never, "p1");
 		assert.equal(hints[0]!.text, "hint");
+	});
+});
+
+describe("hintReplyIndices", () => {
+	it("marks every assistant message answering a hint, across problems", () => {
+		const set = hintReplyIndices(
+			[
+				reply({ type: "tool-problem" }),
+				ask("p1", 1),
+				reply({ type: "text", text: "a" }),
+				reply({ type: "text", text: "b" }),
+				ask("p2", 3),
+				reply({ type: "text", text: "c" }),
+			] as never,
+		);
+		assert.deepEqual([...set], [2, 3, 5]);
+	});
+
+	it("skips replies to plain working and stops at the learner's next message", () => {
+		const set = hintReplyIndices(
+			[ask("p1", 2), reply({ type: "text", text: "hint" }), ask("p1"), reply({ type: "text", text: "verdict" }), { role: "user", parts: [{ type: "text", text: "why?" }] }, reply({ type: "text", text: "because" })] as never,
+		);
+		assert.deepEqual([...set], [1]);
 	});
 });
 

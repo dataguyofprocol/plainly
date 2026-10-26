@@ -307,6 +307,13 @@ describe("persistent practice nudges", () => {
 		assert.match(prompt, /The learner may discard a problem without concluding it/);
 	});
 
+	it("keeps rung names private and names the panel's controls (owner, 2026-10-27)", () => {
+		const prompt = normalizeWhitespace(composeInstructions("practice"));
+		assert.match(prompt, /Never write a rung name, or any other label for how much you are giving, in what the learner reads/);
+		assert.match(prompt, /the \*Your working\* field, the hint buttons \(\*Nudge\*, \*Bigger hint\*, \*First step\*\), and \*Submit answer\*/);
+		assert.match(prompt, /never "commit", "send", or a name the panel doesn't show/);
+	});
+
 	it("aligns the conclude description with the canonical ack without changing outcomes or the runtime pause mechanism", async () => {
 		const tool = concludeTool(createPracticeGate(ctxOf(activeProblemRecord())));
 		const description = normalizeWhitespace(tool.description);
