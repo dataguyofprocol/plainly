@@ -80,9 +80,9 @@ export function AnsweredCard({ answer, input }: { answer: QuestionAnswerData; in
 					(answer.dontKnow ? (
 						<span className="rounded bg-muted px-1.5 py-0.5">didn't know</span>
 					) : answer.correct ? (
-						<span className="rounded bg-green-500/15 px-1.5 py-0.5 text-green-500">correct</span>
+						<span className="rounded bg-good/15 px-1.5 py-0.5 text-good">correct</span>
 					) : (
-						<span className="rounded bg-red-500/15 px-1.5 py-0.5 text-red-500">incorrect</span>
+						<span className="rounded bg-danger/15 px-1.5 py-0.5 text-danger">incorrect</span>
 					))}
 			</div>
 			<div className="mb-3 font-medium">
@@ -106,10 +106,10 @@ export function AnsweredCard({ answer, input }: { answer: QuestionAnswerData; in
 								key={opt.index}
 								className={cn(
 									"flex items-center gap-2 rounded-lg border px-3 py-1.5",
-									sel && key && "border-green-500/60 bg-green-500/10",
-									sel && !key && isQuiz && "border-red-500/60 bg-red-500/10",
+									sel && key && "border-good/60 bg-good/10",
+									sel && !key && isQuiz && "border-danger/60 bg-danger/10",
 									sel && !isQuiz && "border-primary bg-accent",
-									!sel && key && "border-green-500/40",
+									!sel && key && "border-good/40",
 								)}
 							>
 								{isQuiz && (
@@ -120,9 +120,9 @@ export function AnsweredCard({ answer, input }: { answer: QuestionAnswerData; in
 										data-mark={sel && key ? "check" : sel && !key ? "x" : !sel && key ? "check" : undefined}
 										className={cn(
 											"flex shrink-0 items-center",
-											sel && key && "text-green-500",
-											sel && !key && "text-red-500",
-											!sel && key && "text-green-500",
+											sel && key && "text-good",
+											sel && !key && "text-danger",
+											!sel && key && "text-good",
 										)}
 									>
 										{/* Owner round 8: a touch smaller than the text (size-4→size-3.5,

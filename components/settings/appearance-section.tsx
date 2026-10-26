@@ -45,7 +45,7 @@ import { CommitInput, SettingsRow, ThinSelect, Toggle } from "./controls.tsx";
 
 /** The factory reading family — the DEFAULT row's identity (unset =
  *  this). Exported for tests. */
-export const DEFAULT_READING_FONT = "Source Sans 3";
+export const DEFAULT_READING_FONT = "Literata";
 
 /** The dev-browser fallback list (queryLocalFonts is absent there):
  *  the app's own knowns plus a handful of ubiquitous macOS families,
@@ -186,24 +186,6 @@ export function AppearanceSection({
 
 	return (
 		<>
-			<SettingsRow label="Mode" hint="Coming soon" testid="row-mode" dimmed>
-				<ThinSelect value="dark" ariaLabel="mode" onChange={() => {}} testid="select-mode" disabled>
-					<option value="dark">Dark</option>
-				</ThinSelect>
-			</SettingsRow>
-			<SettingsRow
-				label="Background"
-				hint={`Empty = ${resolved.background ?? "#141414"}`}
-				testid="row-background"
-			>
-				<CommitInput
-					value={appearance?.background ?? ""}
-					placeholder="#141414"
-					ariaLabel="background hex"
-					testid="input-background"
-					onCommit={(v) => onSectionChange({ ...appearance, background: v === "" ? null : v })}
-				/>
-			</SettingsRow>
 			<SettingsRow
 				label="Reading font"
 				hint={`Empty = ${DEFAULT_READING_FONT}`}
@@ -271,7 +253,7 @@ export function AppearanceSection({
 				<CommitInput
 					type="number"
 					value={String(appearance?.proseFontSize ?? "")}
-					placeholder="16"
+					placeholder="17"
 					ariaLabel="prose font size"
 					testid="input-prose-size"
 					onCommit={(v) => {
@@ -299,7 +281,7 @@ export function AppearanceSection({
 				<CommitInput
 					type="number"
 					value={String(md?.headingWeight ?? "")}
-					placeholder="900"
+					placeholder="600"
 					ariaLabel="heading weight"
 					testid="input-heading-weight"
 					onCommit={(v) => {
@@ -316,27 +298,6 @@ export function AppearanceSection({
 							mdRendering: { ...md, headingWeight: Math.min(900, Math.max(100, Math.round(n))) },
 						});
 					}}
-				/>
-			</SettingsRow>
-			{/* The emphasis inks default to the REGULAR TEXT COLOR now
-			    (appearance wave, 2026-09-26) — the empty-state labels say
-			    so; explicit hex overrides ride unchanged. */}
-			<SettingsRow label="Bold color" hint="Empty = same as text" testid="row-bold-color">
-				<CommitInput
-					value={md?.boldColor ?? ""}
-					placeholder="same as text"
-					ariaLabel="bold color"
-					testid="input-bold-color"
-					onCommit={(v) => onSectionChange({ ...appearance, mdRendering: { ...md, boldColor: v === "" ? null : v } })}
-				/>
-			</SettingsRow>
-			<SettingsRow label="Italic color" hint="Empty = same as text" testid="row-italic-color">
-				<CommitInput
-					value={md?.italicColor ?? ""}
-					placeholder="same as text"
-					ariaLabel="italic color"
-					testid="input-italic-color"
-					onCommit={(v) => onSectionChange({ ...appearance, mdRendering: { ...md, italicColor: v === "" ? null : v } })}
 				/>
 			</SettingsRow>
 		</>

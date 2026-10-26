@@ -6,10 +6,8 @@
  *
  * Why variables and not className swaps: every seam the settings touch was
  * built token-first (--font-prose, --lh-prose-size, --lh-ink-strong, …),
- * so application is setProperty and nothing re-renders. The ONE thing the
- * variables can't reach — the mode — is dark-only this wave (the light
- * palette is designed in the later design wave; <html class="dark"> is
- * static in app/layout.tsx).
+ * so application is setProperty and nothing re-renders. The palette itself
+ * is not a setting: the app is light-only since the v4 redesign.
  *
  * The provider is mounted at the ROOT LAYOUT level (like ActivityProvider):
  * every page picks appearance up on load. The settings page writes a
@@ -39,59 +37,27 @@ export function resolveAppearance(delta: AppearanceSettings | undefined) {
 	};
 }
 
-/** One channel clamped on the dark curve: additive offsets matching today's
- *  hand-picked palette (#141414 → card #1c1c1c (+8) → accent #2a2a2a (+22)
- *  → border #434343 (+47)) — the "per-mode derivation in code" the schema
- *  promises, as the thinnest curve that keeps the palette's relationships. */
-function raise(hex: string, add: number): string {
-	const n = hex.length === 4
-		? hex.slice(1).split("").map((c) => parseInt(c + c, 16))
-		: [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
-	return `#${n.map((c) => Math.min(255, c + add).toString(16).padStart(2, "0")).join("")}`;
-}
-
-/** The derived palette a chosen background implies (dark curve): background
- *  itself, the raised surfaces (card/popover/secondary/muted, +8), the
- *  accent (+22), the edges (border/input, +47), and primary-foreground
- *  (the inverted text on primary = the background's own color, as today). */
-export function derivedPalette(background: string): Record<string, string> {
-	const card = raise(background, 8);
-	const accent = raise(background, 22);
-	const border = raise(background, 47);
-	return {
-		"--background": background,
-		"--card": card,
-		"--popover": card,
-		"--secondary": card,
-		"--muted": card,
-		"--accent": accent,
-		"--border": border,
-		"--input": border,
-		"--primary-foreground": background,
-	};
-}
-
 /** THE mapping: resolved appearance → the CSS variables to set on <html>.
  *  Absent entries = leave the factory stylesheet value in place. Pure —
  *  exported for tests. */
 export function appearanceVars(a: ReturnType<typeof resolveAppearance>): Record<string, string> {
+	// LIGHT ONLY (v4 redesign, owner 2026-10-26): the palette is fixed. A
+	// stored `background` and the bold/italic inks were picked against the
+	// retired dark curve — applied now they would repaint the light ground
+	// or draw near-white emphasis on it, so they are read but never applied.
 	const vars: Record<string, string> = {};
-	if (a.background !== null) Object.assign(vars, derivedPalette(a.background));
 	if (a.fontFamily !== null) {
-		vars["--font-prose"] = `"${a.fontFamily}", var(--font-sans3), ui-sans-serif, system-ui, sans-serif`;
+		vars["--font-prose"] = `"${a.fontFamily}", var(--font-literata), Georgia, serif`;
 	}
 	// The ONE documented reading-size variable (typography round 4): prose,
 	// inputs, and session titles all read it, so one setProperty moves them.
 	vars["--lh-prose-size"] = `${a.proseFontSize}px`;
-	// Session names: CMU Serif by default; the toggle swaps the title font
-	// to the prose family — covers chat.tsx + new-session.tsx titles with
-	// zero component edits (they use the .font-title utility).
-	if (!a.sessionNameSerif) vars["--font-title"] = "var(--font-prose)";
-	// Markdown rendering: heading weight + the emphasis inks (the vars
-	// were built "ready for the settings UI").
+	// Session names: Literata by default; the toggle swaps the title font
+	// to the UI sans (the prose font is a serif too now, so "follow the
+	// prose" would no longer turn the serif off) — covers every .font-title.
+	if (!a.sessionNameSerif) vars["--font-title"] = "var(--font-ui)";
+	// Markdown rendering: heading weight.
 	vars["--lh-heading-weight"] = String(a.mdRendering.headingWeight);
-	if (a.mdRendering.boldColor !== null) vars["--lh-ink-strong"] = a.mdRendering.boldColor;
-	if (a.mdRendering.italicColor !== null) vars["--lh-ink-italic"] = a.mdRendering.italicColor;
 	return vars;
 }
 

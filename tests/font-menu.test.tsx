@@ -138,19 +138,10 @@ describe("the emphasis-ink factory ruling (globals.css)", () => {
 		assert.ok(!css.includes("--lh-ink-italic: #6fa9d6"), "italic factory is not the old blue");
 	});
 
-	it("both blocks default the inks to the regular text color", () => {
+	it("the palette defaults the inks to the regular text color", () => {
 		const css = fs.readFileSync("app/globals.css", "utf-8");
-		assert.equal((css.match(/--lh-ink-strong: var\(--foreground\)/g) ?? []).length, 2, "both theme blocks");
-		assert.equal((css.match(/--lh-ink-italic: var\(--foreground\)/g) ?? []).length, 2, "both theme blocks");
-	});
-
-	it("the appearance rows' empty-state labels say 'same as text'", () => {
-		const html = renderToStaticMarkup(
-			<AppearanceSection appearance={undefined} onSectionChange={() => {}} />,
-		);
-		assert.equal((html.match(/Empty = same as text/g) ?? []).length, 2, "bold + italic rows");
-		assert.ok(!html.includes("#ee928c"));
-		assert.ok(!html.includes("#6fa9d6"));
+		assert.equal((css.match(/--lh-ink-strong: var\(--foreground\)/g) ?? []).length, 1, "the one (light) palette");
+		assert.equal((css.match(/--lh-ink-italic: var\(--foreground\)/g) ?? []).length, 1, "the one (light) palette");
 	});
 });
 

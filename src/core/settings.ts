@@ -398,12 +398,15 @@ export const FACTORY_SETTINGS: FactorySettings = {
 	version: CURRENT_SETTINGS_VERSION,
 	general: { autoUpdate: true },
 	appearance: {
-		mode: "dark",
-		background: null, // the dark default (#141414) lives in the mode's derivation curve
-		fontFamily: null, // Source Sans 3
-		proseFontSize: 16,
+		// Light only since the v4 redesign (2026-10-26): `mode`, `background`
+		// and the emphasis inks stay in the schema (old records still parse)
+		// but the app no longer applies them.
+		mode: "light",
+		background: null,
+		fontFamily: null, // Literata
+		proseFontSize: 17,
 		sessionNameSerif: true,
-		mdRendering: { headingWeight: 900, boldColor: null, italicColor: null },
+		mdRendering: { headingWeight: 600, boldColor: null, italicColor: null },
 	},
 	graph: { enabled: true, rendering: true, extractionChunkTokens: 4096 },
 	compaction: { thresholdTokens: 150_000 },

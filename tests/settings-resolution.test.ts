@@ -36,12 +36,12 @@ describe("resolveSettings", () => {
 		assert.equal(eff.models.strong, null);
 		assert.equal(eff.models.cheap, null);
 		assert.equal(eff.models.vision, null);
-		assert.equal(eff.appearance.mode, "dark");
+		assert.equal(eff.appearance.mode, "light");
 		assert.equal(eff.appearance.background, null);
 		assert.equal(eff.appearance.fontFamily, null);
-		assert.equal(eff.appearance.proseFontSize, 16);
+		assert.equal(eff.appearance.proseFontSize, 17);
 		assert.equal(eff.appearance.sessionNameSerif, true);
-		assert.equal(eff.appearance.mdRendering.headingWeight, 900);
+		assert.equal(eff.appearance.mdRendering.headingWeight, 600);
 		// wave 7 collapse: the master switch ONLY + the redesign's chunk
 		// budget — absent record resolves the factory 4096 (halved back
 		// from the digest-era 8192, owner, 2026-10-13)
