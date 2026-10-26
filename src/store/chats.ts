@@ -191,6 +191,20 @@ function renameChat(id: string, title: string): ChatRecord {
 	return record;
 }
 
+/** Archive or restore a session (2026-10-26). Like renameChat, NOT
+ * conversation activity: updatedAt stays put, so restoring a session puts
+ * it back where it was. Unarchive deletes the field — absent is the
+ * default, never an explicit false. */
+function setArchived(id: string, archived: boolean): ChatRecord {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	if (archived) record.archived = true;
+	else delete record.archived;
+	writeChat(record);
+	emit("chats-changed", {});
+	return record;
+}
+
 /** Delete the session record file entirely (session-deletion wave 6,
  *  owner 2026-09-22). False when the id is unknown — the route turns that
  *  into a 404. The record's graph traces and jobs are the route's
@@ -223,6 +237,7 @@ export const chatStore: ChatStore = {
 	saveTree,
 	saveSettings,
 	renameChat,
+	setArchived,
 	deleteChat,
 	appendTurnUsage,
 	appendExtractionUsage,

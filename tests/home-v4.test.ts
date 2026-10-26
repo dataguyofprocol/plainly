@@ -46,6 +46,12 @@ describe("continueModel", () => {
 	it("no sessions: no hero", () => {
 		assert.equal(continueModel([]).hero, null);
 	});
+	it("archived sessions never surface, waiting or not", () => {
+		const m = continueModel([chat("old", { archived: true }), chat("w-arch", { pendingQuestion: true, archived: true }), chat("live")]);
+		assert.equal(m.hero?.id, "live");
+		assert.deepEqual(m.waiting, []);
+		assert.equal(continueModel([chat("only", { archived: true })]).hero, null);
+	});
 });
 
 describe("kpiCells", () => {

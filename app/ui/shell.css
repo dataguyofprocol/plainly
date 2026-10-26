@@ -42,15 +42,29 @@
 .v4 .sess.on { background: var(--surface); box-shadow: var(--e1), 0 0 0 1px var(--line) inset; }
 .v4 .sess.ctx { background: var(--hover); box-shadow: 0 0 0 1px var(--line-strong) inset; }
 .v4 .sess-mark { grid-row: 1; display: flex; align-items: center; justify-content: center; height: 18px; color: var(--faint); }
-.v4 .sess-mark .dot { width: 6px; height: 6px; opacity: 0.7; }
-.v4 .sess-mark .dot.brand { opacity: 1; }
-.v4 .sess-mark .ping { width: 7px; height: 7px; }
+/* The mark is the session's kind (book = lesson, target = practice); a
+   warn ping rides its corner while the session waits on you, and a live
+   turn tints it brand. */
+.v4 .sess-mark { position: relative; }
+.v4 .sess-mark .ic { opacity: 0.85; }
+.v4 .sess-mark.working { color: var(--brand); }
+.v4 .sess-mark.waiting { color: var(--muted-foreground); }
+.v4 .sess-mark .ping { --ping-size: 6px; position: absolute; top: 0; right: -3px; box-shadow: 0 0 0 2px var(--background); }
+.v4 .sess.on .sess-mark .ping { box-shadow: 0 0 0 2px var(--surface); }
 .v4 .sess-t { grid-column: 2; font-size: 13px; line-height: 18px; font-weight: 500; color: var(--ink); }
 .v4 .sess-m { grid-column: 2; font-size: 12px; line-height: 16px; color: var(--faint); }
 .v4 .sess.on .sess-t { font-weight: 600; }
 .v4 .sess.renaming { cursor: text; }
 .v4 .sess-input { grid-column: 2; width: 100%; height: 18px; padding: 0; border: 0; border-radius: 0; background: transparent; outline: none; font-size: 13px; line-height: 18px; font-weight: 600; box-shadow: 0 1px 0 var(--brand); }
 .v4 .sess-input:focus-visible { outline: none; }
+/* Archived: a collapsed group at the bottom; the header is its toggle. */
+.v4 .sgroup.archived { margin-top: 8px; border-top: 1px solid var(--line); }
+.v4 .gl-toggle { width: 100%; border: 0; background: transparent; border-radius: 8px; cursor: pointer; text-align: left; transition: color var(--dur-1); }
+.v4 .gl-toggle:hover { color: var(--ink); }
+.v4 .gl-toggle > span:first-child { display: inline-flex; align-items: center; gap: 4px; }
+.v4 .gl-chev { transition: transform var(--dur-2) var(--ease-out); }
+.v4 .gl-toggle[aria-expanded="true"] .gl-chev { transform: rotate(90deg); }
+.v4 .sgroup.archived .sess-t { color: var(--muted-foreground); }
 .v4 .sess-more { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; height: 28px; margin: 2px 0 0; padding: 0 10px 0 9px; border: 0; border-radius: 8px; background: transparent; color: var(--faint); font-size: 12px; font-weight: 600; transition: background var(--dur-1), color var(--dur-1); }
 .v4 .sess-more:hover { background: var(--hover); color: var(--ink); }
 .v4 .sess-empty { display: flex; align-items: flex-start; gap: 10px; margin: 16px 2px 0; padding: 12px; border-radius: 12px; background: var(--tint); color: var(--muted-foreground); font-size: 13px; line-height: 18px; }
@@ -83,6 +97,9 @@
 .v4 .ri.open { background: var(--surface); color: var(--ink); box-shadow: var(--e1), 0 0 0 1px var(--line) inset; }
 .v4 .ri.logo { margin-bottom: 12px; }
 .v4 .ri.logo:hover { background: transparent; }
+.v4 .ri .ri-plus { position: absolute; right: 5px; bottom: 5px; width: 14px; height: 14px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--ink); color: var(--on-ink); box-shadow: 0 0 0 2px var(--background); }
+.v4 .ri.new-prac { margin-top: 6px; }
+.v4 .ri.new-prac:hover .ri-plus { background: var(--brand); }
 .v4 .ri.new { color: var(--ink); background: var(--surface); box-shadow: var(--e1), 0 0 0 1px var(--line-strong) inset; }
 .v4 .ri.new:hover { box-shadow: var(--e2), 0 0 0 1px var(--line-strong) inset; }
 .v4 .ri.foot { margin-top: auto; }
@@ -127,3 +144,9 @@
 	.v4 .side-rail .fly { position: fixed; left: 12px; right: 12px; top: 60px; width: auto; max-height: calc(100vh - 72px); }
 	.v4 .main { padding: 16px; }
 }
+
+/* New lesson / New practice: two action rows under the places, set off by
+   a hairline so they never read as destinations. */
+.v4 .side-new { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); flex: none; }
+.v4 .side-new-b .ic { color: var(--brand); }
+.v4 .side-new-b:hover .ic { color: var(--brand); }

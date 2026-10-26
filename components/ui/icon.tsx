@@ -10,6 +10,8 @@
 
 import type { CSSProperties } from "react";
 import {
+	Archive,
+	ArchiveRestore,
 	ArrowDown,
 	ArrowLeft,
 	ArrowRight,
@@ -126,6 +128,8 @@ export const ICONS = {
 	import: FolderOpen,
 	edit: PenLine,
 	delete: Trash2,
+	archive: Archive,
+	unarchive: ArchiveRestore,
 	retry: RotateCcw,
 	refresh: RefreshCw,
 	expand: Maximize2,

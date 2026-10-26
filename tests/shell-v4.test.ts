@@ -88,6 +88,20 @@ describe("groupChats", () => {
 	it("empty groups are dropped", () => {
 		assert.deepEqual(groupChats([], NOW), []);
 	});
+	it("archived sessions leave the live groups for Archived, last — even when waiting", () => {
+		const groups = groupChats(
+			[chat({ id: "a", updatedAt: TODAY }), chat({ id: "x", archived: true, pendingQuestion: true }), chat({ id: "c" }), chat({ id: "y", archived: true, updatedAt: TODAY })],
+			NOW,
+		);
+		assert.deepEqual(
+			groups.map((g) => [g.name, g.chats.map((c) => c.id)]),
+			[
+				["Today", ["a"]],
+				["Earlier", ["c"]],
+				["Archived", ["x", "y"]],
+			],
+		);
+	});
 });
 
 describe("formatting", () => {

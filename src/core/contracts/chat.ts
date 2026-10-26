@@ -53,6 +53,10 @@ export interface ChatRecord {
 	extractions?: ExtractionRunUsage[];
 	/** Per-chat model/thinking overrides for the conversation agents. */
 	settings?: ChatSettings;
+	/** Archived by the learner (2026-10-26): out of the sidebar's live groups
+	 *  and Home's Continue, kept whole and restorable. Absent = not archived;
+	 *  only true is ever written (unarchive deletes the field). */
+	archived?: boolean;
 	/** SCHEMA STAMP (schema-versioning wave, owner 2026-10-10): LAZY v1 —
 	 *  existing records stay unstamped (absence reads as v1); every write
 	 *  stamps the current version. A record stamped NEWER than this build
@@ -309,6 +313,8 @@ export interface ChatSummary {
 	 *  summary spread (the picker never needs it from here; the full record
 	 *  is its source). */
 	settings?: ChatSettings;
+	/** Archived by the learner — rides the summary spread from the record. */
+	archived?: boolean;
 	/** The record-derived progress fold (v4 redesign, 2026-10-26 —
 	 *  core/activity.ts chatProgressOf), computed where listChats already
 	 *  holds the parsed record. The chats route unpacks it onto the

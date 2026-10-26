@@ -7,15 +7,15 @@
  *   Field        the drifting gradient behind everything (paused when the
  *                window is in the background; still under reduced motion)
  *   SidebarCard  the inset glass card at ≥1100px: wordmark, Home /
- *                Knowledge / Practice, a screen-owned middle (sessions by
+ *                Knowledge, New lesson / New practice, a screen-owned middle (sessions by
  *                default, topics on Knowledge), a footer (Settings, or
  *                Import notes). Between 800 and 1099px the same frame
  *                renders as the icon rail; below 800 the rail lies flat
  *                along the top. CSS decides which one shows (no layout
  *                flash on first paint).
- *   SessionGroups  Waiting on you / Today / Earlier, capped per group,
- *                with the right-click menu (rename, export, delete,
- *                extraction coverage)
+ *   SessionGroups  Waiting on you / Today / Earlier, capped per group, then
+ *                a collapsed Archived group; the right-click menu (rename,
+ *                export, archive, delete, extraction coverage)
  *   Rail         the icon column of Lesson and Practice, with the
  *                sessions flyout (hover, focus, click, or ⌘B) — the very
  *                same component the sidebar card collapses into
@@ -33,7 +33,7 @@ import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { Icon, LogoMark, type IconName } from "@/components/ui/icon";
 import { displayTitle } from "@/components/ui/format";
 import { kbdEventForAction, type ChatDeleteMode } from "@/src/core";
-import { groupChats, sessionLine, sessionState, useChats, type V4Chat } from "@/components/v4/data";
+import { groupChats, isPractice, sessionLine, sessionState, useChats, type V4Chat } from "@/components/v4/data";
 
 /** Rows shown per group before "Show all" (a real library runs to hundreds). */
 const GROUP_CAP = 8;
@@ -43,20 +43,27 @@ type Place = "home" | "knowledge" | "practice";
 const NAV: Array<{ href: string; label: string; icon: IconName; place: Place }> = [
 	{ href: "/", label: "Home", icon: "home", place: "home" },
 	{ href: "/knowledge", label: "Knowledge", icon: "knowledge", place: "knowledge" },
-	{ href: "/practice", label: "Practice", icon: "practice", place: "practice" },
 ];
 
 function placeOf(pathname: string | null): Place | undefined {
 	return pathname === "/" ? "home" : pathname === "/knowledge" ? "knowledge" : pathname === "/practice" ? "practice" : undefined;
 }
 
-/** New lesson = Home with the omnibar focused (⌘N does the same). */
-function useNewLesson() {
+/** New lesson / New practice = Home's field, focused and ready for that
+ *  kind (⌘N does New lesson). Already on Home, the event alone switches it;
+ *  elsewhere the URL carries the mode for Home's first render. */
+function useNewSession() {
 	const router = useRouter();
-	return useCallback(() => {
-		router.push("/");
-		window.setTimeout(() => window.dispatchEvent(new CustomEvent("lh:focus-omnibar")), 150);
-	}, [router]);
+	const pathname = usePathname();
+	return useCallback(
+		(mode: "teach" | "practice" = "teach") => {
+			const ready = () => window.dispatchEvent(new CustomEvent("lh:focus-omnibar", { detail: { mode } }));
+			if (pathname === "/") return ready();
+			router.push(mode === "practice" ? "/?mode=practice" : "/");
+			window.setTimeout(ready, 150);
+		},
+		[router, pathname],
+	);
 }
 
 // ─── Field ─────────────────────────────────────────────────────────────────
@@ -96,7 +103,7 @@ export function SidebarCard({
 	const pathname = usePathname();
 	const chats = useChats();
 	const { open: openSettings } = useSettingsDialog();
-	const newLesson = useNewLesson();
+	const newSession = useNewSession();
 	const here = placeOf(pathname);
 	return (
 		<>
@@ -107,7 +114,7 @@ export function SidebarCard({
 							<LogoMark size={24} />
 							<span>LearnHarness</span>
 						</Link>
-						<button type="button" className="ib sm tipb" aria-label="New lesson" data-tip="New lesson  ⌘N" onClick={newLesson}>
+						<button type="button" className="ib sm tipb" aria-label="New lesson" data-tip="New lesson  ⌘N" onClick={() => newSession("teach")}>
 							<Icon name="plus" size="sm" />
 						</button>
 					</div>
@@ -124,6 +131,16 @@ export function SidebarCard({
 							);
 						})}
 					</nav>
+					<div className="side-new" role="group" aria-label="Start">
+						<button type="button" className="srow side-new-b" onClick={() => newSession("teach")}>
+							<Icon name="plus" size="md" />
+							<span>New lesson</span>
+						</button>
+						<button type="button" className="srow side-new-b" onClick={() => newSession("practice")}>
+							<Icon name="plus" size="md" />
+							<span>New practice</span>
+						</button>
+					</div>
 					<div className="side-mid">{children ?? <SessionGroups chats={chats} />}</div>
 					<div className="side-foot">
 						{footer ?? (
@@ -184,6 +201,15 @@ export function SessionGroups({ chats, compact = false }: { chats: V4Chat[] | nu
 		};
 	}, [ctx]);
 
+	const setArchived = useCallback(async (id: string, archived: boolean) => {
+		const res = await fetch(`/api/chats/${id}`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ archived }),
+		}).catch(() => null);
+		if (res?.ok) window.dispatchEvent(new CustomEvent("lh:chat-renamed", { detail: { id } }));
+	}, []);
+
 	const commitRename = useCallback(async (id: string, next: string) => {
 		setRenaming(null);
 		const t = next.trim();
@@ -231,14 +257,40 @@ export function SessionGroups({ chats, compact = false }: { chats: V4Chat[] | nu
 			{groups.map((g) => {
 				const all = expanded.has(g.name);
 				const activeAt = g.chats.findIndex((c) => pathname === `/chat/${c.id}`);
-				// Capped, but the open session always stays in view.
-				const shown = all ? g.chats : g.chats.filter((_, i) => i < GROUP_CAP || i === activeAt);
+				// Archived folds shut until opened (the open session keeps it
+				// open); live groups are capped, the open session always in view.
+				const archive = g.name === "Archived";
+				const archiveOpen = archive && (all || activeAt !== -1);
+				const shown = archive
+					? archiveOpen
+						? g.chats
+						: []
+					: all
+						? g.chats
+						: g.chats.filter((_, i) => i < GROUP_CAP || i === activeAt);
+				const toggle = () =>
+					setExpanded((s) => {
+						const next = new Set(s);
+						if (all) next.delete(g.name);
+						else next.add(g.name);
+						return next;
+					});
 				return (
-					<section key={g.name} className="sgroup" aria-label={g.name}>
-						<div className="gl">
-							<span>{g.name}</span>
-							<span className="num">{g.chats.length}</span>
-						</div>
+					<section key={g.name} className={`sgroup ${archive ? "archived" : ""}`} aria-label={g.name}>
+						{archive ? (
+							<button type="button" className="gl gl-toggle" aria-expanded={archiveOpen} onClick={toggle}>
+								<span>
+									<Icon name="chevron-right" size="xs" className="gl-chev" />
+									{g.name}
+								</span>
+								<span className="num">{g.chats.length}</span>
+							</button>
+						) : (
+							<div className="gl">
+								<span>{g.name}</span>
+								<span className="num">{g.chats.length}</span>
+							</div>
+						)}
 						{shown.map((c) => {
 							const on = pathname === `/chat/${c.id}`;
 							const state = sessionState(c);
@@ -259,28 +311,17 @@ export function SessionGroups({ chats, compact = false }: { chats: V4Chat[] | nu
 										setCtx(c.id);
 									}}
 								>
-									<span className="sess-mark" aria-hidden="true">
-										{state === "waiting" ? <span className="ping" /> : <span className={`dot ${state === "working" ? "brand" : ""}`} />}
+									<span className={`sess-mark ${state}`} aria-hidden="true">
+										<Icon name={isPractice(c) ? "practice" : "lesson"} size="sm" />
+										{state === "waiting" && <span className="ping" />}
 									</span>
 									<span className="sess-t trunc">{displayTitle(c.title)}</span>
 									<span className="sess-m trunc">{sessionLine(c)}</span>
 								</button>
 							);
 						})}
-						{g.chats.length > GROUP_CAP && (
-							<button
-								type="button"
-								className="sess-more"
-								aria-expanded={all}
-								onClick={() =>
-									setExpanded((s) => {
-										const next = new Set(s);
-										if (all) next.delete(g.name);
-										else next.add(g.name);
-										return next;
-									})
-								}
-							>
+						{!archive && g.chats.length > GROUP_CAP && (
+							<button type="button" className="sess-more" aria-expanded={all} onClick={toggle}>
 								<Icon name={all ? "chevron-up" : "chevron-down"} size="xs" />
 								{all ? "Show fewer" : `Show all ${g.chats.length}`}
 							</button>
@@ -312,6 +353,14 @@ export function SessionGroups({ chats, compact = false }: { chats: V4Chat[] | nu
 						<Icon name="download" size="sm" />
 						Export as Markdown
 					</button>
+					<ArchiveItem
+						archived={chats.find((c) => c.id === ctx)?.archived === true}
+						onClick={(archived) => {
+							const id = ctx;
+							setCtx(null);
+							void setArchived(id, !archived);
+						}}
+					/>
 					<div className="msep" aria-hidden="true" />
 					<button
 						type="button"
@@ -333,6 +382,15 @@ export function SessionGroups({ chats, compact = false }: { chats: V4Chat[] | nu
 			)}
 			<DeleteSessionDialog chat={deleting} onClose={() => setDeleting(null)} onDeleted={onDeleted} />
 		</div>
+	);
+}
+
+function ArchiveItem({ archived, onClick }: { archived: boolean; onClick: (archived: boolean) => void }) {
+	return (
+		<button type="button" className="mrow" data-testid="ctx-archive" onClick={() => onClick(archived)}>
+			<Icon name={archived ? "unarchive" : "archive"} size="sm" />
+			{archived ? "Unarchive" : "Archive"}
+		</button>
 	);
 }
 
@@ -427,8 +485,8 @@ function RailNav({
 	panel?: { label: string; content: ReactNode };
 }) {
 	const { open: openSettings } = useSettingsDialog();
-	const newLesson = useNewLesson();
-	const waiting = (chats ?? []).filter((c) => sessionState(c) === "waiting").length;
+	const newSession = useNewSession();
+	const waiting = (chats ?? []).filter((c) => !c.archived && sessionState(c) === "waiting").length;
 	const sessions = useFlyout();
 	const extra = useFlyout();
 	const railRef = useRef<HTMLElement>(null);
@@ -473,7 +531,7 @@ function RailNav({
 					<nav className="fly pop settle" aria-label="Sessions">
 						<div className="fly-head">
 							<span className="h">Sessions</span>
-							<button type="button" className="mini" onClick={newLesson}>
+							<button type="button" className="mini" onClick={() => newSession("teach")}>
 								<Icon name="plus" size="sm" />
 								New lesson
 							</button>
@@ -485,10 +543,6 @@ function RailNav({
 			<Link className={`ri ${active === "knowledge" ? "on" : ""}`} href="/knowledge" aria-label="Knowledge" aria-current={active === "knowledge" ? "page" : undefined}>
 				<Icon name="knowledge" size="lg" />
 				<Tip label="Knowledge" />
-			</Link>
-			<Link className={`ri ${active === "practice" ? "on" : ""}`} href="/practice" aria-label="Practice" aria-current={active === "practice" ? "page" : undefined}>
-				<Icon name="practice" size="lg" />
-				<Tip label="Practice" />
 			</Link>
 			{panel && (
 				<div className="ri-wrap" {...extra.wrap}>
@@ -504,9 +558,16 @@ function RailNav({
 				</div>
 			)}
 			<span className="rail-sep" aria-hidden="true" />
-			<button type="button" className="ri new" aria-label="New lesson" onClick={newLesson}>
+			<button type="button" className="ri new" aria-label="New lesson" onClick={() => newSession("teach")}>
 				<Icon name="plus" size="lg" />
 				<Tip label="New lesson" keys="⌘N" />
+			</button>
+			<button type="button" className="ri new-prac" aria-label="New practice" onClick={() => newSession("practice")}>
+				<Icon name="practice" size="lg" />
+				<span className="ri-plus" aria-hidden="true">
+					<Icon name="plus" size="xs" strokeWidth={3} />
+				</span>
+				<Tip label="New practice" />
 			</button>
 			<button type="button" className="ri foot" aria-label="Settings" onClick={() => openSettings()} data-testid={embedded ? undefined : "settings-entry"}>
 				<Icon name="settings" size="lg" />

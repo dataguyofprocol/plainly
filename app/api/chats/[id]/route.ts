@@ -25,22 +25,30 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 /**
- * Rename (2026-09-17): the header's click-to-edit title commits here.
- * Validation is a single rule — a non-empty string after trim (the store's
- * "Untitled session" floor is never reached from this route). updatedAt is
- * deliberately NOT bumped: a rename must not reorder the sidebar (same
- * rule as the settings PUT).
+ * Rename (2026-09-17) and archive (2026-10-26). The body carries `title`,
+ * `archived`, or both. Title: a non-empty string after trim (the store's
+ * "Untitled session" floor is never reached from this route). Archived: a
+ * boolean. Neither bumps updatedAt — renaming or archiving must not
+ * reorder the sidebar (same rule as the settings PUT).
  */
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
 	const { id } = await params;
 	if (!getChat(id)) return Response.json({ error: "Not found" }, { status: 404 });
-	const body = (await req.json().catch(() => null)) as { title?: unknown } | null;
-	if (typeof body?.title !== "string" || body.title.trim() === "") {
+	const body = (await req.json().catch(() => null)) as { title?: unknown; archived?: unknown } | null;
+	const hasTitle = body?.title !== undefined;
+	const hasArchived = body?.archived !== undefined;
+	if (!hasTitle && !hasArchived) {
+		return Response.json({ error: "send a title or archived" }, { status: 400 });
+	}
+	if (hasTitle && (typeof body.title !== "string" || body.title.trim() === "")) {
 		return Response.json({ error: "title must be a non-empty string" }, { status: 400 });
 	}
-	const title = body.title.trim();
-	const record = stores.chatStore.renameChat(id, title);
-	return Response.json({ title: record.title });
+	if (hasArchived && typeof body.archived !== "boolean") {
+		return Response.json({ error: "archived must be a boolean" }, { status: 400 });
+	}
+	let record = hasTitle ? stores.chatStore.renameChat(id, (body.title as string).trim()) : getChat(id)!;
+	if (hasArchived) record = stores.chatStore.setArchived(id, body.archived as boolean);
+	return Response.json({ title: record.title, archived: record.archived === true });
 }
 
 /**

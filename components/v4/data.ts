@@ -101,20 +101,23 @@ export function sessionLine(c: V4Chat, now = new Date()): string {
 }
 
 export interface SessionGroupV4 {
-	name: "Waiting on you" | "Today" | "Earlier";
+	name: "Waiting on you" | "Today" | "Earlier" | "Archived";
 	chats: V4Chat[];
 }
 
-/** The sidebar groups (Home4): what waits on you, today's, the rest. */
+/** The sidebar groups (Home4): what waits on you, today's, the rest — and,
+ *  last, what the learner archived (out of the live groups, restorable). */
 export function groupChats(chats: readonly V4Chat[], now = new Date()): SessionGroupV4[] {
 	const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 	const groups: SessionGroupV4[] = [
 		{ name: "Waiting on you", chats: [] },
 		{ name: "Today", chats: [] },
 		{ name: "Earlier", chats: [] },
+		{ name: "Archived", chats: [] },
 	];
 	for (const c of chats) {
-		if (sessionState(c) === "waiting") groups[0]!.chats.push(c);
+		if (c.archived) groups[3]!.chats.push(c);
+		else if (sessionState(c) === "waiting") groups[0]!.chats.push(c);
 		else if (new Date(c.updatedAt).getTime() >= start) groups[1]!.chats.push(c);
 		else groups[2]!.chats.push(c);
 	}
