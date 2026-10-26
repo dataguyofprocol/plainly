@@ -97,9 +97,6 @@
 .v4 .ri.open { background: var(--surface); color: var(--ink); box-shadow: var(--e1), 0 0 0 1px var(--line) inset; }
 .v4 .ri.logo { margin-bottom: 12px; }
 .v4 .ri.logo:hover { background: transparent; }
-.v4 .ri .ri-plus { position: absolute; right: 5px; bottom: 5px; width: 14px; height: 14px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--ink); color: var(--on-ink); box-shadow: 0 0 0 2px var(--background); }
-.v4 .ri.new-prac { margin-top: 6px; }
-.v4 .ri.new-prac:hover .ri-plus { background: var(--brand); }
 .v4 .ri.new { color: var(--ink); background: var(--surface); box-shadow: var(--e1), 0 0 0 1px var(--line-strong) inset; }
 .v4 .ri.new:hover { box-shadow: var(--e2), 0 0 0 1px var(--line-strong) inset; }
 .v4 .ri.foot { margin-top: auto; }
@@ -150,3 +147,5 @@
 .v4 .side-new { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); flex: none; }
 .v4 .side-new-b .ic { color: var(--brand); }
 .v4 .side-new-b:hover .ic { color: var(--brand); }
+.v4 .side-new-k { margin-left: auto; opacity: 0; transition: opacity var(--dur-1); }
+.v4 .side-new-b:hover .side-new-k, .v4 .side-new-b:focus-visible .side-new-k { opacity: 1; }

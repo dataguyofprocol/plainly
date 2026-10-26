@@ -92,6 +92,10 @@
 	--brand-wash: rgb(21 110 98 / 0.06);
 	--practice: #8f5317;
 	--practice-soft: rgb(240 181 110 / 0.22);
+	--practice-hover: #7a4612;
+	--practice-line: rgb(143 83 23 / 0.32);
+	--practice-ring: 0 0 0 3px rgb(143 83 23 / 0.2);
+	--brand-ring: 0 0 0 3px rgb(21 110 98 / 0.2);
 	--warn: #8f5517;
 	--warn-soft: rgb(233 184 114 / 0.24);
 	--warn-line: rgb(143 85 23 / 0.28);

@@ -7,7 +7,7 @@
  *   Field        the drifting gradient behind everything (paused when the
  *                window is in the background; still under reduced motion)
  *   SidebarCard  the inset glass card at ≥1100px: wordmark, Home /
- *                Knowledge, New lesson / New practice, a screen-owned middle (sessions by
+ *                Knowledge, New session, a screen-owned middle (sessions by
  *                default, topics on Knowledge), a footer (Settings, or
  *                Import notes). Between 800 and 1099px the same frame
  *                renders as the icon rail; below 800 the rail lies flat
@@ -49,8 +49,9 @@ function placeOf(pathname: string | null): Place | undefined {
 	return pathname === "/" ? "home" : pathname === "/knowledge" ? "knowledge" : pathname === "/practice" ? "practice" : undefined;
 }
 
-/** New lesson / New practice = Home's field, focused and ready for that
- *  kind (⌘N does New lesson). Already on Home, the event alone switches it;
+/** New session = Home's composer, focused and set to that kind (⌘N and
+ *  the sidebar/rail "+" open Learn; /practice and ⌘K open Practice).
+ *  Already on Home, the event alone switches it;
  *  elsewhere the URL carries the mode for Home's first render. */
 function useNewSession() {
 	const router = useRouter();
@@ -114,9 +115,6 @@ export function SidebarCard({
 							<LogoMark size={24} />
 							<span>LearnHarness</span>
 						</Link>
-						<button type="button" className="ib sm tipb" aria-label="New lesson" data-tip="New lesson  ⌘N" onClick={() => newSession("teach")}>
-							<Icon name="plus" size="sm" />
-						</button>
 					</div>
 					<nav className="side-nav" aria-label="Places">
 						{NAV.map((n) => {
@@ -131,14 +129,11 @@ export function SidebarCard({
 							);
 						})}
 					</nav>
-					<div className="side-new" role="group" aria-label="Start">
+					<div className="side-new">
 						<button type="button" className="srow side-new-b" onClick={() => newSession("teach")}>
 							<Icon name="plus" size="md" />
-							<span>New lesson</span>
-						</button>
-						<button type="button" className="srow side-new-b" onClick={() => newSession("practice")}>
-							<Icon name="plus" size="md" />
-							<span>New practice</span>
+							<span>New session</span>
+							<span className="kbd side-new-k" aria-hidden="true">⌘N</span>
 						</button>
 					</div>
 					<div className="side-mid">{children ?? <SessionGroups chats={chats} />}</div>
@@ -533,7 +528,7 @@ function RailNav({
 							<span className="h">Sessions</span>
 							<button type="button" className="mini" onClick={() => newSession("teach")}>
 								<Icon name="plus" size="sm" />
-								New lesson
+								New session
 							</button>
 						</div>
 						<SessionGroups chats={chats} compact />
@@ -558,16 +553,9 @@ function RailNav({
 				</div>
 			)}
 			<span className="rail-sep" aria-hidden="true" />
-			<button type="button" className="ri new" aria-label="New lesson" onClick={() => newSession("teach")}>
+			<button type="button" className="ri new" aria-label="New session" onClick={() => newSession("teach")}>
 				<Icon name="plus" size="lg" />
-				<Tip label="New lesson" keys="⌘N" />
-			</button>
-			<button type="button" className="ri new-prac" aria-label="New practice" onClick={() => newSession("practice")}>
-				<Icon name="practice" size="lg" />
-				<span className="ri-plus" aria-hidden="true">
-					<Icon name="plus" size="xs" strokeWidth={3} />
-				</span>
-				<Tip label="New practice" />
+				<Tip label="New session" keys="⌘N" />
 			</button>
 			<button type="button" className="ri foot" aria-label="Settings" onClick={() => openSettings()} data-testid={embedded ? undefined : "settings-entry"}>
 				<Icon name="settings" size="lg" />

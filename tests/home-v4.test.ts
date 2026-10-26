@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { barHeights, continueModel, greeting, kpiCells, mixPicks } from "../components/home.tsx";
+import { barHeights, continueModel, greeting, homeGreeting, kpiCells, mixPicks } from "../components/home.tsx";
 import type { V4Chat, V4Stats } from "../components/v4/data.ts";
 
 function chat(id: string, o: Partial<V4Chat> = {}): V4Chat {
@@ -105,5 +105,39 @@ describe("mixPicks", () => {
 		];
 		assert.equal(mixPicks(topics, ["a"], ideas).length, 40);
 		assert.deepEqual(mixPicks(topics, [], ideas), []);
+	});
+});
+
+describe("homeGreeting", () => {
+	// Local-time dates: the buckets follow the learner's clock.
+	const at = (h: number, m = 0, day = 26) => new Date(2026, 9, day, h, m);
+	const leads = (h: number, m = 0) => [26, 27].map((d) => homeGreeting(at(h, m, d)).lead);
+
+	it("picks the bucket by local hour, boundaries included", () => {
+		assert.ok(leads(4, 59).every((l) => ["Burning the midnight oil?", "Quiet hours."].includes(l)));
+		assert.ok(leads(5).every((l) => ["Early start.", "Up with the sun."].includes(l)));
+		assert.ok(leads(11, 59).every((l) => ["Good morning.", "Morning."].includes(l)));
+		assert.ok(leads(12).every((l) => ["Good afternoon.", "Lunch break?"].includes(l)));
+		assert.ok(leads(21, 59).every((l) => ["Good evening.", "Evening."].includes(l)));
+		assert.ok(leads(22).every((l) => ["Still up?", "Late one."].includes(l)));
+		assert.ok(leads(0, 30).every((l) => ["Still up?", "Late one."].includes(l)), "just past midnight is still late");
+	});
+
+	it("holds all day and changes with the date", () => {
+		assert.deepEqual(homeGreeting(at(18, 5)), homeGreeting(at(21, 40)));
+		assert.notDeepEqual(homeGreeting(at(19, 0, 26)), homeGreeting(at(19, 0, 27)));
+	});
+
+	it("practice keeps the lead and swaps in a practice tail", () => {
+		const learn = homeGreeting(at(9));
+		const practise = homeGreeting(at(9), "practice");
+		assert.equal(practise.lead, learn.lead);
+		assert.ok(["What shall we sharpen?", "Ready for a few problems?"].includes(practise.tail));
+	});
+
+	it("a lead that stands alone gets a practice tail", () => {
+		const day = [26, 27].find((d) => homeGreeting(at(2, 0, d)).lead === "Burning the midnight oil?")!;
+		assert.equal(homeGreeting(at(2, 0, day)).tail, "");
+		assert.notEqual(homeGreeting(at(2, 0, day), "practice").tail, "");
 	});
 });

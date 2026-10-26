@@ -22,16 +22,31 @@
 .v4 .hm-learn { position: relative; z-index: 10; display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
 .v4 .hm-greet { margin: 0 0 8px; text-align: center; font-size: 32px; line-height: 40px; font-weight: 500; letter-spacing: -0.018em; }
 .v4 .hm-greet span { color: var(--muted-foreground); }
-.v4 .hm-field { position: relative; z-index: 2; display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 12px; border-radius: 20px; background: var(--glass-strong); -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6); border: 1px solid var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-edge), var(--e2), 0 0 0 1px var(--line); transition: box-shadow var(--dur-3) var(--ease-out); }
-.v4 .hm-field:focus-within { box-shadow: inset 0 1px 0 var(--glass-edge), var(--e2), 0 0 0 1px var(--brand), var(--focus-ring); }
-.v4 .hm-input { flex: 1; min-width: 0; height: 48px; padding: 0 8px; border: 0; background: transparent; outline: none; font-size: 20px; line-height: 26px; }
+/* The composer: one card — the input on top, a toolbar below with the
+   session kind (Learn | Practice), the model, the mic and one send button.
+   The kind owns the accent: teal for Learn, amber for Practice. */
+.v4 .hm-composer { --acc: var(--brand); --acc-hover: var(--brand-hover); --acc-soft: var(--brand-soft); --acc-line: var(--brand-line); --acc-ring: var(--brand-ring); position: relative; z-index: 2; display: flex; flex-direction: column; gap: 6px; padding: 14px 12px 12px 14px; border-radius: 22px; background: var(--glass-strong); -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6); border: 1px solid var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-edge), var(--e2), 0 0 0 1px var(--line); transition: box-shadow var(--dur-3) var(--ease-out); }
+.v4 .hm-composer.practice { --acc: var(--practice); --acc-hover: var(--practice-hover); --acc-soft: var(--practice-soft); --acc-line: var(--practice-line); --acc-ring: var(--practice-ring); }
+.v4 .hm-composer:focus-within { box-shadow: inset 0 1px 0 var(--glass-edge), var(--e2), 0 0 0 1px var(--acc-line), var(--acc-ring); }
+.v4 .hm-input { width: 100%; height: 48px; padding: 0 10px; border: 0; background: transparent; outline: none; font-size: 21px; line-height: 28px; }
 .v4 .hm-input:focus-visible { outline: none; }
-.v4 .hm-input::placeholder { color: var(--faint); }
-.v4 .hm-alt { margin-left: 4px; }
-.v4 .hm-alt .ic { color: var(--faint); }
-.v4 .hm-go { margin-left: 2px; }
-.v4 .hm-under { display: flex; padding: 0 8px; margin-top: -4px; }
-.v4 .hm-model { color: var(--faint); }
+.v4 .hm-input::placeholder { color: var(--faint); transition: color var(--dur-2); }
+.v4 .hm-bar { display: flex; align-items: center; gap: 6px; }
+.v4 .hm-mode { padding: 3px; border-radius: 12px; }
+.v4 .hm-mode button { height: 32px; padding: 0 12px; gap: 7px; border-radius: 9px; font-size: 13px; font-weight: 600; transition: background var(--dur-2) var(--ease-out), color var(--dur-2), box-shadow var(--dur-2); }
+.v4 .hm-mode button .ic { color: var(--faint); transition: color var(--dur-2); }
+.v4 .hm-mode button.on { color: var(--acc); }
+.v4 .hm-mode button.on .ic { color: var(--acc); }
+.v4 .hm-mode button:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+.v4 .hm-model { margin-left: 2px; }
+.v4 .hm-composer .mchip-dot:not(.off) { background: var(--acc); transition: background var(--dur-2); }
+.v4 .hm-fill { flex: 1; min-width: 0; }
+.v4 .hm-send { width: 38px; height: 38px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: var(--acc); color: var(--on-ink); box-shadow: 0 2px 8px -2px var(--acc-line); transition: background var(--dur-2) var(--ease-out), transform var(--dur-1) var(--ease-out), opacity var(--dur-2), box-shadow var(--dur-2); }
+.v4 .hm-send:hover:not(:disabled) { background: var(--acc-hover); }
+.v4 .hm-send:active:not(:disabled) { transform: scale(0.94); }
+.v4 .hm-send:disabled { opacity: 0.35; cursor: default; box-shadow: none; }
+.v4 .hm-send:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; border-radius: 50%; }
+.v4 .hm-composer .tipb::after { top: auto; bottom: calc(100% + 8px); }
 .v4 .hm-next { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 .v4 .hm-next .chip { max-width: 224px; }
 .v4 .hm-next .chip .ic { flex: none; color: var(--brand); }
@@ -93,7 +108,7 @@
 /* ── Narrow ────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
 	.v4 .hm-greet { font-size: 24px; line-height: 30px; }
-	.v4 .hm-field { flex-wrap: wrap; }
-	.v4 .hm-input { flex-basis: 100%; }
-	.v4 .hm-alt { margin-left: auto; }
+	.v4 .hm-mode button { padding: 0 10px; }
+	.v4 .hm-input { font-size: 17px; height: 44px; }
+	.v4 .hm-model { display: none; }
 }

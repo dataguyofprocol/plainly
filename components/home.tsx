@@ -62,6 +62,33 @@ export function greeting(now: Date): string {
 	return h < 5 ? "Good evening." : h < 12 ? "Good morning." : h < 18 ? "Good afternoon." : "Good evening.";
 }
 
+/** Home's greeting lines by local time of day: [lead, tail] pairs per
+ *  bucket (owner, 2026-10-26). An empty tail means the lead stands alone. */
+const GREETINGS: Array<{ from: number; lines: Array<[string, string]> }> = [
+	{ from: 1, lines: [["Burning the midnight oil?", ""], ["Quiet hours.", "What shall we explore?"]] },
+	{ from: 5, lines: [["Early start.", "What's on your mind?"], ["Up with the sun.", "What shall we learn?"]] },
+	{ from: 8, lines: [["Good morning.", "What shall we learn today?"], ["Morning.", "Fresh mind, fresh topic?"]] },
+	{ from: 12, lines: [["Good afternoon.", "Got a few minutes?"], ["Lunch break?", "Let's learn something."]] },
+	{ from: 14, lines: [["Good afternoon.", "What are you curious about?"], ["Afternoon.", "What shall we dig into?"]] },
+	{ from: 18, lines: [["Good evening.", "What shall we dig into?"], ["Evening.", "Something new before the day ends?"]] },
+	{ from: 22, lines: [["Still up?", "Let's learn something."], ["Late one.", "What's keeping you curious?"]] },
+];
+const PRACTICE_TAILS = ["What shall we sharpen?", "Ready for a few problems?"];
+
+/** Pure: today's greeting for this moment, as { lead, tail }. The bucket
+ *  follows the local hour; the line within it follows the local date, so
+ *  it holds all day and changes tomorrow. Practice swaps in a practice
+ *  tail. Exported for tests. */
+export function homeGreeting(now: Date, mode: "teach" | "practice" = "teach"): { lead: string; tail: string } {
+	const h = now.getHours();
+	// 22:00–00:59 belongs to the late bucket; GREETINGS is ordered by start.
+	const bucket = h < 1 ? GREETINGS[GREETINGS.length - 1]! : [...GREETINGS].reverse().find((b) => h >= b.from)!;
+	const day = Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 86_400_000);
+	const [lead, tail] = bucket.lines[day % bucket.lines.length]!;
+	if (mode === "practice") return { lead, tail: PRACTICE_TAILS[day % PRACTICE_TAILS.length]! };
+	return { lead, tail };
+}
+
 /** Pure: Continue's hero (the first session waiting on you, else the most
  *  recent) and the other waiting sessions. Archived sessions never surface
  *  here. Exported for tests. */
@@ -123,10 +150,15 @@ export function Home({ initialConfigured, initialMode = "teach" }: { initialConf
 	const [now, setNow] = useState<Date | null>(null);
 	useEffect(() => setNow(new Date()), []);
 	const needSetup = useCallback(() => setSetupOpen(true), []);
+	// The session kind the composer starts — it also tints the page: teal
+	// for Learn, the warm register for Practice. Follows the URL (/practice,
+	// ⌘K "New practice set") and the New-session event.
+	const [mode, setMode] = useState<Mode>(initialMode);
+	useEffect(() => setMode(initialMode), [initialMode]);
 
 	return (
-		<div className="v4">
-			<Field />
+		<div className={`v4 hm-root ${mode === "practice" ? "warm" : ""}`}>
+			<Field variant={mode === "practice" ? "warm" : "home"} />
 			<div className="shell">
 				<SidebarCard knowledgeCount={ideas?.length ?? null} />
 				<main className="main">
@@ -146,7 +178,7 @@ export function Home({ initialConfigured, initialMode = "teach" }: { initialConf
 								</button>
 							</section>
 						)}
-						<LearnField chats={chats} now={now} initialMode={initialMode} ready={readiness.ready} onNeedSetup={needSetup} />
+						<LearnField chats={chats} now={now} mode={mode} onMode={setMode} focusOnArrival={initialMode === "practice"} ready={readiness.ready} onNeedSetup={needSetup} />
 						<ContinueCard chats={chats} now={now} />
 						<ProgressLine ideaCount={ideas?.length ?? null} />
 					</div>
@@ -164,7 +196,7 @@ export function Home({ initialConfigured, initialMode = "teach" }: { initialConf
 	);
 }
 
-// ─── The Learn field ──────────────────────────────────────────────────────
+// ─── The composer ─────────────────────────────────────────────────────────
 
 const ROW_ICON: Record<PaletteRow["icon"], IconName> = {
 	learn: "learn",
@@ -176,16 +208,25 @@ const ROW_ICON: Record<PaletteRow["icon"], IconName> = {
 	connect: "provider",
 };
 
+const MODES: ReadonlyArray<{ id: Mode; label: string; icon: IconName }> = [
+	{ id: "teach", label: "Learn", icon: "learn" },
+	{ id: "practice", label: "Practice", icon: "practice" },
+];
+
 function LearnField({
 	chats,
 	now,
-	initialMode,
+	mode,
+	onMode,
+	focusOnArrival,
 	ready,
 	onNeedSetup,
 }: {
 	chats: V4Chat[] | null;
 	now: Date | null;
-	initialMode: Mode;
+	mode: Mode;
+	onMode: (m: Mode) => void;
+	focusOnArrival: boolean;
 	ready: boolean;
 	onNeedSetup: () => void;
 }) {
@@ -195,43 +236,44 @@ function LearnField({
 	const suggestions = useSuggestions();
 	const [q, setQ] = useState("");
 	const qRef = useRef("");
-	const [walk, setWalk] = useState(0);
+	const [walk, setWalk] = useState(-1);
 	const [focused, setFocused] = useState(false);
 	const [busy, setBusy] = useState(false);
-	// Which kind Enter starts: Learn by default, Practice after "New
-	// practice". Both buttons are always there; this only picks the primary.
-	const [mode, setMode] = useState<Mode>(initialMode);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const setQuery = useCallback((v: string) => {
 		qRef.current = v;
 		setQ(v);
-		setWalk(0);
+		setWalk(-1);
 	}, []);
 	const dictation = useDictation({ append: (t) => setQuery(joinDictation(qRef.current, t)) });
 
-	// Query → results: the same model as ⌘K, minus the empty-query lists.
-	const groups = useMemo(() => (q.trim() ? paletteResults(q, mode, chats ?? [], ideas ?? []) : []), [q, mode, chats, ideas]);
+	// Query → matching sessions and ideas (the ⌘K model). Its "Start" rows
+	// are left out: the composer itself is the start, in the chosen kind.
+	const groups = useMemo(
+		() => (q.trim() ? paletteResults(q, mode, chats ?? [], ideas ?? []).filter((g) => g.name !== "Start") : []),
+		[q, mode, chats, ideas],
+	);
 	const rows = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
 	const open = focused && rows.length > 0;
-	const active = Math.min(walk, Math.max(0, rows.length - 1));
+	// Nothing is preselected (-1): Enter starts a session until an arrow key
+	// picks a result.
+	const active = Math.min(walk, rows.length - 1);
 
 	// New lesson / New practice (sidebar, rail, ⌘N) land here: focus the
 	// field, ready for the kind the event names.
 	useEffect(() => {
 		const on = (e: Event) => {
 			const next = (e as CustomEvent<{ mode?: Mode } | null>).detail?.mode;
-			if (next) setMode(next);
+			if (next) onMode(next);
 			inputRef.current?.focus();
 		};
 		window.addEventListener("lh:focus-omnibar", on);
 		return () => window.removeEventListener("lh:focus-omnibar", on);
-	}, []);
-	// Arriving as "New practice" (/?mode=practice, also from ⌘K while already
-	// on Home): the field follows the URL's kind and takes focus.
+	}, [onMode]);
+	// Arriving to practise (/practice, ⌘K "New practice set"): focus the field.
 	useEffect(() => {
-		setMode(initialMode);
-		if (initialMode === "practice") inputRef.current?.focus();
-	}, [initialMode]);
+		if (focusOnArrival) inputRef.current?.focus();
+	}, [focusOnArrival]);
 
 	const start = async (text: string, as: Mode) => {
 		if (!text.trim() || busy) return;
@@ -254,19 +296,26 @@ function LearnField({
 		else openSettings();
 	};
 	const submit = () => {
-		const go = () => (open ? run(rows[active]) : void start(qRef.current, mode));
+		const go = () => (open && active >= 0 ? run(rows[active]) : void start(qRef.current, mode));
 		if (dictation.active) void dictation.finish().then(go);
 		else go();
 	};
 
+	const greet = now ? homeGreeting(now, mode) : null;
 	let index = -1;
 	return (
 		<section className="hm-learn rise" aria-labelledby="greet">
 			<h1 id="greet" className="hm-greet serif" suppressHydrationWarning>
-				{now ? greeting(now) : " "} <span>What shall we learn?</span>
+				{greet ? (
+					<>
+						{greet.lead} {greet.tail && <span>{greet.tail}</span>}
+					</>
+				) : (
+					" "
+				)}
 			</h1>
 			<form
-				className={`hm-field ${mode === "practice" ? "practice" : ""}`}
+				className={`hm-composer ${mode === "practice" ? "practice" : ""}`}
 				role="search"
 				aria-label="Start a lesson or practice, or search your sessions and ideas"
 				onSubmit={(e) => {
@@ -293,7 +342,12 @@ function LearnField({
 						if ((e.key === "ArrowDown" || e.key === "ArrowUp") && open) {
 							e.preventDefault();
 							const n = rows.length;
-							setWalk((i) => (Math.min(i, n - 1) + (e.key === "ArrowDown" ? 1 : -1) + n) % n);
+							// -1 (the field) → first/last row; past either end → back to the field.
+							setWalk((i) => {
+								const at = Math.min(i, n - 1);
+								const next = e.key === "ArrowDown" ? at + 1 : at === -1 ? n - 1 : at - 1;
+								return next >= n ? -1 : next;
+							});
 						} else if (e.key === "Escape") {
 							e.stopPropagation();
 							if (dictation.active) dictation.cancel();
@@ -303,49 +357,72 @@ function LearnField({
 					}}
 					placeholder={mode === "practice" ? "What do you want to practise?" : "What do you want to understand?"}
 				/>
-				<button
-					type="button"
-					className={`ib lg tipb up mid ${dictation.active ? "on" : ""}`}
-					aria-label={dictation.active ? "Stop dictation" : "Dictate"}
-					data-tip={dictation.active ? "Stop dictation" : "Dictate"}
-					aria-pressed={dictation.active}
-					onClick={() => (dictation.active ? void dictation.finish() : dictation.toggle())}
-				>
-					{dictation.active ? (
-						<span className="wave" aria-hidden="true">
-							<i />
-							<i />
-							<i />
-							<i />
-						</span>
-					) : (
-						<Icon name="mic" size="md" />
-					)}
-				</button>
-				{/* The primary (Enter) kind sits last, filled; the other stays
-				    one click away as the quiet button before it. */}
-				<button
-					type="button"
-					className="btn lg secondary hm-alt"
-					data-testid={`home-start-${mode === "practice" ? "teach" : "practice"}`}
-					disabled={busy}
-					onClick={() => {
-						const other: Mode = mode === "practice" ? "teach" : "practice";
-						const go = () => void start(qRef.current, other);
-						if (!qRef.current.trim()) {
-							setMode(other);
-							inputRef.current?.focus();
-						} else if (dictation.active) void dictation.finish().then(go);
-						else go();
-					}}
-				>
-					<Icon name={mode === "practice" ? "learn" : "practice"} size="sm" />
-					{mode === "practice" ? "Learn" : "Practice"}
-				</button>
-				<button type="submit" className={`btn lg hm-go ${mode === "practice" ? "brand" : ""}`} data-testid={`home-start-${mode}`} disabled={busy}>
-					{mode === "practice" ? "Practice" : "Learn"}
-					<Icon name="arrow-right" size="sm" />
-				</button>
+				<div className="hm-bar">
+					{/* The kind of session: Learn or Practice. A radio group —
+					    arrows move between the two, the whole page re-tints. */}
+					<div className="seg hm-mode" role="radiogroup" aria-label="Kind of session">
+						{MODES.map((m) => {
+							const on = mode === m.id;
+							return (
+								<button
+									key={m.id}
+									type="button"
+									role="radio"
+									aria-checked={on}
+									tabIndex={on ? 0 : -1}
+									className={on ? "on" : ""}
+									data-testid={`home-mode-${m.id}`}
+									onClick={() => {
+										onMode(m.id);
+										inputRef.current?.focus();
+									}}
+									onKeyDown={(e) => {
+										if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+											e.preventDefault();
+											const next: Mode = m.id === "teach" ? "practice" : "teach";
+											onMode(next);
+											(e.currentTarget.parentElement?.querySelector(`[data-testid=home-mode-${next}]`) as HTMLElement | null)?.focus();
+										}
+									}}
+								>
+									<Icon name={m.icon} size="md" />
+									{m.label}
+								</button>
+							);
+						})}
+					</div>
+					<ModelControl variant="chip" className="mini hm-model" />
+					<span className="hm-fill" aria-hidden="true" />
+					<button
+						type="button"
+						className={`ib lg tipb up mid ${dictation.active ? "on" : ""}`}
+						aria-label={dictation.active ? "Stop dictation" : "Dictate"}
+						data-tip={dictation.active ? "Stop dictation" : "Dictate"}
+						aria-pressed={dictation.active}
+						onClick={() => (dictation.active ? void dictation.finish() : dictation.toggle())}
+					>
+						{dictation.active ? (
+							<span className="wave" aria-hidden="true">
+								<i />
+								<i />
+								<i />
+								<i />
+							</span>
+						) : (
+							<Icon name="mic" size="md" />
+						)}
+					</button>
+					<button
+						type="submit"
+						className="hm-send tipb up mid"
+						aria-label={mode === "practice" ? "Start practice" : "Start lesson"}
+						data-tip={mode === "practice" ? "Start practice  ↵" : "Start lesson  ↵"}
+						data-testid={`home-start-${mode}`}
+						disabled={busy || !q.trim()}
+					>
+						<Icon name="arrow-up" size="lg" strokeWidth={2.25} />
+					</button>
+				</div>
 				{open && (
 					<div className="hm-drop pop settle" role="listbox" aria-label="Matching sessions and ideas">
 						{groups.map((g) => (
@@ -381,9 +458,6 @@ function LearnField({
 					</div>
 				)}
 			</form>
-			<div className="hm-under">
-				<ModelControl variant="chip" className="mini hm-model" />
-			</div>
 			{suggestions.length > 0 && (
 				<div className="hm-next" aria-label="Next from your graph">
 					{suggestions.slice(0, 3).map((s) => (
