@@ -1,4 +1,4 @@
-import { Home } from "@/components/home";
+import { KnowledgeView } from "@/components/knowledge-view";
 import { readSettingsRecord } from "@/src/server";
 import { resolveSettings, slotsConfigured } from "@/src/core";
 
@@ -11,5 +11,5 @@ export const dynamic = "force-dynamic";
 export default function KnowledgePage() {
 	const record = readSettingsRecord();
 	const rendering = resolveSettings(record ?? null).graph.rendering;
-	return <Home initialConfigured={slotsConfigured(record?.models)} rendering={rendering} />;
+	return <KnowledgeView initialConfigured={slotsConfigured(record?.models)} rendering={rendering} />;
 }

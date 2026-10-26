@@ -1,325 +1,300 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { CornerDownLeftIcon, DumbbellIcon } from "lucide-react";
-import { GraphView } from "@/components/graph-view";
-import { MinimalHome } from "@/components/minimal-home";
-import { SetupDialog } from "@/components/setup-dialog";
-import { ComposerActions, NodePickerControl } from "@/components/composer-actions";
-import { useStrongKeyless, useZeroKeys, ZeroKeysPill } from "@/components/setup-cta";
-import { DictationBar, joinDictation, useDictation } from "@/components/dictation";
-import { useFieldCycle } from "@/components/field-cycle";
-import { StatsBar } from "@/components/stats-bar";
-import type { TurnUsage } from "@/src/core";
-
 /**
- * Home — the knowledge graph is the main view, full-bleed edge to edge
- * (owner, graph-view round 1): the canvas owns the whole column, running
- * under the header and the new-session dock, both of which float over it
- * with no gradient scrims. Sessions live in the toggleable sidebar.
+ * HOME (v4 redesign, owner 2026-10-26) — the dashboard at "/". The graph
+ * moved to /knowledge; home answers the two questions a learner opens the
+ * app with: "where was I?" and "what's new in what I know?".
+ *
+ *   - the omnibar (the same one ⌘K opens): start a lesson or practice set,
+ *     or find a session or idea;
+ *   - setup, while a session can't start yet;
+ *   - Continue: the session waiting on you (or the latest), then the rest
+ *     of what is waiting;
+ *   - Just added: the newest ideas in the graph;
+ *   - one quiet line of counts — no streaks, goals, or cost on this page
+ *     (the product principle: ideas and their connections, not ratings).
  */
-export function Home({
-	initialConfigured,
-	rendering = true,
-}: {
-	initialConfigured: boolean;
-	/** GRAPH RENDERING off (owner, 2026-10-06): the home's main view is
-	 * the chains view, not the canvas. Read server-side per navigation —
-	 * changing the setting applies on the next visit home. */
-	rendering?: boolean;
-}) {
-	const router = useRouter();
-	const [topic, setTopic] = useState("");
-	/* The topic MIRROR ("nothing gets lost" round, 2026-10-01 — same
-	 * mechanics as the chat composer, owner's consistency ruling): a
-	 * dictation flush lands via setState, invisible to a closure that
-	 * waited through `await finish()`. Kept current at every write. */
-	const topicRef = useRef("");
-	// First-run gate (model-slots wave, owner 2026-09-20): chats cannot
-	// start until the user has picked all three slots — no defaults for
-	// 33 providers. The dock shows the CTA while unconfigured; submitting
-	// a topic opens the setup dialog WITH THE DRAFT PRESERVED (Save
-	// stores the slots and the queued message sends).
-	const [configured, setConfigured] = useState(initialConfigured);
-	// The zero-keys truth (zero-keys wave): no provider key = the pill
-	// takes precedence over the models CTA (keys come first in the chain).
-	const zeroKeys = useZeroKeys();
-	// The strong slot's keyless truth (pre-send key guards, owner interlude
-	// 2026-09-25): keys may exist generally while the STRONG slot's pinned
-	// provider has none — the same skip-everything treatment on send.
-	const strongKeyless = useStrongKeyless();
-	const [setupOpen, setSetupOpen] = useState(false);
-	// Voice dictation (STT wave, 2026-09-17): finals append at the end of the
-	// topic draft; the strip lives in the stats bar's middle slot.
-	const dictation = useDictation({
-		// Ref-first: the join reads the mirror so the send resuming after
-		// `await finish()` sees the dictated tail.
-		append: (t) => {
-			const v = joinDictation(topicRef.current, t);
-			topicRef.current = v;
-			setTopic(v);
-		},
-	});
-	const [busy, setBusy] = useState(false);
-	/* Run end focuses the topic input (owner, 2026-10-01): the hands are on
-	 * the keyboard from the stop. Falling edge only; this surface's only
-	 * dictation target IS this textarea, so no case-split is needed. */
-	const topicInputRef = useRef<HTMLTextAreaElement>(null);
-	// Tab navigates INTO the topic composer (owner, keyboard round
-	// 2026-10-06): the only text field on this surface — and home's
-	// composer is its OWN textarea, not the shared Composer component,
-	// so the chain is the ref itself (the smoke caught a selector that
-	// matched nothing here).
-	const cycleTopicField = useCallback(
-		(): readonly HTMLElement[] => (topicInputRef.current ? [topicInputRef.current] : []),
-		[],
-	);
-	useFieldCycle(cycleTopicField);
-	const dictationWasActiveRef = useRef(false);
-	useEffect(() => {
-		if (dictation.active) {
-			dictationWasActiveRef.current = true;
-		} else if (dictationWasActiveRef.current) {
-			dictationWasActiveRef.current = false;
-			topicInputRef.current?.focus();
-		}
-	}, [dictation.active]);
 
-	/* PRACTICE MODE (owner, 2026-10-04): the graph composer's teach |
-	 *  practice switch — practice creates a kind:"practice" session and
-	 *  may carry proposition picks from the chain table (the chip above
-	 *  the composer opens the picker; the picks seed the opening prompt).
-	 *  Not enforcing any input format — the picks are a convenience. */
-	const [mode, setMode] = useState<"teach" | "practice">("teach");
-	const [practiceProps, setPracticeProps] = useState<{ id: string; name: string; statement: string }[]>([]);
-	const [chainSelectOpen, setChainSelectOpen] = useState(false);
-	// The chain table is CONTROLLED off this id set (the lifted pick).
-	const pickedIds = useMemo(() => new Set(practiceProps.map((p) => p.id)), [practiceProps]);
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowRightIcon, DumbbellIcon, FileUpIcon } from "lucide-react";
+import { Omnibar } from "@/components/command-palette";
+import { useGraphIndex, type IndexedIdea } from "@/components/graph-index";
+import { NotesImportErrors, useNotesImport } from "@/components/notes-import";
+import { useServerEvent, useServerResync } from "@/components/server-events";
+import { SetupDialog } from "@/components/setup-dialog";
+import { isWaitingOnYou, timeAgo } from "@/components/sidebar";
+import { useStartReadiness } from "@/components/start-session";
+import { cn } from "@/lib/utils";
+import type { ChatListItem } from "@/src/core";
 
-	/* FINISH DICTATION FIRST (owner, 2026-10-01): Enter may arrive while a
-	 * run is live with the topic still deferred in the run's buffer — stop
-	 * the run, let the last finals land, THEN read the REF mirror (not the
-	 * state closure) and run. Applies before the setup/key guards too, so
-	 * an intercepted draft is the complete one. */
-	const start = () => {
-		if (!dictation.active) {
-			void begin();
-			return;
-		}
-		void dictation.finish().then(() => begin());
-	};
-	const begin = async () => {
-		const t = topicRef.current.trim();
-		if (!t || busy) return;
-		// Unconfigured: the send INTERCEPTS into the setup flow (the draft
-		// stays in the textarea; the learner sends it after Save).
-		if (!configured) {
-			setSetupOpen(true);
-			return;
-		}
-		// The pre-send KEY guards (owner interlude, no-orphan-chats): the
-		// models case guards BEFORE creation; the key cases must too — a
-		// refused first send would otherwise leave an orphan error-shell
-		// chat in the sidebar (the 503 lands only after POST /api/chats
-		// already created the record). Same skip-everything-and-open-setup
-		// treatment; the server's 503 gate remains the belt for /chat/[id]
-		// sessions.
-		if (zeroKeys || strongKeyless) {
-			setSetupOpen(true);
-			return;
-		}
-		setBusy(true);
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Pure: the time-of-day greeting. Exported for tests. */
+export function greeting(now: Date): string {
+	const h = now.getHours();
+	return h < 5 ? "Good evening." : h < 12 ? "Good morning." : h < 18 ? "Good afternoon." : "Good evening.";
+}
+
+/** Pure: what Continue shows — the session waiting on you (else the most
+ *  recent), and the other waiting sessions. Exported for tests. */
+export function continueModel(chats: readonly ChatListItem[]): { hero: ChatListItem | null; waiting: ChatListItem[] } {
+	const waiting = chats.filter((c) => !c.busy && isWaitingOnYou(c));
+	const hero = waiting[0] ?? chats[0] ?? null;
+	return { hero, waiting: waiting.filter((c) => c !== hero).slice(0, 3) };
+}
+
+/** Pure: the counts line. Exported for tests. */
+export function knowledgeCounts(ideas: readonly IndexedIdea[], now: Date): { total: number; thisWeek: number } {
+	const since = now.getTime() - WEEK_MS;
+	return { total: ideas.length, thisWeek: ideas.filter((i) => new Date(i.createdAt).getTime() >= since).length };
+}
+
+function useChatList(): ChatListItem[] | null {
+	const [chats, setChats] = useState<ChatListItem[] | null>(null);
+	const refresh = useCallback(async () => {
 		try {
-			// The map context (owner, 2026-10-04): picks in EITHER mode ride
-			// the CREATION as graphContext — the server writes a
-			// graph-context marker as message[0] (a separate custom message
-			// before the learner's first user message, propositions + the
-			// chains among them); the prompt stays the learner's own words.
-			const res = await fetch("/api/chats", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					title: t,
-					...(mode === "practice" ? { kind: "practice" } : {}),
-					...(practiceProps.length > 0 ? { graphContext: { propositions: practiceProps } } : {}),
-				}),
-			});
-			const { id } = (await res.json()) as { id: string };
-			// No settings PUT on create (per-session models, owner
-			// 2026-09-28): the SERVER stamps the newborn from the strong
-			// slot — the same default this surface's model control edits.
-			router.push(`/chat/${id}?prompt=${encodeURIComponent(t)}`);
+			const res = await fetch("/api/chats", { cache: "no-store" });
+			setChats(((await res.json()) as { chats: ChatListItem[] }).chats);
 		} catch {
-			setBusy(false);
+			setChats((prev) => prev ?? []);
 		}
+	}, []);
+	const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+	const schedule = () => {
+		if (debounceRef.current) clearTimeout(debounceRef.current);
+		debounceRef.current = setTimeout(() => void refresh(), 250);
 	};
+	useServerEvent("chats-changed", schedule);
+	useServerEvent("turn-settled", schedule);
+	useServerResync(() => void refresh());
+	useEffect(() => {
+		void refresh();
+		return () => {
+			if (debounceRef.current) clearTimeout(debounceRef.current);
+		};
+	}, [refresh]);
+	return chats;
+}
+
+export function Home({ initialConfigured }: { initialConfigured: boolean }) {
+	const router = useRouter();
+	const chats = useChatList();
+	const ideas = useGraphIndex();
+	const readiness = useStartReadiness(initialConfigured);
+	const [setupOpen, setSetupOpen] = useState(false);
+	const [omnibarKey, setOmnibarKey] = useState(0);
+	const [draft, setDraft] = useState<{ query: string; mode: "teach" | "practice" }>({ query: "", mode: "teach" });
+	const notesImport = useNotesImport();
+	const fileRef = useRef<HTMLInputElement>(null);
+
+	// Client clock only: the server's render time is not the reader's.
+	const [now, setNow] = useState<Date | null>(null);
+	useEffect(() => setNow(new Date()), []);
+
+	const { hero, waiting } = useMemo(() => continueModel(chats ?? []), [chats]);
+	const recentIdeas = (ideas ?? []).slice(0, 4);
+	const counts = now && ideas ? knowledgeCounts(ideas, now) : null;
+	const heroWaiting = hero ? isWaitingOnYou(hero) && !hero.busy : false;
+	const firstRun = chats !== null && chats.length === 0;
 
 	return (
-		<div className="relative h-dvh">
-			{/* Window-drag strip (merged chrome, owner 2026-09-17): a dedicated
-			    mask element, deliberately FIRST in the DOM. Electron's app-region
-			    mask resolves by DOM order — a no-drag element subtracts only drag
-			    regions that came EARLIER in the tree — not by z-index, so the
-			    header's old inline drag region (after <main>) re-added itself over
-			    the graph chrome row's carve-out and the buttons dragged the window.
-			    Placed first, every carved control (chrome row, node detail card,
-			    the toggle) comes later and subtracts correctly. Pure mask: it
-			    never needs to receive events — the mask routes the pixels. */}
+		<div className="relative h-dvh overflow-y-auto">
+			{/* Window-drag strip (merged chrome): a mask FIRST in the DOM —
+			    later controls subtract from it (see knowledge-view.tsx). */}
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
 
-			{/* The main view — full-bleed (owner, graph-view round 1): no
-			    padding on any side; it runs from the sidebar to the right edge
-			    and from the bottom to the top, under everything else. With
-			    rendering OFF (graph.rendering, owner 2026-10-06) it is the
-			    MINIMAL HOME — a quiet knowledge-base summary + the graph
-			    chrome's survivors; data, extraction, and the pick flow are
-			    untouched, and the chain table stays behind its button. */}
-			<main className="absolute inset-0">
-				{rendering ? (
-					<GraphView
-						chainSelectOpen={chainSelectOpen}
-						practiceSelection={pickedIds}
-						onPracticeSelectionChange={setPracticeProps}
-						onChainSelectClose={() => setChainSelectOpen(false)}
+			<main className="mx-auto flex w-full max-w-[70rem] flex-col gap-4 px-8 pb-12 pt-16">
+				<section aria-labelledby="home-greeting" className="relative z-10 flex flex-col gap-3">
+					<h1 id="home-greeting" className="ml-1 font-prose text-2xl font-medium" suppressHydrationWarning>
+						{now ? greeting(now) : " "}{" "}
+						<span className="text-muted-foreground">
+							{heroWaiting && hero ? `${hero.title} is waiting.` : "What shall we learn?"}
+						</span>
+					</h1>
+					<Omnibar
+						key={omnibarKey}
+						variant="inline"
+						initial={draft}
+						ready={readiness.ready}
+						onNeedSetup={(next) => {
+							setDraft(next);
+							setSetupOpen(true);
+						}}
+						extraActions={
+							<>
+								<input
+									ref={fileRef}
+									type="file"
+									multiple
+									accept=".md,.markdown,.txt"
+									className="hidden"
+									onChange={(e) => {
+										notesImport.onImportFiles(e.target.files);
+										e.target.value = "";
+									}}
+								/>
+								<button
+									type="button"
+									onClick={() => fileRef.current?.click()}
+									disabled={notesImport.importing}
+									title="Import notes (Markdown or text) — they become ideas your lessons can build on"
+									className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+								>
+									<FileUpIcon className="size-4" aria-hidden />
+									{notesImport.importing ? "Importing…" : "Import notes"}
+								</button>
+							</>
+						}
 					/>
+					<NotesImportErrors errors={notesImport.errors} />
+				</section>
+
+				{readiness.configured !== null && !readiness.ready && (
+					<section aria-labelledby="home-setup" className="flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-card px-5 py-4" data-testid="home-setup">
+						<div className="flex min-w-0 flex-1 flex-col gap-0.5">
+							<h2 id="home-setup" className="text-sm font-semibold">
+								{readiness.zeroKeys ? "Connect a provider to start" : "Choose your models to start"}
+							</h2>
+							<p className="text-sm text-muted-foreground">
+								LearnHarness runs on your own key: you pay the provider directly, and the key stays on this Mac.
+							</p>
+						</div>
+						<button
+							type="button"
+							data-testid="setup-cta"
+							onClick={() => setSetupOpen(true)}
+							className="h-9 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+						>
+							{readiness.zeroKeys ? "Add a provider key" : "Set up models"}
+						</button>
+					</section>
+				)}
+
+				{firstRun ? (
+					<section aria-labelledby="home-how" className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5">
+						<h2 id="home-how" className="text-sm font-semibold">How a lesson goes</h2>
+						<ol className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
+							{[
+								["Check-in", "A few questions find where your understanding ends."],
+								["Your path", "A plan from there to your goal, which adapts as you go."],
+								["Lesson", "Predict, read, then explain your thinking, one step at a time."],
+								["Practice", "Later, problems that make you recall it without a hint."],
+							].map(([title, body]) => (
+								<li key={title} className="flex flex-col gap-1 bg-popover p-4">
+									<span className="text-sm font-semibold">{title}</span>
+									<span className="text-sm text-muted-foreground">{body}</span>
+								</li>
+							))}
+						</ol>
+						<p className="text-sm text-muted-foreground">
+							What you learn is saved as ideas and the reasoning that links them, so the next lesson starts from what you already know.
+						</p>
+					</section>
 				) : (
-					<MinimalHome
-						chainSelectOpen={chainSelectOpen}
-						practiceSelection={pickedIds}
-						onPracticeSelectionChange={setPracticeProps}
-						onChainSelectClose={() => setChainSelectOpen(false)}
-					/>
+					<div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
+						<section aria-labelledby="home-continue" className="overflow-hidden rounded-2xl border border-border bg-card lg:col-span-7">
+							{hero ? (
+								<>
+									<Link href={`/chat/${hero.id}`} className="group block px-5 pb-4 pt-4 transition-colors hover:bg-popover" data-testid="home-continue">
+										<span className="flex items-center gap-2 text-xs">
+											<span className={cn("size-2 rounded-full", heroWaiting ? "bg-warn" : "bg-faint")} aria-hidden />
+											<b id="home-continue" className={cn("font-semibold", heroWaiting ? "text-warn" : "text-muted-foreground")}>
+												{heroWaiting ? "Continue · waiting on your answer" : "Pick up where you left off"}
+											</b>
+											<span className="ml-auto text-muted-foreground">{now ? timeAgo(hero.updatedAt, now) : ""}</span>
+										</span>
+										<span className="mt-2 block font-prose text-xl leading-snug">{hero.title}</span>
+										<span className="mt-3 flex items-center gap-3">
+											<span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+												{(hero.kind ?? "teach") === "practice" && <DumbbellIcon className="size-3.5" aria-hidden />}
+												{(hero.kind ?? "teach") === "practice" ? "Practice" : "Lesson"}
+											</span>
+											<span className="ml-auto flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors group-hover:bg-primary/90">
+												Continue <ArrowRightIcon className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+											</span>
+										</span>
+									</Link>
+									{waiting.length > 0 && (
+										<ul className="border-t border-border px-3 py-1.5">
+											{waiting.map((c) => (
+												<li key={c.id}>
+													<button
+														type="button"
+														onClick={() => router.push(`/chat/${c.id}`)}
+														className="flex h-9 w-full items-center gap-2.5 rounded-md px-2 text-left text-sm transition-colors hover:bg-accent"
+													>
+														<span className="size-2 shrink-0 rounded-full bg-warn" aria-hidden />
+														<span className="min-w-0 flex-1 truncate font-semibold">{c.title}</span>
+														<span className="shrink-0 text-xs text-muted-foreground">{now ? timeAgo(c.updatedAt, now) : ""}</span>
+													</button>
+												</li>
+											))}
+										</ul>
+									)}
+								</>
+							) : (
+								<p className="p-5 text-sm text-muted-foreground">Loading…</p>
+							)}
+						</section>
+
+						<section aria-labelledby="home-new" className="flex flex-col rounded-2xl border border-border bg-card px-5 py-4 lg:col-span-5">
+							<div className="mb-1 flex items-baseline justify-between">
+								<h2 id="home-new" className="text-xs font-semibold text-muted-foreground">Just added to your knowledge</h2>
+								<Link href="/knowledge" className="text-xs font-semibold text-brand hover:underline">
+									Graph →
+								</Link>
+							</div>
+							{recentIdeas.length === 0 ? (
+								<p className="py-2 text-sm text-muted-foreground">Ideas appear here as your lessons are saved to the graph.</p>
+							) : (
+								<ul className="flex flex-col">
+									{recentIdeas.map((idea, i) => (
+										<li key={idea.id} className={cn(i > 0 && "border-t border-border")}>
+											<Link href={`/knowledge?idea=${encodeURIComponent(idea.id)}`} className="flex flex-col gap-0.5 py-2.5 transition-colors hover:text-brand">
+												<span className="font-prose text-[15px] leading-snug">{idea.name}</span>
+												<span className="text-xs text-muted-foreground">
+													{[idea.source, now ? timeAgo(idea.createdAt, now) : null].filter(Boolean).join(" · ")}
+												</span>
+											</Link>
+										</li>
+									))}
+								</ul>
+							)}
+						</section>
+					</div>
+				)}
+
+				{counts && counts.total > 0 && (
+					<Link href="/knowledge" className="ml-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground hover:text-foreground">
+						<span>
+							<b className="font-semibold text-foreground tabular-nums">{counts.total}</b> ideas in your graph
+						</span>
+						{counts.thisWeek > 0 && (
+							<span>
+								<b className="font-semibold text-foreground tabular-nums">+{counts.thisWeek}</b> this week
+							</span>
+						)}
+						{chats && (
+							<span>
+								<b className="font-semibold text-foreground tabular-nums">{chats.length}</b> sessions
+							</span>
+						)}
+					</Link>
 				)}
 			</main>
 
-
-			{/* New session — same floating blob as the chat composer, docked
-			    OVER the graph (no gradient: the graph runs clean under it to the
-			    bottom edge). Matches chat.tsx's DOCK geometry (max-w-[46rem]
-			    px-4) so nothing shifts when a session starts (owner). */}
-			<div className="pointer-events-none absolute inset-x-0 bottom-0 pb-5">
-				<div className="pointer-events-auto mx-auto w-full max-w-[46rem] px-4">
-					{/* The pick bar (owner vision, 2026-10-04): the chain
-					    table's selection is PERSISTENT — picked
-					    propositions show here as a count + Clear in EITHER
-					    mode (it survives mode switches; only a practice
-					    send consumes it). Practice mode with nothing picked
-					    shows the pick HINT so the affordance is discoverable;
-					    teaching mode with nothing picked renders nothing. */}
-					<ComposerActions
-						picker={(practiceProps.length > 0 || mode === "practice") && (
-							<NodePickerControl
-								count={practiceProps.length}
-								onOpen={() => setChainSelectOpen(true)}
-								onClear={() => setPracticeProps([])}
-							/>
-						)}
-						setup={zeroKeys ? (
-							<ZeroKeysPill inline onOpen={() => setSetupOpen(true)} />
-						) : (
-							!configured && (
-								<button
-									type="button"
-									data-testid="setup-cta"
-									onClick={() => setSetupOpen(true)}
-									className="rounded-sm border border-border bg-card px-3 py-1.5 font-ui text-xs text-foreground transition-colors hover:border-muted-foreground/50 hover:bg-accent cursor-pointer"
-								>
-									Set up your models
-								</button>
-							)
-						)}
-					/>
-					<form
-						className="flex items-end gap-1.5 rounded-2xl border bg-card p-1.5 shadow-lg"
-					onSubmit={(e) => {
-						e.preventDefault();
-						void start();
-					}}
-				>
-					<textarea
-						ref={topicInputRef}
-						value={topic}
-						onChange={(e) => {
-							topicRef.current = e.target.value;
-							setTopic(e.target.value);
-						}}
-						onKeyDown={(e) => {
-							// Esc ends dictation (the dictate decisions: click-again or
-							// Esc) — stopPropagation claims it (keyboard wave A) so
-							// the window chain doesn't also abort a turn.
-							if (e.key === "Escape" && dictation.active) {
-								e.preventDefault();
-								e.stopPropagation();
-								dictation.cancel();
-								return;
-							}
-							if (e.key === "Enter" && !e.shiftKey) {
-								e.preventDefault();
-								void start();
-							}
-						}}
-						placeholder={mode === "practice" ? "What do you want to practice?" : "What do you want to learn?"}
-						autoFocus
-						rows={1}
-						className="field-sizing-content lh-input max-h-48 min-h-10 flex-1 resize-none bg-transparent px-2.5 py-2 outline-none placeholder:text-muted-foreground"
-					/>
-					{/* No tooltip on the start square — the ↵ glyph is the
-					    affordance (owner, subtlety round 2026-09-25). */}
-					<button
-						type="submit"
-						aria-label="Start session"
-						disabled={(!topic.trim() && !dictation.active) || busy}
-						className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-primary text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-40"
-					>
-						<CornerDownLeftIcon className="size-5" />
-					</button>
-					</form>
-					{/* Same as the chat view's under-composer stats bar (owner) — no
-					    session yet, so the LEFT side renders nothing (wave 7 sweep)
-					    while the RIGHT keeps the strong-slot control (fix wave: the
-					    pills write /api/settings/models). */}
-					<StatsBar
-						dictationSlot={<DictationBar dictation={dictation} />}
-						turns={[] as TurnUsage[]}
-						leadingSlot={
-							<div className="flex items-center gap-0.5 rounded-md border border-border/60 bg-background p-0.5" data-testid="home-mode-switch">
-								{(["teach", "practice"] as const).map((m) => (
-									<button
-										key={m}
-										type="button"
-										data-testid={`home-mode-${m}`}
-										onClick={() => setMode(m)}
-										className={
-											"flex items-center gap-1 rounded-sm px-2 py-0.5 text-[11px] transition-colors " +
-											(mode === m
-												? "bg-accent text-foreground"
-												: "text-muted-foreground hover:text-foreground")
-										}
-									>
-										{m === "practice" ? <DumbbellIcon aria-hidden="true" className="size-3" /> : null}
-										{m === "teach" ? "Teach" : "Practice"}
-									</button>
-								))}
-							</div>
-						}
-					/>
-				</div>
-			</div>
-
-			{/* First-run setup (unconfigured): the CTA's target and the send
-			    interception's landing surface — stage 1 is the self-contained
-			    first-key screen (zero-keys wave); Save never sends — the
-			    draft stays for the learner to send (owner 2026-10-09). */}
 			<SetupDialog
 				open={setupOpen}
 				onClose={() => setSetupOpen(false)}
 				onDone={() => {
-					setConfigured(true);
+					readiness.markConfigured();
 					setSetupOpen(false);
-					// Save only saves: the draft waits in the composer.
+					// Save only saves: the words wait in the omnibar.
+					setOmnibarKey((k) => k + 1);
 				}}
-				/>
+			/>
 		</div>
 	);
 }
