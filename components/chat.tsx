@@ -1478,7 +1478,7 @@ export function Chat({
 							{/* Lesson4's reading mode: only the current step is on the
 							    page — earlier steps fold into the "Steps 1–k" bar above,
 							    and Review unfolds them in place. */}
-							{fold && (
+							{fold && fold.startIndex > 0 && (
 								<div className="past rise" data-testid="past-steps">
 									<CheckIcon className="" />
 									<span>
