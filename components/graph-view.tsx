@@ -1557,9 +1557,12 @@ export function GraphView({
 	useEffect(() => {
 		rendererRef.current?.setHighlight(highlight?.ids ?? null, highlight?.selected ?? null);
 	}, [highlight, isEmpty]);
+	// A search outranks the topic focus: matches outside the focused topic
+	// would otherwise draw stepped back, as if they didn't match.
+	const searching = query.trim() !== "";
 	useEffect(() => {
-		rendererRef.current?.setFocus(focusIds ?? null);
-	}, [focusIds, isEmpty]);
+		rendererRef.current?.setFocus(searching ? null : (focusIds ?? null));
+	}, [focusIds, isEmpty, searching]);
 	useImperativeHandle(
 		apiRef,
 		() => ({
@@ -1591,6 +1594,27 @@ export function GraphView({
 		// The open detail card cannot outlive its node's visibility.
 		setSelected((sel) => (sel && visibleIds.has(sel.node.id) ? sel : null));
 	}, [visibleIds, query]);
+
+	// v4: the camera follows the search. Hiding the non-matches is not
+	// enough — zoomed into a topic, every match can sit off-screen and the
+	// canvas reads as empty. Once typing settles, frame the matches; when
+	// the search clears, return to the focused topic (or the whole graph).
+	const searchedRef = useRef(false);
+	useEffect(() => {
+		if (!v4) return;
+		const q = query.trim();
+		const t = window.setTimeout(() => {
+			const r = rendererRef.current;
+			if (!r) return;
+			if (q && visibleIds.size > 0) r.frameNodes([...visibleIds]);
+			else if (!q && searchedRef.current) {
+				if (focusIds && focusIds.size > 0) r.frameNodes([...focusIds]);
+				else r.fit();
+			}
+			searchedRef.current = q !== "";
+		}, 250);
+		return () => window.clearTimeout(t);
+	}, [v4, visibleIds, query, focusIds]);
 
 	// Feed #4 — region tuning. `isEmpty` in the deps (same as Feed #2):
 	// the settings fetch resolves BEFORE the snapshot creates the renderer,

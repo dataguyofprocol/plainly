@@ -319,6 +319,30 @@ export function KnowledgeView({ initialConfigured, focusIdeaId }: { initialConfi
 							</div>
 						)}
 
+						{!empty && matches === 0 && (
+							<div className="kempty knomatch" data-testid="graph-no-match">
+								<EmptyState
+									icon="search"
+									title={`No ideas match “${q.trim()}”`}
+									action={
+										<button
+											type="button"
+											className="ghost tall"
+											onClick={() => {
+												setQ("");
+												searchRef.current?.focus();
+											}}
+										>
+											<Icon name="close" size="sm" />
+											Clear search
+										</button>
+									}
+								>
+									Search looks through idea names and statements.
+								</EmptyState>
+							</div>
+						)}
+
 						{notesImport.errors.length > 0 && !errorsHidden && (
 							<div className="kerr pop settle" role="group" aria-label="Import problems">
 								<div className="kerr-h">
