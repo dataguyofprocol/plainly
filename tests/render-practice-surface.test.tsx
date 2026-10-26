@@ -17,7 +17,7 @@ import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it } from "node:test";
 
-import { PracticePanel } from "../components/lesson-panel.tsx";
+import { HintCard, PracticePanel } from "../components/lesson-panel.tsx";
 import { ConcludeCard, ProblemCard, ThinkingCard } from "../components/practice-cards.tsx";
 import { GraphContextCard } from "../components/graph-context-card.tsx";
 import { newGraphContextMessage } from "../src/core/native-messages.ts";
@@ -181,6 +181,30 @@ describe("the practice transcript cards", () => {
 		assert.match(legacy, /Your thinking/);
 		assert.doesNotMatch(legacy, /Your solution/);
 	});
+
+	it("ThinkingCard: working sent with a hint carries the hint as a chip (owner, 2026-10-27)", () => {
+		const html = renderToStaticMarkup(<ThinkingCard data={{ problemCallId: "c", text: "(b) fails?", hint: 1 }} />);
+		assert.ok(html.includes('class="pill practice">with a nudge<'));
+		assert.doesNotMatch(renderToStaticMarkup(<ThinkingCard data={{ problemCallId: "c", text: "(b) fails?" }} />), /pill practice/);
+	});
+
+	it("ProblemCard: the hint footer shows only once a hint is used, used rungs filled", () => {
+		assert.doesNotMatch(renderToStaticMarkup(<ProblemCard part={part({ input: { statement: "S." }, hints: [] })} />), /problem-hints/);
+		const html = renderToStaticMarkup(<ProblemCard part={part({ input: { statement: "S." }, hints: [1, 2] })} />);
+		assert.ok(html.includes('data-testid="problem-hints"'));
+		assert.equal(html.match(/pcard-hint used/g)?.length, 2);
+		assert.match(html, /class="pcard-hint"><i aria-hidden="true"><\/i>First step/);
+	});
+
+	it("HintCard: the newest is open with no toggle; an older one folds behind Show", () => {
+		const hint = { rung: 1 as const, label: "Nudge", text: "Look at the right-hand side." };
+		const latest = renderToStaticMarkup(<HintCard hint={hint} latest />);
+		assert.match(latest, /class="hcard open"/);
+		assert.doesNotMatch(latest, /hcard-more/);
+		const older = renderToStaticMarkup(<HintCard hint={hint} latest={false} />);
+		assert.match(older, /class="hcard"/);
+		assert.match(older, /aria-expanded="false"[^>]*>Show</);
+	});
 });
 
 // ── the view projection ──────────────────────────────────────────────────────
@@ -217,6 +241,12 @@ describe("the practice view projection", () => {
 		const view = projectView(messages);
 		const toolPart = view[0]!.parts.find((p) => p.type === `tool-${PRACTICE_PROBLEM_TOOL}`)!;
 		assert.equal(toolPart.state, "input-available");
+		assert.deepEqual(toolPart.hints, [], "no hints asked yet");
+		// The hint footer's join (owner, 2026-10-27): the rungs asked on
+		// this problem, in order; another problem's requests don't count.
+		const asked = projectView([...messages, newThinkingMessage("call_p1", "", 1), newThinkingMessage("call_other", "", 3), newThinkingMessage("call_p1", "x", 2)] as LhMessage[]);
+		const hinted = asked[0]!.parts.find((p) => p.type === `tool-${PRACTICE_PROBLEM_TOOL}`)!;
+		assert.deepEqual(hinted.hints, [1, 2]);
 	});
 });
 

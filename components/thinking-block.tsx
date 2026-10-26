@@ -49,6 +49,7 @@ function subscribeUserThinking(fn: (open: boolean) => void): () => void {
 
 export function ThinkingBlock({
 	label = "Your thinking",
+	tag,
 	text,
 	testId,
 	dataCommit,
@@ -56,6 +57,8 @@ export function ThinkingBlock({
 	inCard = false,
 }: {
 	label?: string;
+	/** A small chip after the label (practice: the hint this working rode). */
+	tag?: string;
 	text: string;
 	testId?: string;
 	/** The practice marker's register flag (commit vs nudge). */
@@ -90,6 +93,7 @@ export function ThinkingBlock({
 			>
 				<Icon name="edit" size="sm" />
 				{label}
+				{tag && <span className="pill practice">{tag}</span>}
 				<Icon name="chevron-right" size="xs" className="ls-chev" />
 			</button>
 			{open && <div className="ls-well mine">{text}</div>}

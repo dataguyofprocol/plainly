@@ -3,7 +3,7 @@
 import { MessageResponse } from "@/components/ai-elements/message";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
-import { repairMathForDisplay, type ArtifactPartProps } from "@/src/core";
+import { HINT_RUNGS, hintTag, isHintRung, repairMathForDisplay, type ArtifactPartProps } from "@/src/core";
 
 /**
  * The practice transcript cards (practice sessions, owner design
@@ -73,6 +73,23 @@ export function ProblemCard({ part }: ArtifactPartProps) {
 			<div className="pcard-read">
 				<MessageResponse>{repairMathForDisplay(statement)}</MessageResponse>
 			</div>
+			{part.hints && part.hints.length > 0 && <ProblemHints used={part.hints} />}
+		</div>
+	);
+}
+
+/** The problem card's hint footer (owner, 2026-10-27): the hints live in
+ *  the practice panel; the transcript keeps only which rungs were used. */
+function ProblemHints({ used }: { used: readonly number[] }) {
+	return (
+		<div className="pcard-hints" data-testid="problem-hints">
+			<span className="pcard-hints-l">Hints</span>
+			{HINT_RUNGS.map(({ rung, label }) => (
+				<span key={rung} className={cn("pcard-hint", used.includes(rung) && "used")}>
+					<i aria-hidden="true" />
+					{label}
+				</span>
+			))}
 		</div>
 	);
 }
@@ -303,5 +320,6 @@ export function ThinkingCard({ data }: { data: PracticeThinkingData }) {
 	// 50%-italic quote block on expand. Legacy records' commit flag is
 	// deliberately unread (one lane now). A TRANSCRIPT row (owner round,
 	// 2026-10-07): full-width band + rail, arriving expanded.
-	return <ThinkingBlock testId="thinking-card" label="Your thinking" text={data.text} defaultOpen />;
+	// Working sent with a hint request carries the rung as a chip.
+	return <ThinkingBlock testId="thinking-card" label="Your thinking" tag={isHintRung(data.hint) ? hintTag(data.hint) : undefined} text={data.text} defaultOpen />;
 }

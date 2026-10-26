@@ -183,13 +183,14 @@
    below them one quiet line asks for the next. */
 .v4 .hints { display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line); }
 .v4 .hcard { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 8px 12px 9px; border-radius: 0 10px 10px 0; background: var(--tint); box-shadow: inset 2px 0 0 var(--practice); animation: v4-settle 0.4s var(--ease-expo) both; }
+.v4 .hcard-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .v4 .hcard-l { font-size: 12px; line-height: 16px; font-weight: 700; color: var(--practice); }
-.v4 .hcard-t { font-size: 13.5px; line-height: 20px; color: var(--muted-foreground); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-.v4 .hcard.more .hcard-t { display: block; -webkit-line-clamp: unset; }
+.v4 .hcard-t { font-size: 13.5px; line-height: 20px; color: var(--muted-foreground); }
+.v4 .hcard:not(.open) .hcard-t { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; max-height: 20px; }
 .v4 .hcard-t .lh-prose { font-size: 13.5px; line-height: 20px; }
 .v4 .hcard-t :where(p, ul, ol) { margin: 0 0 6px; }
 .v4 .hcard-t :where(p, ul, ol):last-child { margin-bottom: 0; }
-.v4 .hcard-more { align-self: flex-start; margin-top: 2px; padding: 0; border: 0; background: transparent; font-size: 12px; font-weight: 600; color: var(--practice); }
+.v4 .hcard-more { flex: none; padding: 0; border: 0; background: transparent; font-size: 12px; font-weight: 600; color: var(--practice); }
 .v4 .hcard-more:hover { color: var(--practice-hover); }
 .v4 .hcard-wait { display: flex; flex-direction: column; gap: 6px; padding: 4px 0 2px; }
 .v4 .hcard-wait i { height: 10px; width: 90%; }
@@ -235,6 +236,12 @@
 .v4 .pcard-o { font-size: 12px; line-height: 16px; font-weight: 600; color: var(--faint); letter-spacing: 0.01em; }
 .v4 .pcard-read, .v4 .pcard-read .lh-prose { font-family: var(--font-literata), Georgia, serif; font-size: 17px; line-height: 28px; }
 .v4 .pcard-verdict, .v4 .pcard-verdict .lh-prose { font-family: inherit; font-size: 14px; line-height: 21px; color: var(--muted-foreground); }
+.v4 .pcard-hints { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; line-height: 16px; }
+.v4 .pcard-hints-l { font-weight: 600; color: var(--faint); margin-right: 2px; }
+.v4 .pcard-hint { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: var(--faint); }
+.v4 .pcard-hint > i { width: 7px; height: 7px; border-radius: 999px; box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+.v4 .pcard-hint.used { color: var(--foreground); }
+.v4 .pcard-hint.used > i { background: var(--practice); box-shadow: none; }
 .v4 .pcard-sec { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--line); }
 .v4 .pcard [data-streamdown="code-block"] { padding: 0; border: 0; border-radius: 10px; background: var(--tint); }
 .v4 .pcard [data-streamdown="code-block-body"] { padding: 12px 14px; border: 0; background: transparent; }

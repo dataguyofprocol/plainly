@@ -236,11 +236,10 @@ export function hintRequestText(rung: HintRung): string {
 	return `[Hint request — rung ${rung} of 3: ${HINT_REQUEST_ASK[rung]}]`;
 }
 
-/** The learner-facing transcript line for a hint request (owner,
- *  2026-10-27): hints live in the practice panel; the transcript keeps
- *  only this — "Asked for a bigger hint". */
-export function hintRequestLine(rung: HintRung): string {
-	return `Asked for ${HINT_REQUEST_ASK[rung]}`;
+/** The learner-facing chip on working sent with a hint request (owner,
+ *  2026-10-27): "with a bigger hint". */
+export function hintTag(rung: HintRung): string {
+	return `with ${HINT_REQUEST_ASK[rung]}`;
 }
 
 /** Narrow an unknown value to a hint rung (the input parser's gate). */
@@ -388,5 +387,8 @@ export interface ArtifactPartProps {
 		 *  the modelSolution committed at POSE time, folded onto the part by
 		 *  projectView — the reveal is never re-authored. */
 		reveal?: unknown;
+		/** The view-seam join for problem cards (owner, 2026-10-27): the
+		 *  hint rungs the learner asked for on this problem, in order. */
+		hints?: HintRung[];
 	};
 }

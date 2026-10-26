@@ -660,13 +660,21 @@ export function hintReplyIndices(messages: readonly PopupMessage[]): Set<number>
 
 const HINT_ASK: Record<HintRung, string> = { 1: "Show a nudge", 2: "Show a bigger hint", 3: "Show the first step" };
 
-/** One opened hint: a quiet card, clamped until "Show more". */
-function HintCard({ hint }: { hint: OpenedHint }) {
-	const [more, setMore] = useState(false);
-	const long = (hint.text?.length ?? 0) > 220;
+/** One opened hint: a quiet card. The newest is open; an older one folds
+ *  to its first line until "Show" (owner, 2026-10-27). Exported for tests. */
+export function HintCard({ hint, latest }: { hint: OpenedHint; latest: boolean }) {
+	const [expanded, setExpanded] = useState(false);
+	const open = latest || expanded;
 	return (
-		<div className={cn("hcard", more && "more")} data-testid="practice-hint-card">
-			<span className="hcard-l">{hint.label}</span>
+		<div className={cn("hcard", open && "open")} data-testid="practice-hint-card">
+			<span className="hcard-h">
+				<span className="hcard-l">{hint.label}</span>
+				{!latest && (
+					<button type="button" className="hcard-more" aria-expanded={open} onClick={() => setExpanded((v) => !v)}>
+						{open ? "Hide" : "Show"}
+					</button>
+				)}
+			</span>
 			{hint.text === null ? (
 				<span className="hcard-wait" aria-label="The hint is on its way">
 					<i className="skel" />
@@ -676,11 +684,6 @@ function HintCard({ hint }: { hint: OpenedHint }) {
 				<div className="hcard-t">
 					<MessageResponse>{hint.text}</MessageResponse>
 				</div>
-			)}
-			{long && (
-				<button type="button" className="hcard-more" onClick={() => setMore((v) => !v)}>
-					{more ? "Show less" : "Show more"}
-				</button>
 			)}
 		</div>
 	);
@@ -805,8 +808,8 @@ export function PracticePanel({
 								<ConfidenceLadder value={conf} onChange={setConf} labelledBy="sure" />
 							</div>
 							<div className="hints">
-								{hints.map((h) => (
-									<HintCard key={h.rung} hint={h} />
+								{hints.map((h, i) => (
+									<HintCard key={h.rung} hint={h} latest={i === hints.length - 1} />
 								))}
 								<div className="hints-row">
 									{outOfHints ? (

@@ -314,6 +314,12 @@ describe("persistent practice nudges", () => {
 		assert.match(prompt, /never "commit", "send", or a name the panel doesn't show/);
 	});
 
+	it("caps hint length (owner, 2026-10-27)", () => {
+		const prompt = normalizeWhitespace(composeInstructions("practice"));
+		assert.match(prompt, /A hint answers one question — the first one the learner cannot answer — never every part of the problem at once/);
+		assert.match(prompt, /A nudge or a bigger hint is one or two sentences\. The first step is at most three short sentences and one equation, for that one move only/);
+	});
+
 	it("aligns the conclude description with the canonical ack without changing outcomes or the runtime pause mechanism", async () => {
 		const tool = concludeTool(createPracticeGate(ctxOf(activeProblemRecord())));
 		const description = normalizeWhitespace(tool.description);

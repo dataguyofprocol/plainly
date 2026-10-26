@@ -34,7 +34,7 @@
 
 import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
 import type { LhMarkerMessage, LhMessage } from "./native-messages.ts";
-import { modelSolutionForConclude, PRACTICE_CONCLUDE_TOOL, problemInputForConclude } from "./native-messages.ts";
+import { modelSolutionForConclude, PRACTICE_CONCLUDE_TOOL, PRACTICE_PROBLEM_TOOL, practiceHintsUsed, problemInputForConclude } from "./native-messages.ts";
 import { activeCompactionOf, type CompactionDetails } from "./compaction.ts";
 import { QUESTION_TOOLS } from "./pending.ts";
 import type { SubagentArtifactData, SubagentResultMeta } from "./contracts/jobs.ts";
@@ -225,6 +225,9 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 						part.reveal = modelSolutionForConclude(messages, block.id);
 						part.problemInput = problemInputForConclude(messages, block.id);
 					}
+					// The problem card's hint footer (owner, 2026-10-27): the rungs
+					// the learner asked for on this problem, joined here too.
+					if (block.name === PRACTICE_PROBLEM_TOOL) part.hints = practiceHintsUsed(messages, block.id);
 					rest.push(part);
 				}
 			}

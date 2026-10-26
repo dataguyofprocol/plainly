@@ -73,7 +73,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { displayTitle } from "@/components/ui/format";
 import { Field, Rail } from "@/components/v4/shell";
 import { currentUserThinkingOpen, setAllUserThinkingOpen } from "@/components/thinking-block";
-import { PRACTICE_SET_SIZE, hintRequestLine, isHintRung, practiceHintsUsed, slotsConfigured, type HintRung, type ModelsSettings } from "@/src/core";
+import { PRACTICE_SET_SIZE, isHintRung, practiceHintsUsed, slotsConfigured, type HintRung, type ModelsSettings } from "@/src/core";
 import { useSettingsSaved } from "@/components/settings-signal";
 
 /**
@@ -1159,20 +1159,12 @@ export function Chat({
 											case "data-compaction-cut":
 												return <CompactionCutDivider key={pi} data={part.data as CompactionDividerData} />;
 											case "data-practice-thinking": {
-												// A hint request (owner, 2026-10-27): the working row only
-												// when there is working, then one quiet line — the hint
-												// itself is in the practice panel.
+												// A hint request (owner, 2026-10-27): the problem card's
+												// footer records it, so a bare request draws nothing; working
+												// sent with it keeps its row (tagged with the hint).
 												const data = part.data as PracticeThinkingData;
-												if (!isHintRung(data.hint)) return <ThinkingCard key={pi} data={data} />;
-												return (
-													<Fragment key={pi}>
-														{data.text.trim() && <ThinkingCard data={data} />}
-														<SystemLine testId="practice-hint-line">
-															<Icon name="hint" size="xs" />
-															{hintRequestLine(data.hint)}
-														</SystemLine>
-													</Fragment>
-												);
+												if (isHintRung(data.hint) && !data.text.trim()) return null;
+												return <ThinkingCard key={pi} data={data} />;
 											}
 											case "data-practice-next":
 												// The learner's move-on signal (owner round 16): a compact
