@@ -1,8 +1,29 @@
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Repository root (this file is at <root>/config.ts). */
 export const ROOT = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * THE TEST SANDBOX (2026-10-27): a test process may never resolve the
+ * learner's real data. Under NODE_ENV=test with no LH_DATA_DIR, the data
+ * root is a fresh temp dir for this process, published back to the env so
+ * child processes share it, and removed on exit. Tests that isolate
+ * themselves (setting LH_DATA_DIR before importing app modules) are
+ * unaffected. Before this, any test that forgot to isolate wrote its
+ * fixture sessions and jobs into the repo's data/.
+ */
+function testSandbox(): string | null {
+	if (process.env.NODE_ENV !== "test" || process.env.LH_DATA_DIR) return null;
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lh-test-data-"));
+	process.env.LH_DATA_DIR = dir;
+	process.env.LH_AUTH_FILE ??= path.join(dir, "auth.json");
+	process.once("exit", () => fs.rmSync(dir, { recursive: true, force: true }));
+	return dir;
+}
+const TEST_SANDBOX = testSandbox();
 
 /**
  * THE data-location seam (the Electron contract, 2026-09-17): LH_DATA_DIR
@@ -11,12 +32,11 @@ export const ROOT = path.dirname(fileURLToPath(import.meta.url));
  * userData so nothing is written inside the read-only .app bundle
  * (macOS translocation guarantees the bundle is read-only anyway).
  * Unset (plain web dev / repo work) it resolves to the repo's data/,
- * byte-for-byte as before. Read-only assets (prompts) stay ROOT-anchored
- * on purpose: they ship inside the app bundle by design.
+ * byte-for-byte as before — except in tests (the sandbox above). Read-only
+ * assets (prompts) stay ROOT-anchored on purpose: they ship inside the
+ * app bundle by design.
  */
-const DATA_ROOT = process.env.LH_DATA_DIR
-	? path.resolve(process.env.LH_DATA_DIR)
-	: path.join(ROOT, "data");
+const DATA_ROOT = TEST_SANDBOX ?? (process.env.LH_DATA_DIR ? path.resolve(process.env.LH_DATA_DIR) : path.join(ROOT, "data"));
 
 export const PATHS = {
 	root: ROOT,

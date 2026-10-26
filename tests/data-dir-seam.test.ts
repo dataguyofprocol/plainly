@@ -38,10 +38,17 @@ describe("LH_DATA_DIR seam", () => {
 	});
 
 	it("unset = the repo data/ exactly as before (fresh child process, no env)", () => {
+		// The child runs as the APP does — no NODE_ENV=test and no data env —
+		// because under tests the sandbox owns the unset case
+		// (tests/test-sandbox.test.ts).
+		const env: Record<string, string | undefined> = { ...process.env };
+		delete env.NODE_ENV;
+		delete env.LH_DATA_DIR;
+		delete env.LH_AUTH_FILE;
 		const out = execFileSync(
 			process.execPath,
 			["--import", TSX_LOADER, "--eval", `const m = await import(${JSON.stringify(path.join(REPO_ROOT, "config.ts"))}); console.log(JSON.stringify({ data: m.PATHS.data, chats: m.PATHS.chats }));`],
-			{ cwd: REPO_ROOT, encoding: "utf-8" },
+			{ cwd: REPO_ROOT, encoding: "utf-8", env: env as NodeJS.ProcessEnv },
 		);
 		const parsed = JSON.parse(out) as { data: string; chats: string | null };
 		assert.equal(parsed.data, path.join(REPO_ROOT, "data"));

@@ -3,17 +3,19 @@ import assert from "node:assert/strict";
 import { type Model } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import type { AgentEvent, AgentMessage } from "@earendil-works/pi-agent-core";
-import { piModels, piEngineForSpec, APP_IDENTITY } from "../src/agent/models.ts";
-import { refreshChatGPTModels, chatGPTScopeCurrent } from "../src/agent/chatgpt-bridge.ts";
-import { ChatGPTRequestCycle } from "../src/agent/chatgpt-request-cycle.ts";
-import { createTeacherAgent } from "../src/agent/teacher-agent.ts";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+// The data seam is set BEFORE any app module loads (config.ts resolves the
+// data dir at import time), so every app import below is dynamic.
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "lh-chatgpt-native-"));
 process.env.LH_DATA_DIR = path.join(scratch, "data");
 process.env.LH_AUTH_FILE = path.join(scratch, "auth.json");
 fs.writeFileSync(process.env.LH_AUTH_FILE, "{}");
+const { piModels, piEngineForSpec, APP_IDENTITY } = await import("../src/agent/models.ts");
+const { refreshChatGPTModels, chatGPTScopeCurrent } = await import("../src/agent/chatgpt-bridge.ts");
+const { ChatGPTRequestCycle } = await import("../src/agent/chatgpt-request-cycle.ts");
+const { createTeacherAgent } = await import("../src/agent/teacher-agent.ts");
 const { runPiTurn } = await import("../src/server/pi/ui-stream.ts");
 import { newUserMessage, newNextMessage, newThinkingMessage, newAnswerResult, reconstructRequestCause, concludedByDismissalPair, type LhMessage } from "../src/core/native-messages.ts";
 

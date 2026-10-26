@@ -5,12 +5,14 @@ import os from "node:os";
 import path from "node:path";
 import { Agent, type AgentMessage } from "@earendil-works/pi-agent-core";
 import { AssistantMessageEventStream } from "@earendil-works/pi-ai/utils/event-stream";
-import { piModels } from "../src/agent/models.ts";
-import { toLlmMessages } from "../src/core/native-messages.ts";
-import { buildSubagentSteer } from "../src/core/contracts.ts";
-import { NATIVE_SUBSCRIPTIONS } from "../src/core/contracts/subscriptions.ts";
+// The data seam is set BEFORE any app module loads (config.ts resolves the
+// data dir at import time), so every app import below is dynamic.
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), "lh-subscription-background-"));
 process.env.LH_DATA_DIR = path.join(directory, "data"); process.env.LH_AUTH_FILE = path.join(directory, "auth.json"); fs.writeFileSync(process.env.LH_AUTH_FILE, "{}");
+const { piModels } = await import("../src/agent/models.ts");
+const { toLlmMessages } = await import("../src/core/native-messages.ts");
+const { buildSubagentSteer } = await import("../src/core/contracts.ts");
+const { NATIVE_SUBSCRIPTIONS } = await import("../src/core/contracts/subscriptions.ts");
 const { stores } = await import("../src/server/stores.ts");
 const { beginTurn, endTurn } = await import("../src/server/turn-liveness.ts");
 const { deliverJobResult, registerLiveAgent, unregisterLiveAgent, setTurnRunner, settleSteers, steerLiveChat, automaticFollowUpAllowed } = await import("../src/server/jobs.ts");
