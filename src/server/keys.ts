@@ -51,6 +51,7 @@ import {
 	maskKey,
 	validateKeyShape,
 } from "../core/auth-keys.ts";
+import { isCustomProviderEnvVar, parseCustomProviderKey } from "../core/custom-providers.ts";
 import { authStore } from "../store/auth.ts";
 import { isSubscriptionProvider, subscriptionConnected } from "../agent/subscription-connections.ts";
 
@@ -152,7 +153,9 @@ export function resolveKeyStatuses(
 	 *  discovery surface). Curated keys always get rows, present or not. */
 	providerEnvVars: ReadonlySet<string> = new Set(),
 ): AuthKeyStatus[] {
-	const ids = new Set<string>([...AUTH_KEYS.map((k) => k.id), ...Object.keys(fileVars)]);
+	// Custom providers' LH_CUSTOM_* keys are NOT generic rows (custom-endpoint
+	// wave, 2026-10-26): /api/providers/custom owns them end to end.
+	const ids = new Set<string>([...AUTH_KEYS.map((k) => k.id), ...Object.keys(fileVars).filter((id) => !isCustomProviderEnvVar(id))]);
 	for (const envVar of providerEnvVars) {
 		if (env[envVar] !== undefined || fileVars[envVar] !== undefined) ids.add(envVar);
 	}
@@ -215,15 +218,35 @@ export function providerKeyPresent(provider: string): boolean {
 export function saveKey(id: string, value: string): { ok: true; status: AuthKeyStatus } | { ok: false; error: string } {
 	const shape = isProviderEnvVar(id) ? genericProviderKeyGuard(id, value) : validateKeyShape(id, value);
 	if (!shape.ok) return { ok: false, error: shape.error };
-	const trimmed = value.trim();
+	writeKey(id, value.trim());
+	// validateKeyShape guarantees catalog membership, so the row exists.
+	return { ok: true, status: keyStatuses().find((s) => s.id === id)! };
+}
+
+/** The file write + env reflection every save shares (env wins: a var the
+ *  REAL env owns is persisted but not reflected). */
+function writeKey(id: string, trimmed: string): void {
 	authStore.setAuthVar(id, trimmed);
 	const record = boot();
 	if (!record.realEnv.has(id)) {
 		process.env[id] = trimmed;
 		record.fillGap.add(id);
 	}
-	// validateKeyShape guarantees catalog membership, so the row exists.
-	return { ok: true, status: keyStatuses().find((s) => s.id === id)! };
+}
+
+/**
+ * Save a CUSTOM provider's key (custom-endpoint wave, 2026-10-26) — the
+ * only write path for LH_CUSTOM_* vars: the generic PUT /api/keys refuses
+ * them (isWritableAuthKey), so the custom routes own their lifecycle. Same
+ * store, same env reflection; the shape gate is paste hygiene only (core/
+ * custom-providers.ts: self-hosted tokens have no length floor).
+ */
+export function saveCustomProviderKey(envVar: string, value: string): { ok: true } | { ok: false; error: string } {
+	if (!isCustomProviderEnvVar(envVar)) return { ok: false, error: `"${envVar}" is not a custom provider key` };
+	const key = parseCustomProviderKey(value);
+	if (!key.ok) return key;
+	writeKey(envVar, key.value);
+	return { ok: true };
 }
 
 /**
@@ -232,13 +255,23 @@ export function saveKey(id: string, value: string): { ok: true; status: AuthKeyS
  * wins) and the status shows the key still present from env.
  */
 export function deleteKey(id: string): AuthKeyStatus {
+	removeKey(id);
+	return keyStatuses().find((s) => s.id === id)!;
+}
+
+/** Gone from the file; gone from the env only when the env copy was ours. */
+function removeKey(id: string): void {
 	authStore.deleteAuthVar(id);
 	const record = boot();
 	if (record.fillGap.has(id) && !record.realEnv.has(id)) {
 		delete process.env[id];
 		record.fillGap.delete(id);
 	}
-	return keyStatuses().find((s) => s.id === id)!;
+}
+
+/** Remove a custom provider's key (its PUT apiKey:null and its DELETE). */
+export function deleteCustomProviderKey(envVar: string): void {
+	if (isCustomProviderEnvVar(envVar)) removeKey(envVar);
 }
 
 // Reflect the file into the env at first import (idempotent; the module is
