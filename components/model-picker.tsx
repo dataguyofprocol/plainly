@@ -339,7 +339,7 @@ export function ModelControl({
 						aria-expanded={open === "model"}
 						onClick={() => openMenu("model")}
 					>
-						<span className="dot" style={{ background: "var(--accent)", width: 6, height: 6 }} />
+						<span className="dot" style={{ background: "var(--v-accent)", width: 6, height: 6 }} />
 						<span>{effectiveId ? prettyModel(effectiveId) : "Choose a model"}</span>
 						{levelLabel && <span style={{ color: "var(--faint)" }}>· {levelLabel}</span>}
 						<span aria-hidden style={{ fontSize: 10 }}>▾</span>

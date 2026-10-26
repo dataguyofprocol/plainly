@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ConfidenceRail } from "@/components/confidence-rail";
+import { CONFIDENCE_LEVEL_COLORS, nearestLevel } from "@/components/confidence-colors";
 import { GlyphMark } from "@/components/ui/glyph-mark";
 import { ThinkingBlock } from "@/components/thinking-block";
 import { cn } from "@/lib/utils";
@@ -58,7 +58,10 @@ export function AnsweredCard({ answer, input }: { answer: QuestionAnswerData; in
 		    p-4 into a 28px void below (12px above); the card's own padding is
 		    the bottom rhythm when a row ends the card. */}
 		<div
-			className="rounded-xl border bg-card p-4 text-card-foreground [&>*:last-child]:mb-0"
+			// Compact record (v4): the card reads at 14px — a past answer is
+			// context, not the lesson — with options in the UI sans.
+			className="rounded-xl border bg-card px-4 py-3 text-card-foreground [&>*:last-child]:mb-0"
+			style={{ "--lh-prose-size": "14px" } as React.CSSProperties}
 			data-testid="answered-card"
 		>
 			<div className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -85,19 +88,19 @@ export function AnsweredCard({ answer, input }: { answer: QuestionAnswerData; in
 						<span className="rounded bg-danger/15 px-1.5 py-0.5 text-danger">incorrect</span>
 					))}
 			</div>
-			<div className="mb-3 font-medium">
+			<div className="mb-2 font-medium">
 				<MessageResponse>{answer.questionText}</MessageResponse>
 			</div>
 			{parsedDetails && (
 				// The details line, same paint as the pending dock (owner,
 				// 2026-10-12): full markdown, LaTeX included.
-				<div className="mb-3 text-sm text-muted-foreground">
+				<div className="mb-2 text-sm text-muted-foreground">
 					<MessageResponse>{parsedDetails}</MessageResponse>
 				</div>
 			)}
 
 			{((answer.options?.length ?? 0) > 0 || answer.other) && (
-				<div className="flex flex-col gap-1.5 text-sm">
+				<div className="flex flex-col gap-1 font-ui text-[13px] leading-snug [&_.lh-prose]:font-ui [&_.lh-prose]:text-[13px]">
 					{answer.options?.map((opt) => {
 						const sel = selectedIdx.has(opt.index);
 						const key = isQuiz && correctIdx.has(opt.index);
@@ -105,11 +108,12 @@ export function AnsweredCard({ answer, input }: { answer: QuestionAnswerData; in
 							<div
 								key={opt.index}
 								className={cn(
-									"flex items-center gap-2 rounded-lg border px-3 py-1.5",
-									sel && key && "border-good/60 bg-good/10",
-									sel && !key && isQuiz && "border-danger/60 bg-danger/10",
-									sel && !isQuiz && "border-primary bg-accent",
+									"flex items-start gap-2 rounded-lg border px-2.5 py-1",
+									sel && key && "border-good/50 bg-good/10",
+									sel && !key && isQuiz && "border-danger/50 bg-danger/10",
+									sel && !isQuiz && "border-brand/50 bg-brand-soft",
 									!sel && key && "border-good/40",
+									!sel && !key && "border-transparent",
 								)}
 							>
 								{isQuiz && (
@@ -132,11 +136,11 @@ export function AnsweredCard({ answer, input }: { answer: QuestionAnswerData; in
 								)}
 								<span className={cn(!sel && "text-muted-foreground")}>
 									<MessageResponse>{opt.label}</MessageResponse>
-									{descByIndex.get(opt.index) && (
+									{sel && descByIndex.get(opt.index) && (
 										// Ask-option subtext (owner, 2026-10-12): same markdown path
 										// as the pending dock — LaTeX included. Quiz options carry
 										// none (owner ruling 2026-09-26); the map stays empty for them.
-										<MessageResponse className="lh-prose block text-xs text-muted-foreground">
+										<MessageResponse className="lh-prose block text-xs text-muted-foreground [&_p]:my-0">
 											{descByIndex.get(opt.index)}
 										</MessageResponse>
 									)}
@@ -150,7 +154,7 @@ export function AnsweredCard({ answer, input }: { answer: QuestionAnswerData; in
 					{answer.other && (
 						<div
 							data-testid="answered-other"
-							className="flex items-center gap-2 rounded-lg border border-primary bg-accent px-3 py-1.5"
+							className="flex items-center gap-2 rounded-lg border border-brand/50 bg-brand-soft px-2.5 py-1"
 						>
 							<span>“{answer.other}”</span>
 						</div>
@@ -167,14 +171,21 @@ export function AnsweredCard({ answer, input }: { answer: QuestionAnswerData; in
 			    "I don't know" sent none (its slider was grayed out), explain and
 			    ask never had one, and records from before the feature carry no
 			    field — nothing to show, nothing rendered. */}
-			{isQuiz && answer.confidence != null && (
-				<div className="mt-3 flex items-center gap-3" data-testid="answered-confidence">
-					<ConfidenceRail value={answer.confidence} className="min-w-0 flex-1" />
-					<span className="w-9 shrink-0 text-right font-mono text-sm tabular-nums text-muted-foreground">
-						{answer.confidence}%
-					</span>
-				</div>
-			)}
+			{isQuiz && answer.confidence != null && (() => {
+				// The confidence record: the level word in its colour (the
+				// live switch's palette); old six-stop answers read as their
+				// nearest level, the number kept in the title.
+				const level = nearestLevel(answer.confidence);
+				const c = CONFIDENCE_LEVEL_COLORS[level.value]!;
+				return (
+					<div className="mt-2 flex items-center gap-2 text-xs" data-testid="answered-confidence" title={`${answer.confidence}%`}>
+						<span className="text-muted-foreground">How sure</span>
+						<span className="rounded-full px-2 py-0.5 font-semibold" style={{ background: c.soft, color: c.ink }}>
+							{level.label}
+						</span>
+					</div>
+				);
+			})()}
 			{answer.dontKnow && isQuiz && (
 				<div className="mt-2 text-sm text-muted-foreground">Answered “I don't know”.</div>
 			)}

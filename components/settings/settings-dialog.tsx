@@ -30,6 +30,7 @@ import {
 	useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { OPEN_CONNECT_EVENT } from "@/components/connect-provider";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import {
 	CURRENT_SETTINGS_VERSION,
@@ -91,6 +92,12 @@ export function SettingsDialogProvider({
 		setLandOn(section ? section as SectionId : "keys");
 		setLandOnRow(row ?? null);
 		setShow(true);
+	}, []);
+	// The connect screen replaces Settings rather than stacking on it.
+	useEffect(() => {
+		const onConnect = () => setShow(false);
+		window.addEventListener(OPEN_CONNECT_EVENT, onConnect);
+		return () => window.removeEventListener(OPEN_CONNECT_EVENT, onConnect);
 	}, []);
 	return (
 		<ChatGPTUIProvider><NativeSubscriptionUIProvider><DialogContext.Provider value={{ open }}>

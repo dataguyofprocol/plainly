@@ -19,6 +19,7 @@ import { ModelControl } from "@/components/model-picker";
 import { NotesImportErrors, useNotesImport } from "@/components/notes-import";
 import { SetupDialog } from "@/components/setup-dialog";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
+import { OPEN_CONNECT_EVENT } from "@/components/connect-provider";
 import { createSession, useStartReadiness, type StartPick } from "@/components/start-session";
 import {
 	ago,
@@ -117,7 +118,7 @@ export function Home({ initialConfigured, initialMode = "teach" }: { initialConf
 							<section className="glass card rise" style={{ display: "flex", alignItems: "center", gap: 16, animationDelay: "40ms" }} data-testid="home-setup">
 								<div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
 									<b>{readiness.zeroKeys ? "Connect a provider to start" : "Choose your models to start"}</b>
-									<span style={{ color: "var(--muted)", fontSize: 12.5 }}>
+									<span style={{ color: "var(--v-muted)", fontSize: 12.5 }}>
 										LearnHarness runs on your own key: you pay the provider directly, and the key stays on this Mac.
 									</span>
 								</div>
@@ -205,6 +206,7 @@ function HomeOmni({ now, initialMode, ready, onNeedSetup }: { now: Date | null; 
 		else if (a.kind === "open-session") router.push(`/chat/${a.id}`);
 		else if (a.kind === "open-idea") router.push(`/knowledge?idea=${encodeURIComponent(a.id)}`);
 		else if (a.kind === "route") router.push(a.href);
+		else if (a.kind === "connect") window.dispatchEvent(new Event(OPEN_CONNECT_EVENT));
 		else openSettings();
 	};
 	const submit = () => {
@@ -217,7 +219,7 @@ function HomeOmni({ now, initialMode, ready, onNeedSetup }: { now: Date | null; 
 	return (
 		<section className="rise" aria-labelledby="greet" style={{ display: "flex", flexDirection: "column", gap: 10, position: "relative", zIndex: 10 }}>
 			<h1 id="greet" className="serif" style={{ margin: "0 0 0 4px", fontSize: 22, lineHeight: "28px", fontWeight: 500 }} suppressHydrationWarning>
-				{now ? greeting(now) : " "} <span style={{ color: "var(--muted)" }}>What shall we learn?</span>
+				{now ? greeting(now) : " "} <span style={{ color: "var(--v-muted)" }}>What shall we learn?</span>
 			</h1>
 			<form
 				className="omni"
@@ -322,7 +324,7 @@ function HomeOmni({ now, initialMode, ready, onNeedSetup }: { now: Date | null; 
 										>
 											<span className="dot" style={{ background: rowDot(row) }} />
 											<span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.label}</span>
-											<span style={{ fontSize: 11.5, color: "var(--muted)" }}>{row.hint}</span>
+											<span style={{ fontSize: 11.5, color: "var(--v-muted)" }}>{row.hint}</span>
 										</button>
 									);
 								})}
@@ -359,7 +361,7 @@ function HomeOmni({ now, initialMode, ready, onNeedSetup }: { now: Date | null; 
 function rowDot(row: PaletteRow): string {
 	if (row.icon === "learn") return "var(--ink)";
 	if (row.icon === "idea") return "#2f8f7f";
-	if (row.icon === "graph" || row.icon === "settings") return "var(--accent)";
+	if (row.icon === "graph" || row.icon === "settings") return "var(--v-accent)";
 	if (row.hint === "waiting on you") return "var(--warn)";
 	return "var(--faint)";
 }
@@ -417,28 +419,28 @@ function ContinueCard({ chats, now }: { chats: V4Chat[] | null; now: Date | null
 			{!hero ? (
 				<div className="card" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
 					<h2 id="cont" className="h">Continue</h2>
-					<span style={{ color: "var(--muted)" }}>{chats === null ? "Loading…" : "Your lessons appear here. Start one above."}</span>
+					<span style={{ color: "var(--v-muted)" }}>{chats === null ? "Loading…" : "Your lessons appear here. Start one above."}</span>
 				</div>
 			) : (
 				<>
 					<Link className="hero" href={`/chat/${hero.id}`} style={{ padding: "14px 16px 12px" }} data-testid="home-continue">
 						<span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5 }}>
 							<span className="dot" style={{ background: heroWaiting ? "var(--warn)" : "var(--faint)" }} />
-							<b id="cont" style={{ color: heroWaiting ? "var(--warn)" : "var(--muted)", fontWeight: 700 }}>
+							<b id="cont" style={{ color: heroWaiting ? "var(--warn)" : "var(--v-muted)", fontWeight: 700 }}>
 								{heroWaiting ? `Continue · waiting on your ${isPractice(hero) ? "working" : "answer"}` : "Pick up where you left off"}
 							</b>
-							<span style={{ marginLeft: "auto", color: "var(--muted)" }}>{now ? ago(hero.updatedAt, now) : ""}</span>
+							<span style={{ marginLeft: "auto", color: "var(--v-muted)" }}>{now ? ago(hero.updatedAt, now) : ""}</span>
 						</span>
 						<span style={{ display: "block", marginTop: 6, fontWeight: 700 }}>
 							{hero.title}
 							{hero.plan && hero.plan.current !== null && (
-								<span style={{ fontWeight: 500, color: "var(--muted)" }}>
+								<span style={{ fontWeight: 500, color: "var(--v-muted)" }}>
 									{" "}
 									· step {hero.plan.current} of {hero.plan.total}
 								</span>
 							)}
 							{hero.practiceSet && (
-								<span style={{ fontWeight: 500, color: "var(--muted)" }}>
+								<span style={{ fontWeight: 500, color: "var(--v-muted)" }}>
 									{" "}
 									· problem {Math.min(hero.practiceSet.done + 1, hero.practiceSet.size)} of {hero.practiceSet.size}
 								</span>
@@ -451,7 +453,7 @@ function ContinueCard({ chats, now }: { chats: V4Chat[] | null; now: Date | null
 						)}
 						<span style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
 							{hero.plan && <Ticks total={hero.plan.total} current={hero.plan.current} visited={hero.plan.visited} />}
-							<span className="hide-sm" style={{ fontSize: 11.5, color: "var(--muted)" }}>
+							<span className="hide-sm" style={{ fontSize: 11.5, color: "var(--v-muted)" }}>
 								{[
 									hero.minutes ? `${hero.minutes} min in` : null,
 									hero.answers && hero.answers.total > 0 ? `${hero.answers.firstTry} of ${hero.answers.total} right first time` : null,
@@ -470,7 +472,7 @@ function ContinueCard({ chats, now }: { chats: V4Chat[] | null; now: Date | null
 								<Link key={c.id} className="wrow" href={`/chat/${c.id}`}>
 									<span className="dot" style={{ background: "var(--warn)" }} />
 									<b style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{c.title}</b>
-									<span className="serif" style={{ flex: 1, minWidth: 0, color: "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+									<span className="serif" style={{ flex: 1, minWidth: 0, color: "var(--v-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
 										{c.pendingQuestionText ?? ""}
 									</span>
 									<span style={{ fontSize: 11.5, color: "var(--faint)", whiteSpace: "nowrap" }}>
@@ -508,7 +510,7 @@ function MinutesCard() {
 			<div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
 				<h2 id="mins" className="h">Minutes learning, this week</h2>
 				{daily && (
-					<span style={{ fontSize: 11.5, color: "var(--muted)" }}>
+					<span style={{ fontSize: 11.5, color: "var(--v-muted)" }}>
 						goal {daily.goalMinutes} · met {daily.metDays} of {Math.max(1, todayIdx + 1)}
 					</span>
 				)}
@@ -524,7 +526,7 @@ function MinutesCard() {
 			</div>
 			<div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 8, textAlign: "center", fontSize: 11, color: "var(--faint)" }}>
 				{(daily?.days ?? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label) => ({ label, today: false }))).map((d) => (
-					<span key={d.label} style={d.today ? { color: "var(--accent)", fontWeight: 700 } : undefined}>
+					<span key={d.label} style={d.today ? { color: "var(--v-accent)", fontWeight: 700 } : undefined}>
 						{d.today ? "Today" : d.label}
 					</span>
 				))}
@@ -574,7 +576,7 @@ function ReadyToPractice({ ideas, ready, onNeedSetup, now }: { ideas: IndexedIde
 				<span style={{ fontSize: 11.5, color: "var(--faint)" }}>pick to mix</span>
 			</div>
 			{shown.length === 0 ? (
-				<span style={{ color: "var(--muted)", padding: "6px 0" }}>{topics === null ? "Loading…" : "Topics appear here once your lessons are saved to the graph."}</span>
+				<span style={{ color: "var(--v-muted)", padding: "6px 0" }}>{topics === null ? "Loading…" : "Topics appear here once your lessons are saved to the graph."}</span>
 			) : (
 				<div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 }}>
 					{shown.map((t) => {
@@ -593,7 +595,7 @@ function ReadyToPractice({ ideas, ready, onNeedSetup, now }: { ideas: IndexedIde
 								</span>
 								<span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
 									<b style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</b>
-									<span style={{ fontSize: 11.5, color: "var(--muted)" }}>
+									<span style={{ fontSize: 11.5, color: "var(--v-muted)" }}>
 										{t.ideaIds.length} ideas · {t.lastPracticedAt ? (now ? ago(t.lastPracticedAt, now) : "") : "never practiced"}
 									</span>
 								</span>
@@ -603,7 +605,7 @@ function ReadyToPractice({ ideas, ready, onNeedSetup, now }: { ideas: IndexedIde
 				</div>
 			)}
 			<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-				<span style={{ fontSize: 12, color: "var(--muted)" }}>{note}</span>
+				<span style={{ fontSize: 12, color: "var(--v-muted)" }}>{note}</span>
 				<button type="button" className="btn" style={{ marginLeft: "auto" }} disabled={busy} onClick={() => void start()}>
 					{picked.length > 1 ? `Practice these ${picked.length}` : "Start practice"}
 				</button>
@@ -627,11 +629,11 @@ function JustAdded({ ideas, now }: { ideas: IndexedIdea[] | null; now: Date | nu
 		<section className="glass card rise" aria-labelledby="new" style={{ gridColumn: "span 5", display: "flex", flexDirection: "column", gap: 2, animationDelay: "240ms" }}>
 			<div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 2 }}>
 				<h2 id="new" className="h">Just added to your knowledge</h2>
-				<Link href="/knowledge" style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)" }}>
+				<Link href="/knowledge" style={{ fontSize: 12, fontWeight: 600, color: "var(--v-accent)" }}>
 					Graph →
 				</Link>
 			</div>
-			{shown.length === 0 && <span style={{ color: "var(--muted)", padding: "6px 0" }}>{ideas === null ? "Loading…" : "Ideas appear here as your lessons are saved."}</span>}
+			{shown.length === 0 && <span style={{ color: "var(--v-muted)", padding: "6px 0" }}>{ideas === null ? "Loading…" : "Ideas appear here as your lessons are saved."}</span>}
 			{shown.map((idea, i) => {
 				const topic = topicOf.get(idea.id);
 				const more = i === shown.length - 1 && week > shown.length ? ` · +${week - shown.length} more this week` : "";

@@ -124,7 +124,7 @@ export function groupChats(chats: readonly V4Chat[], now = new Date()): SessionG
 /** The row dot's colour: waiting = warn, today's live work = accent, else faint. */
 export function dotColor(c: V4Chat, group: SessionGroupV4["name"]): string {
 	if (group === "Waiting on you") return "var(--warn)";
-	if (group === "Today" && sessionState(c) !== "finished") return "var(--accent)";
+	if (group === "Today" && sessionState(c) !== "finished") return "var(--v-accent)";
 	return "var(--faint)";
 }
 

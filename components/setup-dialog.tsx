@@ -32,7 +32,7 @@
  * CMU title, z-50.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import type React from "react";
@@ -43,7 +43,7 @@ import { MenuShell } from "@/components/menu-shell";
 import { notifySettingsSaved, useSettingsSaved } from "@/components/settings-signal";
 import { Hint } from "@/components/ui/hint";
 import { type ProviderKeyInfo } from "@/components/settings/keys-section";
-import { ProviderMenuList } from "@/components/settings/model-menu";
+import { ConnectProviderBody } from "@/components/connect-provider";
 import { ChatGPTBackgroundAccess } from "@/components/settings/chatgpt-connection";
 import { NativeSubscriptionBackgroundAccess, SubscriptionConnections } from "@/components/settings/subscription-connections";
 import { defaultOrderLevel, populateLevel, THINKING_LABEL } from "@/components/thinking-default";
@@ -110,109 +110,26 @@ export function prefillLevelFromPin(
 	return populateLevel(pin?.thinkingLevel, entry.supportedLevels);
 }
 
-/** Stage 1's pure body — exported for SSR pins (the delete/settings
- *  body pattern). The wrapper owns state + effects + the portal.
- *
- * The first-key screen (owner, zero-keys wave): provider picker (the
- * app's shared dropdown language, ProviderMenuList), one paste input,
- * Save. A save that 400s keeps the line inline (the keys section's
- * shape-gates write user-facing error text). */
+/** Stage 1's pure body — exported for SSR pins. The connect screen
+ *  (v4, 2026-10-26: featured chips + "more" + OpenAI-compatible), with
+ *  subscriptions as the secondary route below it. */
 export function SetupKeysBody({
 	providers,
-	provider,
-	value,
-	saving,
-	error,
-	menuOpen,
-	onToggleMenu,
-	onPick,
-	onValue,
-	onSave,
-	menuAnchor,
+	connected,
 }: {
 	/** The full provider roster (GET /api/keys providers) — undefined
-	 *  while it loads; the picker renders an honest empty state then. */
+	 *  while it loads. */
 	providers: ProviderKeyInfo[] | undefined;
-	/** The chosen provider; null = the picker trigger reads "Pick a
-	 *  provider…". */
-	provider: ProviderKeyInfo | null;
-	value: string;
-	saving: boolean;
-	error: string | null;
-	menuOpen: boolean;
-	onToggleMenu: () => void;
-	onPick: (p: ProviderKeyInfo) => void;
-	onValue: (v: string) => void;
-	onSave: () => void;
-	/** The MenuShell anchor — wired by the wrapper (its triggerRef). */
-	menuAnchor: React.RefObject<HTMLDivElement | null>;
+	/** Provider ids that already have a key. */
+	connected: readonly string[];
 }) {
 	return (
-		<div className="flex flex-col gap-3 px-6 py-5" data-testid="setup-stage-keys">
-			<p className="text-xs text-muted-foreground">
-				Choose your AI provider and paste its API key. You’ll pick your models next.
-			</p>
-			<div className="flex flex-col gap-2">
-				<div ref={menuAnchor} className="relative max-w-96">
-					<button
-						type="button"
-						aria-label="Provider"
-						data-testid="setup-key-provider"
-						aria-expanded={menuOpen}
-						onClick={onToggleMenu}
-						className="flex h-7 w-full items-center gap-1 rounded-sm border border-border bg-background px-1.5 font-ui text-xs text-foreground transition-colors hover:border-muted-foreground/50"
-					>
-						<span className="min-w-0 flex-1 truncate text-left">{provider ? provider.label : "Pick a provider…"}</span>
-						<span aria-hidden className="text-muted-foreground">
-							▾
-						</span>
-					</button>
-					{menuOpen && (
-						<MenuShell
-							anchorRef={menuAnchor}
-							testid="setup-key-provider-menu"
-							preferredSide="down"
-							align="left"
-							menuClass="flex w-[22rem] flex-col rounded-xl border border-border bg-card p-2 text-xs shadow-xl"
-						>
-							<ProviderMenuList providers={providers ?? []} onPick={onPick} />
-						</MenuShell>
-					)}
-				</div>
-				{provider && (
-					<div className="flex max-w-96 items-center gap-2">
-						<input
-							type="text"
-							value={value}
-							onChange={(e) => onValue(e.target.value)}
-							onKeyDown={(e) => {
-								if (e.key === "Enter" && value.trim()) onSave();
-							}}
-							placeholder="Paste key…"
-							aria-label={`${provider.label} key`}
-							data-testid="setup-key-input"
-							disabled={saving}
-							autoFocus
-							className="h-7 min-w-0 flex-1 rounded-sm border border-border bg-background px-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-muted-foreground/50"
-						/>
-						<button
-							type="button"
-							onClick={onSave}
-							disabled={saving || !value.trim()}
-							data-testid="setup-key-save"
-							className="shrink-0 rounded-sm border border-border bg-background px-3 py-1.5 font-ui text-xs text-foreground transition-colors hover:border-muted-foreground/50 disabled:cursor-not-allowed disabled:opacity-40"
-						>
-							{saving ? "Saving…" : "Save key"}
-						</button>
-					</div>
-				)}
-				{error && (
-					<p role="alert" data-testid="setup-key-error" className="text-xs text-danger">
-						{error}
-					</p>
-				)}
+		<div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+			<ConnectProviderBody providers={providers} connected={connected} />
+			<div style={{ borderTop: "1px solid var(--line)", paddingTop: 16 }}>
+				<span className="flabel" style={{ display: "block", marginBottom: 10 }}>Or use a subscription</span>
+				<SubscriptionConnections setup />
 			</div>
-			<div className="mt-2 border-t border-border/60 pt-4"><h3 className="mb-3 font-ui text-xs text-muted-foreground">Subscriptions</h3><SubscriptionConnections setup /></div>
 		</div>
 	);
 }
@@ -223,8 +140,11 @@ export function SetupDialog({
 	/** Saved: the models section landed; the caller marks configured (the
 	 *  draft stays put — save never sends). */
 	onDone,
+	/** Open on the connect screen even when a provider is keyed. */
+	connect = false,
 }: {
 	open: boolean;
+	connect?: boolean;
 	onClose: () => void;
 	onDone: (models: ModelsSettings) => void;
 }) {
@@ -238,21 +158,11 @@ export function SetupDialog({
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [openMenu, setOpenMenu] = useState<{ slot: ModelSlotName; kind: "model" | "thinking" } | null>(null);
-	// Stage 1's first-key screen (zero-keys wave): the provider roster,
-	// the chosen provider + pasted value, its busy/error pair, and its own
-	// menu-open bit (the slot menus' dismissal machinery covers it too —
-	// see the trigger testid branch below).
+	// Stage 1's provider roster (the connect screen owns its own form state).
 	const [keyProviders, setKeyProviders] = useState<ProviderKeyInfo[] | undefined>(undefined);
-	const [keyProvider, setKeyProvider] = useState<ProviderKeyInfo | null>(null);
-	const [keyValue, setKeyValue] = useState("");
-	const [keySaving, setKeySaving] = useState(false);
-	const [keyError, setKeyError] = useState<string | null>(null);
-	const [keyMenuOpen, setKeyMenuOpen] = useState(false);
-	// Stage 1's provider-picker trigger wrapper — the shared shell's anchor.
-	// Declared with the other hooks: the early `if (!open) return null` sits
-	// below them all. (Stage 2's slot menus anchor by anchorTestid instead —
-	// see the slot MenuShell below for why a ref cannot work there.)
-	const keyTriggerRef = useRef<HTMLDivElement>(null);
+	// "Connect another provider" from the pickers: back to stage 1 until
+	// the next key lands (the keys signal clears it).
+	const [addingProvider, setAddingProvider] = useState(false);
 
 	// The keys signal (zero-keys wave): keys-section saves/deletes AND
 	// THIS dialog's own first-key save dispatch it; the fetch effect below
@@ -260,11 +170,18 @@ export function SetupDialog({
 	// the widened catalog — no restart, no Settings round-trip.
 	const [keysTick, setKeysTick] = useState(0);
 	useSettingsSaved((section) => {
-		if (section === "keys") setKeysTick((t) => t + 1);
+		if (section === "keys") {
+			setKeysTick((t) => t + 1);
+			setAddingProvider(false);
+		}
 	});
 
 	// Fresh /api/models per open AND per keys change — a key saved a
 	// moment ago (stage 1's own screen) widens the pickers immediately.
+	useEffect(() => {
+		if (open) setAddingProvider(connect);
+	}, [open, connect]);
+
 	useEffect(() => {
 		if (!open) return;
 		let cancelled = false;
@@ -315,20 +232,12 @@ export function SetupDialog({
 			// never also fire. One Esc, one action.
 			e.preventDefault();
 			e.stopPropagation();
-			if (keyMenuOpen) {
-				setKeyMenuOpen(false);
-				return;
-			}
 			if (openMenu !== null) setOpenMenu(null);
 			else onClose();
 		};
 		const onPointerDown = (e: PointerEvent) => {
 			if (!(e.target instanceof Element)) return;
 			const t = e.target;
-			if (keyMenuOpen) {
-				if (t.closest("[data-lh-menu]") || t.closest('[data-testid="setup-key-provider"]')) return;
-				setKeyMenuOpen(false);
-			}
 			if (openMenu === null) return;
 			const triggerTestid =
 				openMenu.kind === "model" ? `setup-trigger-${openMenu.slot}` : `setup-thinking-${openMenu.slot}`;
@@ -341,36 +250,13 @@ export function SetupDialog({
 			document.removeEventListener("keydown", onKey);
 			document.removeEventListener("pointerdown", onPointerDown);
 		};
-	}, [open, onClose, openMenu, keyMenuOpen]);
+	}, [open, onClose, openMenu]);
 
 	if (!open) return null;
 
-	const stage = failed ? "keys" : setupStage(body ? body.providers : null);
+	const stage = failed || addingProvider ? "keys" : setupStage(body ? body.providers : null);
+	const connected = (body?.providers ?? []).filter((p) => p.keyPresent).map((p) => p.id);
 	const allPicked = SLOT_ORDER.every((s) => picked[s]);
-
-	/** Stage 1's save: PUT the pasted key, dispatch the keys signal, and
-	 *  CLEAN the local screen — the signal re-fetch widens the catalog and
-	 *  the stage flips to the pickers on its own; the dialog stays mounted
-	 *  the whole way. Shape-gate 400s keep their user-facing line inline. */
-	async function saveKey() {
-		if (!keyProvider || !keyValue.trim() || keySaving) return;
-		setKeySaving(true);
-		setKeyError(null);
-		const res = await fetch(`/api/keys/${encodeURIComponent(keyProvider.envVar)}`, {
-			method: "PUT",
-			headers: { "content-type": "application/json" },
-			body: JSON.stringify({ value: keyValue }),
-		}).catch(() => null);
-		setKeySaving(false);
-		if (!res || !res.ok) {
-			const body = (await res?.json().catch(() => ({}))) as { error?: string } | undefined;
-			setKeyError(res ? (body?.error ?? `Save failed (${res.status})`) : "Save failed. Check your connection and try again.");
-			return;
-		}
-		setKeyProvider(null);
-		setKeyValue("");
-		notifySettingsSaved("keys");
-	}
 
 	async function save() {
 		if (!allPicked || saving) return;
@@ -407,55 +293,47 @@ export function SetupDialog({
 			<div
 				role="dialog"
 				aria-modal="true"
-				aria-label="Set up your models"
+				aria-label={stage === "keys" ? "Connect a provider" : "Pick your models"}
 				data-testid="setup-dialog"
-				className="settings-dialog-pop flex max-h-[85vh] w-[640px] max-w-[90vw] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_60px_var(--shadow)]"
+				className="v4 scope settings-dialog-pop flex max-h-[85vh] w-[600px] max-w-[92vw] flex-col overflow-hidden rounded-[22px] border border-border shadow-[0_24px_60px_var(--shadow)]"
+				style={{ background: "#fff" }}
 				onClick={(e) => e.stopPropagation()}
 			>
-				<header className="flex h-15 shrink-0 items-center gap-3 border-b border-border px-5">
-					<h2 className="font-title text-2xl tracking-tight">Set up your models</h2>
+				<header className="flex shrink-0 items-start gap-3 px-7 pt-6 pb-1">
+					<div className="flex min-w-0 flex-col gap-1">
+						<h2 className="serif text-[26px] leading-tight tracking-tight">
+							{stage === "keys" ? "Connect a provider" : "Pick your models"}
+						</h2>
+						{stage === "keys" && (
+							<p className="text-[13px] text-muted-foreground">Your tutor runs on your own model account. You’ll pick models next.</p>
+						)}
+					</div>
 					<Hint label="Close" binding="escape" side="left">
-<button
-						type="button"
-						aria-label="Close setup"
-						data-testid="setup-close"
-						onClick={onClose}
-						className="ml-auto text-muted-foreground transition-colors hover:text-foreground"
-					>
-						✕
-					</button>
-</Hint>
+						<button
+							type="button"
+							aria-label="Close setup"
+							data-testid="setup-close"
+							onClick={onClose}
+							className="ib ml-auto shrink-0"
+						>
+							✕
+						</button>
+					</Hint>
 				</header>
 
 				{stage === "keys" ? (
-					<div className="flex flex-col px-6 py-5">
+					<div className="flex flex-col overflow-y-auto px-7 pt-4 pb-6">
 						{failed ? (
 							<p className="text-sm text-foreground">
 								Model catalog could not be loaded. Check the connection and retry.
 							</p>
 						) : (
-							<SetupKeysBody
-								providers={keyProviders}
-								provider={keyProvider}
-								value={keyValue}
-								saving={keySaving}
-								error={keyError}
-								menuOpen={keyMenuOpen}
-								menuAnchor={keyTriggerRef}
-								onToggleMenu={() => setKeyMenuOpen((v) => !v)}
-								onPick={(p) => {
-									setKeyProvider(p);
-									setKeyMenuOpen(false);
-									setKeyError(null);
-								}}
-								onValue={setKeyValue}
-								onSave={() => void saveKey()}
-							/>
+							<SetupKeysBody providers={keyProviders} connected={connected} />
 						)}
 					</div>
 				) : (
-					<div className="flex flex-col gap-4 overflow-y-auto px-6 py-5" data-testid="setup-stage-pickers">
-						<p className="text-xs text-muted-foreground">
+					<div className="flex flex-col gap-4 overflow-y-auto px-7 pt-4 pb-6" data-testid="setup-stage-pickers">
+						<p className="text-[13px] text-muted-foreground">
 							Pick the model for each tier. All three are required before chats can start.
 						</p>
 						{SLOT_ORDER.map((slot) => {
@@ -580,11 +458,20 @@ export function SetupDialog({
 								data-testid="setup-save"
 								disabled={!allPicked || saving}
 								onClick={() => void save()}
-								className="rounded-sm border border-border bg-background px-3 py-1.5 font-ui text-xs text-foreground transition-colors hover:border-muted-foreground/50 disabled:cursor-not-allowed disabled:opacity-40"
+								className="btn tall"
+								style={{ borderRadius: 999 }}
 							>
 								{saving ? "Saving…" : "Save models"}
 							</button>
 							{error && <p className="text-xs text-danger">{error}</p>}
+							<button
+								type="button"
+								data-testid="setup-add-provider"
+								onClick={() => setAddingProvider(true)}
+								className="ml-auto text-[12.5px] font-semibold text-[var(--v-accent)] hover:underline"
+							>
+								Connect another provider
+							</button>
 						</div>
 					</div>
 				)}

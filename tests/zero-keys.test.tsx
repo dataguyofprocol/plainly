@@ -59,55 +59,44 @@ describe("ZeroKeysPill — the composer-hoisted notice", () => {
 	});
 });
 
-describe("SetupKeysBody — stage 1's self-contained first-key screen", () => {
-	const base = {
-		value: "",
-		saving: false,
-		error: null,
-		menuOpen: false,
-		onToggleMenu: () => {},
-		onPick: () => {},
-		onValue: () => {},
-		onSave: () => {},
-		menuAnchor: { current: null },
-	};
+describe("SetupKeysBody — stage 1's connect screen (v4 chips)", () => {
+	const ALL: ProviderKeyInfo[] = [
+		{ id: "openai", envVar: "OPENAI_API_KEY", label: "OpenAI" },
+		...PROVIDERS,
+		{ id: "deepseek", envVar: "DEEPSEEK_API_KEY", label: "DeepSeek" },
+		{ id: "zai", envVar: "ZAI_API_KEY", label: "Z.AI" },
+		{ id: "groq", envVar: "GROQ_API_KEY", label: "Groq" },
+	];
 
-	it("before a pick: the provider trigger, no key input yet", () => {
-		const html = renderToStaticMarkup(
-			createElement(SetupKeysBody, { ...base, providers: PROVIDERS, provider: null }),
-		);
-		assert.ok(html.indexOf('data-testid="setup-key-provider"') < html.indexOf('data-testid="chatgpt-login"'), "API keys remain primary, ChatGPT is secondary");
-		assert.doesNotMatch(html, /chatgpt-privacy-notice|OpenAI privacy|Manage usage/);
-		assert.ok(html.includes("Choose your AI provider and paste its API key. You’ll pick your models next."));
-		assert.doesNotMatch(html, /First, add|keys unlock|—/);
-		assert.ok(html.includes('data-testid="setup-key-provider"'));
-		assert.ok(html.includes("Pick a provider…"));
+	it("the six featured choices, in order, then the rest behind “more”", () => {
+		const html = renderToStaticMarkup(createElement(SetupKeysBody, { providers: ALL, connected: [] }));
+		const order = ["openai", "openrouter", "anthropic", "deepseek", "zai", "custom", "more"].map((id) => html.indexOf(`data-testid="connect-chip-${id}"`));
+		assert.ok(order.every((i) => i >= 0), "every featured chip renders");
+		assert.deepEqual([...order].sort((x, y) => x - y), order, "chip order is the owner's");
+		assert.ok(html.includes("Z.AI Coding Plan"));
+		assert.ok(html.includes("OpenAI-compatible"));
+		assert.ok(html.includes("1+ more"), "only non-featured providers count toward “more”");
 		assert.ok(!html.includes('data-testid="setup-key-input"'), "no paste field before a provider is picked");
 	});
 
-	it("after a pick: the paste input + Save join", () => {
-		const html = renderToStaticMarkup(
-			createElement(SetupKeysBody, { ...base, providers: PROVIDERS, provider: PROVIDERS[0]! }),
-		);
-		assert.ok(html.includes('data-testid="setup-key-input"'));
-		assert.ok(html.includes('data-testid="setup-key-save"'));
-		assert.ok(html.includes("Save key"));
-		assert.ok(html.includes("OpenRouter"), "the chosen provider's label rides the trigger");
+	it("API keys remain primary, subscriptions secondary", () => {
+		const html = renderToStaticMarkup(createElement(SetupKeysBody, { providers: ALL, connected: [] }));
+		assert.ok(html.indexOf('data-testid="connect-chip-openai"') < html.indexOf('data-testid="chatgpt-login"'));
+		assert.doesNotMatch(html, /chatgpt-privacy-notice|OpenAI privacy|Manage usage/);
 	});
 
-	it("a shape-gate 400 keeps its line inline — no Settings round-trip chrome", () => {
-		const html = renderToStaticMarkup(
-			createElement(SetupKeysBody, {
-				...base,
-				providers: PROVIDERS,
-				provider: PROVIDERS[0]!!,
-				error: "Expected 20+ characters",
-			}),
-		);
-		assert.ok(html.includes('data-testid="setup-key-error"'));
-		assert.ok(html.includes("Expected 20+ characters"));
-		// the old "Open Keys settings" round-trip died with the self-contained screen
-		assert.ok(!html.includes("setup-open-keys"));
+	it("a connected provider carries a check on its chip", () => {
+		const html = renderToStaticMarkup(createElement(SetupKeysBody, { providers: ALL, connected: ["anthropic"] }));
+		const chip = html.slice(html.indexOf('data-testid="connect-chip-anthropic"'), html.indexOf('data-testid="connect-chip-deepseek"'));
+		assert.ok(chip.includes("✓"));
+	});
+});
+
+describe("parseModelIds — the custom provider's model list", () => {
+	it("splits on commas, spaces and newlines, dropping blanks and repeats", async () => {
+		const { parseModelIds } = await import("../components/connect-provider.tsx");
+		assert.deepEqual(parseModelIds("a, b\nc  a,,"), ["a", "b", "c"]);
+		assert.deepEqual(parseModelIds("  "), []);
 	});
 });
 

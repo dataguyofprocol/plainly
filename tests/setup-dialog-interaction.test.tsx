@@ -105,47 +105,39 @@ afterEach(async () => {
 });
 
 describe("setup polish interactions", () => {
-	it("provider dropdown closes on a click elsewhere inside the dialog without closing setup", async () => {
+	it("a featured chip opens its key field; “more” lists the rest and a pick opens that key field", async () => {
 		await mount();
-		await click(element('[data-testid="setup-key-provider"]'));
-		assert.ok(document.querySelector('[data-testid="setup-key-provider-menu"]'));
-		await click(element('[data-testid="setup-dialog"] h2'));
-		assert.equal(document.querySelector('[data-testid="setup-key-provider-menu"]'), null);
-		assert.ok(document.querySelector('[data-testid="setup-dialog"]'));
-		assert.equal(closed, 0);
-	});
-
-	it("provider trigger still toggles and picking an option still opens the key field", async () => {
-		await mount();
-		await click(element('[data-testid="setup-key-provider"]'));
-		await click(element('[data-testid="setup-key-provider"]'));
-		assert.equal(document.querySelector('[data-testid="setup-key-provider-menu"]'), null);
-		await click(element('[data-testid="setup-key-provider"]'));
-		await click(element('[data-testid="provider-option-openrouter"]'));
-		assert.equal(document.querySelector('[data-testid="setup-key-provider-menu"]'), null);
+		assert.equal(document.querySelector('[data-testid="setup-key-input"]'), null);
+		await click(element('[data-testid="connect-chip-openrouter"]'));
 		assert.ok(document.querySelector('[data-testid="setup-key-input"]'));
+		assert.ok(element('[data-testid="setup-dialog"]').textContent?.includes("OpenRouter API key"));
+		await click(element('[data-testid="connect-chip-custom"]'));
+		assert.equal(document.querySelector('[data-testid="setup-key-input"]'), null);
+		assert.ok(document.querySelector('[data-testid="connect-custom"]'));
 		assert.equal(closed, 0);
 	});
 
-	it("Escape closes the provider dropdown first, then setup on the next press", async () => {
+	it("Escape closes setup", async () => {
 		await mount();
-		await click(element('[data-testid="setup-key-provider"]'));
-		await escape();
-		assert.equal(document.querySelector('[data-testid="setup-key-provider-menu"]'), null);
-		assert.ok(document.querySelector('[data-testid="setup-dialog"]'));
-		assert.equal(closed, 0);
+		await click(element('[data-testid="connect-chip-openrouter"]'));
 		await escape();
 		assert.equal(closed, 1);
 		assert.equal(document.querySelector('[data-testid="setup-dialog"]'), null);
 	});
 
-	it("a genuine backdrop click closes setup and its open dropdown", async () => {
+	it("a genuine backdrop click closes setup", async () => {
 		await mount();
-		await click(element('[data-testid="setup-key-provider"]'));
 		await click(element('[data-testid="setup-backdrop"]'));
 		assert.equal(closed, 1);
 		assert.equal(document.querySelector('[data-testid="setup-dialog"]'), null);
-		assert.equal(document.querySelector('[data-testid="setup-key-provider-menu"]'), null);
+	});
+
+	it("“Connect another provider” returns a keyed setup to the connect screen", async () => {
+		await mount({ keyed: true });
+		assert.ok(document.querySelector('[data-testid="setup-stage-pickers"]'));
+		await click(element('[data-testid="setup-add-provider"]'));
+		assert.ok(document.querySelector('[data-testid="setup-stage-keys"]'));
+		assert.equal(closed, 0);
 	});
 
 	it("inside press followed by backdrop release and ancestor click does not dismiss setup", async () => {

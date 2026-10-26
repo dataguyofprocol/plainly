@@ -1425,7 +1425,7 @@ export function Chat({
 							</button>
 						</Hint>
 					)}
-					<span className="hide-sm" style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }} data-testid="session-position">
+					<span className="hide-sm" style={{ fontSize: 12, color: "var(--v-muted)", whiteSpace: "nowrap" }} data-testid="session-position">
 						{kind === "practice"
 							? setProgress && setProgress.length > 0
 								? `Practice · problem ${Math.min(setProgress.length, PRACTICE_SET_SIZE)} of ${PRACTICE_SET_SIZE}`
@@ -1488,7 +1488,7 @@ export function Chat({
 									<button
 										type="button"
 										onClick={() => setReviewOpen((v) => !v)}
-										style={{ marginLeft: "auto", border: 0, background: "transparent", fontWeight: 600, color: "var(--muted)" }}
+										style={{ marginLeft: "auto", border: 0, background: "transparent", fontWeight: 600, color: "var(--v-muted)" }}
 									>
 										{reviewOpen ? "Hide" : "Review"}
 									</button>
@@ -1497,13 +1497,29 @@ export function Chat({
 							{(!fold || reviewOpen) && messages.slice(0, fold?.startIndex ?? 0).map((m, i) => renderMessage(m, i))}
 							{fold?.heading && (
 								<div className="rise" style={{ display: "flex", flexDirection: "column", gap: 2, animationDelay: "40ms" }} data-testid="step-heading">
-									<span style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)" }}>Step {fold.heading.number}</span>
+									<span style={{ fontSize: 12, fontWeight: 600, color: "var(--v-accent)" }}>Step {fold.heading.number}</span>
 									<h2 className="serif" style={{ margin: 0, fontSize: 28, lineHeight: "34px", fontWeight: 500, letterSpacing: "-0.01em" }}>
 										{fold.heading.title}
 									</h2>
 								</div>
 							)}
 							{messages.slice(fold?.startIndex ?? 0).map((m, i) => renderMessage(m, i + (fold?.startIndex ?? 0)))}
+							{/* Your turn (v4 polish): a question waits in the dock — the
+							    reading column ends with a card that points there. */}
+							{pending && !busy && (
+								<button type="button" className="nudge" data-testid="your-turn" onClick={() => window.dispatchEvent(new CustomEvent("lh:focus-question"))}>
+									<span className="ping" aria-hidden="true" />
+									<span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+										<b style={{ fontWeight: 700 }}>Your turn</b>
+										<span style={{ fontSize: 12.5, color: "var(--v-muted)" }}>
+											{requiresReveal ? "When you’ve read this step, open the check on the right." : "The tutor asked you something — answer on the right."}
+										</span>
+									</span>
+									<span className="arrow" aria-hidden="true">
+										→
+									</span>
+								</button>
+							)}
 
 							{/* THE placeholder, ACTION-gated (owner, optimistic round
 							    3, 2026-10-02): spinner + shimmered Thinking… from the
@@ -1741,7 +1757,7 @@ function ProblemClock({ problemId }: { problemId: string }) {
 	}, [problemId]);
 	const secs = Math.floor((now - start) / 1000);
 	return (
-		<span className="mono" style={{ fontSize: 12, color: "var(--muted)" }} key={problemId}>
+		<span className="mono" style={{ fontSize: 12, color: "var(--v-muted)" }} key={problemId}>
 			{Math.floor(secs / 60)}:{String(secs % 60).padStart(2, "0")} on this one
 		</span>
 	);

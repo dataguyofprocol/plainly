@@ -156,7 +156,7 @@ export function SessionGroups({ chats, compact = false }: { chats: V4Chat[] | nu
 
 	if (chats === null) return <div className="gl">Loading…</div>;
 	if (groups.length === 0) {
-		return <p style={{ margin: 0, padding: "10px 10px", fontSize: 12.5, color: "var(--muted)" }}>Your lessons will be listed here.</p>;
+		return <p style={{ margin: 0, padding: "10px 10px", fontSize: 12.5, color: "var(--v-muted)" }}>Your lessons will be listed here.</p>;
 	}
 	return (
 		<>
@@ -223,7 +223,7 @@ export function SessionGroups({ chats, compact = false }: { chats: V4Chat[] | nu
 						type="button"
 						className="mrow"
 						data-testid="ctx-delete"
-						style={{ color: "var(--muted)" }}
+						style={{ color: "var(--v-muted)" }}
 						onClick={() => {
 							setDeleting(chats.find((c) => c.id === ctx) ?? null);
 							setCtx(null);

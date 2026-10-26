@@ -30,6 +30,7 @@ import { SubscriptionConnections } from "./subscription-connections.tsx";
 import { ProviderMenuList } from "./model-menu.tsx";
 import { MenuShell } from "@/components/menu-shell";
 import { notifySettingsSaved } from "@/components/settings-signal";
+import { OPEN_CONNECT_EVENT } from "@/components/connect-provider";
 
 /** One pi-ai provider with plain API-key auth (the Platform seam —
  *  derived from pi-ai's own env-key table; no drift possible). */
@@ -292,6 +293,14 @@ function AddProviderRow({
 			>
 				<span>+ Add provider key</span>
 				{addable.length > 0 && <span className="font-mono text-[11px]">{addable.length}</span>}
+			</button>
+			<button
+				type="button"
+				data-testid="add-custom-provider"
+				onClick={() => window.dispatchEvent(new Event(OPEN_CONNECT_EVENT))}
+				className="flex w-full items-center rounded-sm px-1 py-1.5 text-left font-ui text-xs text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+			>
+				+ Connect an OpenAI-compatible endpoint
 			</button>
 			{open && (
 				<MenuShell

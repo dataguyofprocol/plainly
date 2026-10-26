@@ -23,6 +23,7 @@ import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { useGraphIndex, type IndexedIdea } from "@/components/graph-index";
 import { SetupDialog } from "@/components/setup-dialog";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
+import { OPEN_CONNECT_EVENT } from "@/components/connect-provider";
 import { createSession, useStartReadiness } from "@/components/start-session";
 import { cn } from "@/lib/utils";
 import { fuzzyScore, kbdEventForAction, type ChatListItem } from "@/src/core";
@@ -34,7 +35,8 @@ export type PaletteAction =
 	| { kind: "open-session"; id: string }
 	| { kind: "open-idea"; id: string }
 	| { kind: "route"; href: string }
-	| { kind: "settings" };
+	| { kind: "settings" }
+	| { kind: "connect" };
 
 export interface PaletteRow {
 	key: string;
@@ -55,6 +57,7 @@ const IDEA_LIMIT = 5;
 const COMMANDS: PaletteRow[] = [
 	{ key: "cmd-graph", label: "Open the knowledge graph", hint: "⌘G", icon: "graph", action: { kind: "route", href: "/knowledge" } },
 	{ key: "cmd-practice", label: "New practice set", hint: "mixed from your graph", icon: "practice", action: { kind: "route", href: "/chat/new?mode=practice" } },
+	{ key: "cmd-connect", label: "Connect a provider", hint: "API keys and endpoints", icon: "settings", action: { kind: "connect" } },
 	{ key: "cmd-settings", label: "Settings", hint: "models and keys", icon: "settings", action: { kind: "settings" } },
 ];
 
@@ -135,6 +138,9 @@ const ICONS = {
 export function CommandPalette() {
 	const [open, setOpen] = useState(false);
 	const [setupOpen, setSetupOpen] = useState(false);
+	// Opened through lh:open-connect: setup starts on the connect screen
+	// even when a provider is already keyed.
+	const [connect, setConnect] = useState(false);
 	const [draft, setDraft] = useState<{ query: string; mode: PaletteMode }>({ query: "", mode: "teach" });
 	const readiness = useStartReadiness();
 	useEffect(() => {
@@ -145,10 +151,16 @@ export function CommandPalette() {
 			setDraft({ query, mode: "teach" });
 			setOpen(true);
 		};
+		const onConnect = () => {
+			setConnect(true);
+			setSetupOpen(true);
+		};
 		const events = [kbdEventForAction("open-omnibar"), kbdEventForAction("sessions-search"), "lh:open-omnibar"];
 		for (const e of events) window.addEventListener(e, onOpen);
+		window.addEventListener(OPEN_CONNECT_EVENT, onConnect);
 		return () => {
 			for (const e of events) window.removeEventListener(e, onOpen);
+			window.removeEventListener(OPEN_CONNECT_EVENT, onConnect);
 		};
 	}, []);
 	return (
@@ -161,17 +173,19 @@ export function CommandPalette() {
 					onNeedSetup={(next) => {
 						setDraft(next);
 						setOpen(false);
+						setConnect(false);
 						setSetupOpen(true);
 					}}
 				/>
 			)}
 			<SetupDialog
 				open={setupOpen}
+				connect={connect}
 				onClose={() => setSetupOpen(false)}
 				onDone={() => {
 					readiness.markConfigured();
 					setSetupOpen(false);
-					setOpen(true); // Save only saves: the words wait in the palette
+					if (!connect) setOpen(true); // Save only saves: the words wait in the palette
 				}}
 			/>
 		</>
@@ -301,6 +315,7 @@ export function Omnibar({
 			if (a.kind === "open-session") router.push(`/chat/${a.id}`);
 			else if (a.kind === "open-idea") router.push(`/knowledge?idea=${encodeURIComponent(a.id)}`);
 			else if (a.kind === "route") router.push(a.href);
+			else if (a.kind === "connect") window.dispatchEvent(new Event(OPEN_CONNECT_EVENT));
 			else openSettings();
 		},
 		[mode, onDone, onNeedSetup, openSettings, query, ready, router, starting],

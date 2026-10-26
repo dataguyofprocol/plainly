@@ -21,6 +21,7 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { finishDictation, useDictationTarget, joinDictation } from "@/components/dictation";
 import { JobsContext } from "@/components/jobs-context";
+import { CONFIDENCE_LEVEL_COLORS } from "@/components/confidence-colors";
 import { catalogLimits, useModelCatalog } from "@/components/model-picker";
 import { latestTree, type PopupMessage } from "@/components/plan-block";
 import { QuestionDock } from "@/components/question-dock";
@@ -187,6 +188,34 @@ export function LessonPanel({
 	}
 	const revealPending = !!pending && requiresReveal && !revealed;
 
+	// A question just landed: ring the dock (a few seconds — the CSS runs
+	// three pulses), and if the window isn't in front, a system
+	// notification says it's the learner's turn.
+	const [attn, setAttn] = useState(false);
+	useEffect(() => {
+		if (!pendingId) return;
+		setAttn(true);
+		const t = window.setTimeout(() => setAttn(false), 3800);
+		notifyYourTurn(pending);
+		return () => window.clearTimeout(t);
+		// fire once per question
+	}, [pendingId]);
+
+	// The transcript's "your turn" card asks the dock to take focus: open
+	// the question tab, reveal a waiting check (the click is the learner's
+	// "I've read it"), and put the walk on the first row.
+	useEffect(() => {
+		const on = () => {
+			setTab("question");
+			void finishDictation().then(() => {
+				setRevealed(true);
+				window.setTimeout(() => document.querySelector<HTMLElement>('[data-testid="lesson-panel"] [data-kbdrow="0"]')?.focus(), 60);
+			});
+		};
+		window.addEventListener("lh:focus-question", on);
+		return () => window.removeEventListener("lh:focus-question", on);
+	}, []);
+
 	// ENTER OPENS THE WAITING CHECK: with the check behind its card and
 	// plain focus, Enter finishes any dictation first (the flush lands in
 	// the reading-thinking field), then reveals.
@@ -206,21 +235,21 @@ export function LessonPanel({
 	const running = jobs.filter((j) => j.status === "running").length;
 	const answered = !pending ? lastAnswer(messages) : null;
 	const tabs: { id: Tab; label: string; badge?: string; dot?: boolean }[] = [
-		{ id: "question", label: questionTabLabel(pending), dot: !!pending },
+		{ id: "question", label: pending ? "Your turn" : questionTabLabel(pending), dot: !!pending },
 		{ id: "path", label: "Path", badge: progress ? `${progress.currentIndex ?? progress.visited}/${progress.total}` : undefined },
 		{ id: "helpers", label: "Helpers", badge: running ? String(running) : undefined },
 	];
 
 	return (
 		<aside className="dock" aria-label="Question and lesson details" data-testid="lesson-panel">
-			<div className="dockin glass" style={{ "--lh-prose-size": "15px" } as React.CSSProperties}>
+			<div className={`dockin glass ${attn ? "attn" : ""}`} style={{ "--lh-prose-size": "15px" } as React.CSSProperties}>
 				<div className="tabs" role="tablist">
 					{tabs.map((t) => (
 						<button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={tab === t.id ? "on" : ""} onClick={() => setTab(t.id)} data-testid={`lesson-tab-${t.id}`}>
 							{t.label}
-							{t.dot && <span className="dot" style={{ background: "var(--warn)" }} aria-label="waiting on you" />}
+							{t.dot && <span className="ping" aria-label="waiting on you" />}
 							{t.badge && (
-								<span className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>
+								<span className="mono" style={{ fontSize: 11, color: "var(--v-muted)" }}>
 									{t.badge}
 								</span>
 							)}
@@ -229,7 +258,7 @@ export function LessonPanel({
 				</div>
 
 				{tab === "question" && (
-					<div className="pane fade" role="tabpanel" style={{ "--dock-max-h": "calc(100vh - 22rem)" } as React.CSSProperties}>
+					<div className="pane fade" role="tabpanel" style={{ "--dock-max-h": "none" } as React.CSSProperties}>
 						{pending ? (
 							<>
 								<QuestionDock
@@ -258,7 +287,7 @@ export function LessonPanel({
 						) : answered ? (
 							<div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 								<div className="settle" style={{ padding: "10px 12px", borderRadius: 11, background: "var(--line)", display: "flex", flexDirection: "column", gap: 4 }}>
-									<span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--muted)" }}>
+									<span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--v-muted)" }}>
 										{answered.questionType === "predict" ? "You predicted" : "You answered"}
 										{answered.confidence !== undefined && ` · ${(confidenceLabel(answered.confidence) ?? `${answered.confidence}%`).toLowerCase()}`}
 										{answered.correct === true ? " · right" : answered.correct === false ? " · not quite" : ""}
@@ -271,18 +300,18 @@ export function LessonPanel({
 								</div>
 								{busy ? (
 									<div className="settle" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-										<span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--accent)" }}>Tutor</span>
-										<span style={{ fontSize: 12.5, color: "var(--muted)" }}>Replying in the lesson…</span>
+										<span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--v-accent)" }}>Tutor</span>
+										<span style={{ fontSize: 12.5, color: "var(--v-muted)" }}>Replying in the lesson…</span>
 										<span className="ind" aria-hidden="true">
 											<i />
 										</span>
 									</div>
 								) : (
-									<span style={{ fontSize: 12.5, color: "var(--muted)" }}>The next check appears here when you reach it.</span>
+									<span style={{ fontSize: 12.5, color: "var(--v-muted)" }}>The next check appears here when you reach it.</span>
 								)}
 							</div>
 						) : (
-							<span style={{ fontSize: 12.5, color: "var(--muted)" }}>
+							<span style={{ fontSize: 12.5, color: "var(--v-muted)" }}>
 								{phase === "probe" ? "The check-in’s questions appear here." : "No question right now. Checks appear here as the lesson goes; ask or steer any time below."}
 							</span>
 						)}
@@ -294,7 +323,7 @@ export function LessonPanel({
 						{progress ? (
 							<>
 								<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-									<span style={{ fontSize: 12, color: "var(--muted)" }}>
+									<span style={{ fontSize: 12, color: "var(--v-muted)" }}>
 										{progress.visited} of {progress.total} visited
 										{progress.currentIndex !== null && ` · on step ${progress.currentIndex}`}
 									</span>
@@ -315,23 +344,23 @@ export function LessonPanel({
 								</ol>
 							</>
 						) : (
-							<span style={{ fontSize: 12.5, color: "var(--muted)" }}>The path appears once the check-in finds where you are.</span>
+							<span style={{ fontSize: 12.5, color: "var(--v-muted)" }}>The path appears once the check-in finds where you are.</span>
 						)}
 					</div>
 				)}
 
 				{tab === "helpers" && (
 					<div className="pane fade" role="tabpanel">
-						{jobs.length === 0 && <span style={{ fontSize: 12.5, color: "var(--muted)" }}>Helpers research, build demos and draw figures when the lesson calls for one.</span>}
+						{jobs.length === 0 && <span style={{ fontSize: 12.5, color: "var(--v-muted)" }}>Helpers research, build demos and draw figures when the lesson calls for one.</span>}
 						{[...jobs].reverse().map((j) => (
 							<div key={j.id} className="agent" style={j.status === "running" ? undefined : { opacity: 0.75 }}>
 								<span style={{ display: "flex", justifyContent: "space-between" }}>
 									<b style={{ fontWeight: 700 }}>{JOB_LABEL[j.kind]}</b>
-									<span className="mono" style={{ fontSize: 11, color: j.status === "error" ? "#b3261e" : "var(--muted)" }}>
+									<span className="mono" style={{ fontSize: 11, color: j.status === "error" ? "#b3261e" : "var(--v-muted)" }}>
 										{j.status === "running" ? elapsed(j.createdAt) : j.status === "done" ? "done" : "failed"}
 									</span>
 								</span>
-								{j.activity && <span style={{ fontSize: 12, color: "var(--muted)" }}>{j.activity}</span>}
+								{j.activity && <span style={{ fontSize: 12, color: "var(--v-muted)" }}>{j.activity}</span>}
 								{j.status === "running" && (
 									<span className="ind" aria-hidden="true">
 										<i />
@@ -345,6 +374,29 @@ export function LessonPanel({
 			</div>
 		</aside>
 	);
+}
+
+/** The "your turn" system notification — only when the window isn't in
+ *  front (in-app, the dock's ring says it). Permission is asked once,
+ *  the first time it would be useful; Electron grants it for the app. */
+function notifyYourTurn(pending: Pending | null): void {
+	if (!pending || typeof window === "undefined" || !("Notification" in window)) return;
+	if (document.visibilityState === "visible" && document.hasFocus()) return;
+	const q = (pending.input as { question?: unknown } | undefined)?.question;
+	const body = typeof q === "string" ? q.replace(/\s+/g, " ").slice(0, 140) : "The tutor asked you something.";
+	const show = () => {
+		try {
+			const n = new Notification("Your turn", { body, silent: false });
+			n.onclick = () => {
+				window.focus();
+				n.close();
+			};
+		} catch {
+			// notifications unavailable — the in-app ring still shows
+		}
+	};
+	if (Notification.permission === "granted") show();
+	else if (Notification.permission === "default") void Notification.requestPermission().then((p) => p === "granted" && show());
 }
 
 function elapsed(iso: string): string {
@@ -374,7 +426,7 @@ function LessonNumbers({ chatId, turns, contextTokens, pricing }: { chatId: stri
 			<dl style={{ margin: 0, display: "grid", gridTemplateColumns: "1fr auto", gap: "6px 12px", fontSize: 12.5 }}>
 				{rows.map(([k, v]) => (
 					<div key={k} style={{ display: "contents" }}>
-						<dt style={{ color: "var(--muted)" }}>{k}</dt>
+						<dt style={{ color: "var(--v-muted)" }}>{k}</dt>
 						<dd className="mono" style={{ margin: 0 }}>
 							{v}
 						</dd>
@@ -507,9 +559,9 @@ export function PracticePanel({
 									}
 								}}
 								placeholder="Think out loud. Hints read your working; Submit ends the problem."
-								style={{ width: "100%", display: "block", padding: "10px 40px 10px 12px", borderRadius: 11, border: "1px solid var(--line)", background: "var(--input)", resize: "vertical", fontSize: 14.5, lineHeight: "22px", outline: "none" }}
+								style={{ width: "100%", display: "block", padding: "10px 40px 10px 12px", borderRadius: 11, border: "1px solid var(--line)", background: "var(--v-input)", resize: "vertical", fontSize: 14.5, lineHeight: "22px", outline: "none" }}
 							/>
-							<span style={{ position: "absolute", right: 6, bottom: 6, color: "var(--muted)" }} aria-hidden="true">
+							<span style={{ position: "absolute", right: 6, bottom: 6, color: "var(--v-muted)" }} aria-hidden="true">
 								<MicIcon />
 							</span>
 						</div>
@@ -517,9 +569,17 @@ export function PracticePanel({
 							<span id="sure" style={{ fontSize: 12, fontWeight: 600 }}>
 								How sure?
 							</span>
-							<div className="seg" role="radiogroup" aria-labelledby="sure">
+							<div className="seg conf" role="radiogroup" aria-labelledby="sure">
 								{CONFIDENCE_LEVELS.map((l) => (
-									<button key={l.value} type="button" role="radio" aria-checked={conf === l.value} className={conf === l.value ? "on" : ""} onClick={() => setConf(l.value)}>
+									<button
+										key={l.value}
+										type="button"
+										role="radio"
+										aria-checked={conf === l.value}
+										className={conf === l.value ? "on" : ""}
+										onClick={() => setConf(l.value)}
+										style={{ "--lvl": CONFIDENCE_LEVEL_COLORS[l.value]!.ink, "--lvl-soft": CONFIDENCE_LEVEL_COLORS[l.value]!.soft } as React.CSSProperties}
+									>
 										{l.label}
 									</button>
 								))}
@@ -528,7 +588,7 @@ export function PracticePanel({
 						<div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 12px", borderRadius: 11, background: "var(--line)" }}>
 							<span style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
 								<b style={{ fontWeight: 600 }}>Hints</b>
-								<span style={{ color: "var(--muted)" }}>{hintsUsed === 0 ? "none used" : `${hintsUsed} of ${HINT_RUNGS.length} used`}</span>
+								<span style={{ color: "var(--v-muted)" }}>{hintsUsed === 0 ? "none used" : `${hintsUsed} of ${HINT_RUNGS.length} used`}</span>
 							</span>
 							<span style={{ display: "flex", gap: 4 }} aria-hidden="true">
 								{HINT_RUNGS.map((r, i) => (
@@ -545,10 +605,10 @@ export function PracticePanel({
 					</div>
 				) : (
 					<div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-						<span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>
+						<span style={{ fontSize: 12, fontWeight: 700, color: "var(--v-muted)" }}>
 							{set.length > 0 ? `Problem ${set.length} done` : "Your working"}
 						</span>
-						<span style={{ fontSize: 12.5, color: "var(--muted)" }}>
+						<span style={{ fontSize: 12.5, color: "var(--v-muted)" }}>
 							{set.length > 0 ? "Press Enter in the box below for the next problem, or ask about the last one." : "The first problem arrives once the session opens."}
 						</span>
 					</div>
@@ -564,7 +624,7 @@ export function PracticePanel({
 						return (
 							<div key={i} className="prob">
 								<span style={{ flex: 1, fontWeight: working ? 700 : 500 }}>Problem {i + 1}</span>
-								{cls ? <span className={`pill ${cls}`}>{label}</span> : <span style={{ fontWeight: working ? 700 : 500, color: working ? "var(--ink)" : "var(--muted)" }}>{label}</span>}
+								{cls ? <span className={`pill ${cls}`}>{label}</span> : <span style={{ fontWeight: working ? 700 : 500, color: working ? "var(--ink)" : "var(--v-muted)" }}>{label}</span>}
 							</div>
 						);
 					}).slice(0, PRACTICE_SET_SIZE)}

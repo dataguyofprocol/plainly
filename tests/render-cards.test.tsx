@@ -252,13 +252,13 @@ describe("render smoke tests", () => {
 		assert.ok(html.includes('data-mark="check"') && html.includes('data-mark="x"'));
 	});
 
-	it("AnsweredCard shows the confidence rail on quiz answers (record, no disc)", () => {
-		// The slider's rail, disc removed: same paint, same ticks, the % read-out.
+	it("AnsweredCard shows the confidence as its level word on quiz answers (record, not a control)", () => {
+		// v4 (2026-10-26): the four-word scale, the nearest level's word in its colour.
 		const answer = buildAnswer(quizQD(), { values: ["Venus"], confidence: 70 });
 		const html = renderToStaticMarkup(<AnsweredCard answer={answer} />);
 		assert.match(html, /data-testid="answered-confidence"/);
-		assert.match(html, /data-testid="confidence-rail"/);
-		assert.match(html, /70%/);
+		assert.match(html, /Fairly sure/);
+		assert.match(html, /title="70%"/);
 		// It is a RECORD, not a control — no range input on the card.
 		assert.ok(!html.includes('type="range"'));
 	});
@@ -277,7 +277,7 @@ describe("render smoke tests", () => {
 		const answer = buildAnswer(askQD(), { other: "Fairly confident — but shaky on applications" });
 		const html = renderToStaticMarkup(<AnsweredCard answer={answer} />);
 		assert.ok(html.includes('data-testid="answered-other"'), "the Other answer is an option row");
-		assert.match(html, /border-primary bg-accent/, "styled like its selected siblings");
+		assert.match(html, /border-brand\/50 bg-brand-soft/, "styled like its selected siblings");
 		assert.match(html, /shaky on applications/, "the typed words render");
 		// Inside the options container — same list, not a loose quote outside it.
 		assert.ok(

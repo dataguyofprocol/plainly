@@ -5,6 +5,7 @@ import { ArrowDownIcon, ChevronRightIcon, PlayIcon } from "lucide-react";
 import { finishDictation, isDictationActive, joinDictation, useDictationTarget } from "@/components/dictation";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { MessageResponse } from "@/components/ai-elements/message";
+import { CONFIDENCE_LEVEL_COLORS } from "@/components/confidence-colors";
 import { cn } from "@/lib/utils";
 import {
 	buildAnswer,
@@ -560,7 +561,7 @@ function QuestionDockForm({
 		<div ref={rootRef} data-testid="question-dock" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 			<div data-session-find-root="" style={{ maxHeight: "var(--dock-max-h, 55dvh)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
 				<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-					<span style={{ fontSize: 11.5, fontWeight: 700, color: qd.questionType === "predict" ? "var(--warn)" : "var(--accent)" }}>
+					<span style={{ fontSize: 11.5, fontWeight: 700, color: qd.questionType === "predict" ? "var(--warn)" : "var(--v-accent)" }}>
 						{toolName === "probe"
 						? "Probe"
 						: toolName === "recall"
@@ -579,7 +580,7 @@ function QuestionDockForm({
 					</div>
 				</div>
 				{qd.context && (
-					<div className="serif" style={{ fontSize: 14, lineHeight: "21px", color: "var(--muted)" }}>
+					<div className="serif" style={{ fontSize: 14, lineHeight: "21px", color: "var(--v-muted)" }}>
 						<MessageResponse>{qd.context}</MessageResponse>
 					</div>
 				)}
@@ -680,7 +681,7 @@ function QuestionDockForm({
 						How sure?
 					</span>
 					<div
-						className="seg"
+						className="seg conf"
 						role="radiogroup"
 						aria-labelledby={`${toolCallId}-confidence`}
 						aria-disabled={sel.dontKnow}
@@ -698,6 +699,7 @@ function QuestionDockForm({
 								onClick={() => setConfIdx(i)}
 								data-testid={`confidence-stop-${level.value}`}
 								className={!sel.dontKnow && i === confIdx ? "on" : ""}
+								style={{ "--lvl": CONFIDENCE_LEVEL_COLORS[level.value]!.ink, "--lvl-soft": CONFIDENCE_LEVEL_COLORS[level.value]!.soft } as React.CSSProperties}
 							>
 								{level.label}
 							</button>
@@ -742,7 +744,7 @@ function QuestionDockForm({
 							placeholder="Your answer, in your own words…"
 							rows={4}
 							className="serif"
-							style={{ width: "100%", display: "block", padding: "9px 44px 9px 11px", borderRadius: 11, border: "1px solid var(--line)", background: "var(--input)", resize: "vertical", fontSize: 14, lineHeight: "21px", outline: "none" }}
+							style={{ width: "100%", display: "block", padding: "9px 44px 9px 11px", borderRadius: 11, border: "1px solid var(--line)", background: "var(--v-input)", resize: "vertical", fontSize: 14, lineHeight: "21px", outline: "none" }}
 						/>
 					) : (
 						<textarea
@@ -769,7 +771,7 @@ function QuestionDockForm({
 							placeholder="Why this answer? Whatever comes to mind."
 							rows={phase === "teach" ? 3 : 2}
 							className="serif"
-							style={{ width: "100%", display: "block", padding: "9px 44px 9px 11px", borderRadius: 11, border: "1px solid var(--line)", background: "var(--input)", resize: "vertical", fontSize: 14, lineHeight: "21px", outline: "none" }}
+							style={{ width: "100%", display: "block", padding: "9px 44px 9px 11px", borderRadius: 11, border: "1px solid var(--line)", background: "var(--v-input)", resize: "vertical", fontSize: 14, lineHeight: "21px", outline: "none" }}
 						/>
 					)}
 					<button

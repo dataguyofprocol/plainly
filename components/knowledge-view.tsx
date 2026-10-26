@@ -112,14 +112,14 @@ export function KnowledgeView({ initialConfigured, focusIdeaId }: { initialConfi
 			<span style={{ fontSize: 11, fontWeight: 700, color: "var(--faint)" }}>
 				{title} · {ids.length}
 			</span>
-			{ids.length === 0 && <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{empty}</span>}
+			{ids.length === 0 && <span style={{ fontSize: 12.5, color: "var(--v-muted)" }}>{empty}</span>}
 			{ids.slice(0, NEIGHBOUR_LIMIT).map((id) => (
 				<button key={id} type="button" className="nlink" onClick={() => pick(id)}>
 					{byId.get(id)?.name ?? id}
 				</button>
 			))}
 			{ids.length > NEIGHBOUR_LIMIT && (
-				<span style={{ fontSize: 12, color: "var(--muted)" }}>and {ids.length - NEIGHBOUR_LIMIT} more</span>
+				<span style={{ fontSize: 12, color: "var(--v-muted)" }}>and {ids.length - NEIGHBOUR_LIMIT} more</span>
 			)}
 		</div>
 	);
@@ -189,11 +189,11 @@ export function KnowledgeView({ initialConfigured, focusIdeaId }: { initialConfi
 							<h1 className="serif" style={{ margin: 0, fontSize: 22, lineHeight: "28px", fontWeight: 500 }}>
 								Knowledge graph
 							</h1>
-							<span style={{ fontSize: 12, color: "var(--muted)" }}>
+							<span style={{ fontSize: 12, color: "var(--v-muted)" }}>
 								{snapshot ? `${props.length} ideas · ${snapshot.chains.length} chains · ${lessons} lessons · ${notes} notes` : "Loading…"}
 							</span>
 						</div>
-						<label className="glass" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, height: 34, padding: "0 10px", borderRadius: 10, color: "var(--muted)" }}>
+						<label className="glass" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, height: 34, padding: "0 10px", borderRadius: 10, color: "var(--v-muted)" }}>
 							<SearchIcon />
 							<input
 								type="search"
@@ -233,7 +233,7 @@ export function KnowledgeView({ initialConfigured, focusIdeaId }: { initialConfi
 							<aside className="detail pop settle" aria-labelledby="idea">
 								<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
 									<span className="sw" style={{ background: selTopic ? topicColor(selTopic.id) : "var(--faint)" }} />
-									<span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)" }}>
+									<span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--v-muted)" }}>
 										{selTopic?.name ?? "Idea"}
 										{concludes ? " · conclusion" : ""}
 									</span>
@@ -244,17 +244,17 @@ export function KnowledgeView({ initialConfigured, focusIdeaId }: { initialConfi
 								<h2 id="idea" className="serif" style={{ margin: 0, fontSize: 17, lineHeight: "24px", fontWeight: 500 }}>
 									{sel.name}
 								</h2>
-								<p className="serif" style={{ margin: 0, fontSize: 13.5, lineHeight: "20px", color: "var(--muted)" }}>
+								<p className="serif" style={{ margin: 0, fontSize: 13.5, lineHeight: "20px", color: "var(--v-muted)" }}>
 									{sel.statement}
 								</p>
 								{neighbours && relList("Rests on", neighbours.restsOn, "A starting point.")}
 								{neighbours && relList("Leads to", neighbours.leadsTo, "Nothing yet: a good place to go deeper.")}
 								<dl style={{ margin: 0, display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px", fontSize: 12 }}>
-									<dt style={{ color: "var(--muted)" }}>Learned</dt>
+									<dt style={{ color: "var(--v-muted)" }}>Learned</dt>
 									<dd style={{ margin: 0, textAlign: "right" }}>
 										{[learnedIn, now ? ago(sel.createdAt, now) : null].filter(Boolean).join(" · ")}
 									</dd>
-									<dt style={{ color: "var(--muted)" }}>Practice</dt>
+									<dt style={{ color: "var(--v-muted)" }}>Practice</dt>
 									<dd style={{ margin: 0, textAlign: "right" }}>{topicPracticed && now ? `Topic practised ${ago(topicPracticed, now)}` : "Not yet"}</dd>
 								</dl>
 								<div style={{ display: "flex", gap: 6 }}>
@@ -281,7 +281,7 @@ export function KnowledgeView({ initialConfigured, focusIdeaId }: { initialConfi
 							<button type="button" className="ib" aria-label="Zoom out" onClick={() => api.current?.zoomOut()}>
 								−
 							</button>
-							<span className="mono" style={{ width: 44, textAlign: "center", fontSize: 11.5, color: "var(--muted)" }}>
+							<span className="mono" style={{ width: 44, textAlign: "center", fontSize: 11.5, color: "var(--v-muted)" }}>
 								{zoomPct}%
 							</span>
 							<button type="button" className="ib" aria-label="Zoom in" onClick={() => api.current?.zoomIn()}>
