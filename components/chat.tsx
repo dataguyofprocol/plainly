@@ -77,6 +77,8 @@ import {
 	questionNeedsReveal,
 } from "@/src/core";
 import { ReadingThinkingField } from "@/components/reading-thinking";
+import { LESSON_PANEL_MIN, LessonPanel, planProgress } from "@/components/lesson-panel";
+import { cn } from "@/lib/utils";
 import { currentUserThinkingOpen, setAllUserThinkingOpen } from "@/components/thinking-block";
 import { slotsConfigured, type ModelsSettings } from "@/src/core";
 import { useSettingsSaved } from "@/components/settings-signal";
@@ -506,6 +508,24 @@ export function Chat({
 	// ends at the question call), so the session's current phase IS the
 	// question's phase.
 	const requiresReveal = pending !== null && questionNeedsReveal(pending.tool, pending.input, phaseAt3(messages));
+
+	// THE LESSON PANEL (v4 redesign, 2026-10-26): with room for a reading
+	// column AND the panel, the question moves beside the text; narrower,
+	// the bottom dock keeps it. Measured on the session surface (the
+	// sidebar's width already excluded). Practice keeps its dock.
+	const surfaceRef = useRef<HTMLDivElement>(null);
+	const [wide, setWide] = useState(false);
+	useEffect(() => {
+		const el = surfaceRef.current;
+		if (!el) return;
+		const measure = () => setWide(el.offsetWidth >= LESSON_PANEL_MIN);
+		measure();
+		const ro = new ResizeObserver(measure);
+		ro.observe(el);
+		return () => ro.disconnect();
+	}, []);
+	const panelOn = wide && kind !== "practice";
+	const lessonProgress = useMemo(() => (kind === "practice" ? null : planProgress(latestTree(messages), messages)), [kind, messages]);
 
 	/* The READING-THINKING channel (owner 2026-10-03): a draft field for
 	 * thinking while reading the teaching prose, mounted while a check waits
@@ -1169,6 +1189,21 @@ export function Chat({
 		doSend();
 	};
 
+	// THE ANSWER IS THE QUESTION CALL'S TOOL RESULT (fork 1, owner
+	// 2026-09-26): one input event, one turn — the hook appends the
+	// optimistic graded result (the AnsweredCard shows at once) and the
+	// server's write-ahead persists it before the turn; the teacher's
+	// reaction streams below it. Dismissals ride the same callback
+	// (QuestionAnswerData.dismissed). The reading-thinking draft rides along
+	// (owner 2026-10-03) — the check answer is its only carrier. Shared by
+	// the bottom dock and the lesson panel.
+	const submitPendingAnswer = (output: QuestionAnswerData) => {
+		if (!pending) return;
+		const reading = readingThinkingRef.current.trim() || undefined;
+		clearReadingThinking();
+		submitAnswer(pending.tool, pending.toolCallId, reading ? { ...output, readingThinking: reading } : output);
+	};
+
 	return (
 		<ChatActionsContext.Provider
 			value={{
@@ -1193,7 +1228,7 @@ export function Chat({
 		    chip) spans from the left sidebar's edge to the panel's edge. The
 		    dock overlays the column bottom (outside the scroller); a spacer in
 		    the transcript reserves its height. */}
-		<div className="flex h-dvh">
+		<div ref={surfaceRef} className="flex h-dvh">
 			<div className="flex min-w-0 flex-1 flex-col">
 				{/* The top bar is its own block (owner, top-fade round 4): in flow
 				    above the scroller on the plain page background — no gradient. Its
@@ -1238,7 +1273,7 @@ export function Chat({
 								spellCheck={false}
 								aria-label="Session title"
 								title="Rename this session"
-								className="lh-no-drag min-w-[8ch] max-w-[70%] shrink-0 bg-transparent font-title text-3xl tracking-tight caret-current outline-none [field-sizing:content]"
+								className="lh-no-drag min-w-[8ch] max-w-[70%] shrink-0 bg-transparent font-title text-xl caret-current outline-none [field-sizing:content]"
 							/>
 							{/* flex-1 spacer during rename too, so the chips stay at
 							    the right edge; clicks here commit via the header
@@ -1259,11 +1294,32 @@ export function Chat({
 								setTitleDraft(titleText);
 								setRenaming(true);
 							}}
-							className="lh-no-drag -mx-1.5 min-w-4 shrink cursor-text truncate rounded-md px-1.5 text-left font-title text-3xl tracking-tight transition-colors hover:bg-accent"
+							className="lh-no-drag -mx-1.5 min-w-4 shrink cursor-text truncate rounded-md px-1.5 text-left font-title text-xl transition-colors hover:bg-accent"
 						>
 							{titleText}
 							</button>
 						</Hint>
+						{/* Where the lesson is (v4): POSITION in the plan, never
+						    mastery — statuses derive from which node the latest check
+						    was about (lesson-panel.tsx planProgress). */}
+						{lessonProgress && lessonProgress.currentIndex !== null && (
+							<span className="hidden shrink-0 items-center gap-2.5 md:flex" data-testid="lesson-progress">
+								<span className="text-sm text-muted-foreground">
+									Step {lessonProgress.currentIndex} of {lessonProgress.total}
+								</span>
+								<span className="hidden gap-[3px] lg:flex" role="img" aria-label={`${lessonProgress.visited} of ${lessonProgress.total} steps visited`}>
+									{lessonProgress.steps.map((st) => (
+										<i
+											key={st.id}
+											className={cn(
+												"h-1 rounded-full",
+												st.status === "current" ? "w-5 bg-brand" : st.status === "visited" ? "w-3 bg-faint" : "w-3 bg-input",
+											)}
+										/>
+									))}
+								</span>
+							</span>
+						)}
 							{/* flex-1 spacer: keeps the chips at the right edge AND stays a
 							    drag surface (no carve-out) — the freed bar is grippable. */}
 							<div className="min-w-4 flex-1" aria-hidden="true" />
@@ -1281,7 +1337,7 @@ export function Chat({
 								blurAfterPointerClick(e);
 								setPlanOpen(true);
 							}}
-							className="lh-no-drag flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-border/80 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+							className="lh-no-drag flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-border/80 px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:border-border hover:text-foreground"
 						>
 							<WaypointsIcon className="size-3.5 text-primary" aria-hidden />
 							Plan
@@ -1303,7 +1359,7 @@ export function Chat({
 							data-testid="phase-chip"
 							data-phase="practice"
 							aria-hidden="true"
-							className="pointer-events-none flex shrink-0 select-none items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+							className="pointer-events-none flex shrink-0 select-none items-center gap-1 text-xs font-medium text-muted-foreground"
 						>
 							<DumbbellIcon className="size-3" />
 							Practice
@@ -1370,7 +1426,7 @@ export function Chat({
 													<div
 														key={pi}
 														data-testid="practice-next-line"
-														className="my-4 flex items-center justify-center gap-1.5 font-ui text-xs font-medium uppercase tracking-wide text-muted-foreground"
+														className="my-4 flex items-center justify-center gap-1.5 font-ui text-xs font-medium text-muted-foreground"
 													>
 														<ArrowRightIcon className="size-3" />
 														Next problem
@@ -1432,7 +1488,7 @@ export function Chat({
 												{/* The rail GROUPS (owner round 4, 2026-10-05): the YOU heading
 												    sits INSIDE the rail, same mono-xs register and same 1ch
 												    rail as the thinking rows — one quote geometry. */}
-												<div className="font-medium uppercase tracking-wide text-muted-foreground">You</div>
+												<div className="font-medium text-muted-foreground">You</div>
 												<div className="lh-prose whitespace-pre-wrap text-foreground">
 													{m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")}
 												</div>
@@ -1561,16 +1617,16 @@ export function Chat({
 						    the THINKING placeholder by construction (the gate sits
 						    BEFORE beginTurn; the settle kick runs after endTurn). */}
 							{compacting && (
-								<span className="flex items-center gap-2 font-ui text-xs font-medium uppercase tracking-wide text-muted-foreground">
+								<span className="flex items-center gap-2 font-ui text-xs font-medium text-muted-foreground">
 									<BrailleSpinner label="Compacting context" />
-									<Shimmer duration={1}>COMPACTING CONTEXT…</Shimmer>
+									<Shimmer duration={1}>Compacting context…</Shimmer>
 								</span>
 							)}
 							{(status === "submitted" || turnInFlight) && (
-								<span className="flex items-center gap-2 font-ui text-xs font-medium uppercase tracking-wide text-muted-foreground">
+								<span className="flex items-center gap-2 font-ui text-xs font-medium text-muted-foreground">
 									<BrailleSpinner label="Thinking" />
 									<Shimmer duration={1}>
-										THINKING…
+										Thinking…
 									</Shimmer>
 								</span>
 							)}
@@ -1595,7 +1651,9 @@ export function Chat({
 				    height morph (typing, a question growing the band, the
 				    fold) and NEVER overlaps the composer. */}
 				<DockOverlay
-					pending={pending}
+					// Wide lessons: the question lives in the lesson panel, so
+					// the dock is composer-only (no fold, no reserve to defend).
+					pending={panelOn ? null : pending}
 					practice={activeProblem}
 					compactionRunning={compacting}
 					onSubmitThinking={submitThinking}
@@ -1650,23 +1708,16 @@ export function Chat({
 							// applies.
 							nextProblem={nextReady}
 							onNext={sendNext}
-							placeholder={nextReady ? "Ask anything, or press Enter for the next one." : undefined}
+							placeholder={
+								nextReady
+									? "Ask anything, or press Enter for the next one."
+									: panelOn && pending
+										? "Answer the question on the right to continue…"
+										: undefined
+							}
 						/>
 					}
-					onSubmitAnswer={(output) => {
-						if (!pending) return;
-						// THE ANSWER IS THE QUESTION CALL'S TOOL RESULT (fork 1, owner
-						// 2026-09-26): one input event, one turn — the hook appends
-						// the optimistic graded result (the AnsweredCard shows at
-						// once) and the server's write-ahead persists it before the
-						// turn; the teacher's reaction streams below it. Dismissals
-						// ride the same callback (QuestionAnswerData.dismissed). The
-						// reading-thinking draft rides along (owner 2026-10-03) — the
-						// check answer is its only carrier.
-						const reading = readingThinkingRef.current.trim() || undefined;
-						clearReadingThinking();
-						submitAnswer(pending.tool, pending.toolCallId, reading ? { ...output, readingThinking: reading } : output);
-					}}
+					onSubmitAnswer={submitPendingAnswer}
 				/>
 				</Conversation>
 
@@ -1688,6 +1739,20 @@ export function Chat({
 				<AbortTurnDialog mode={abortAsk} onClose={() => setAbortAsk(null)} onConfirm={confirmAbort} busy={busy} />
 				</div>
 			</div>
+			{panelOn && (
+				<LessonPanel
+					messages={messages}
+					pending={pending}
+					requiresReveal={requiresReveal}
+					phase={phases.at(-1) ?? "probe"}
+					compactionRunning={compacting}
+					readingThinking={readingThinking}
+					onReadingThinking={applyReadingThinking}
+					onSubmitAnswer={submitPendingAnswer}
+					dictationCancel={dictation.cancel}
+					onOpenPlan={() => setPlanOpen(true)}
+				/>
+			)}
 		</div>
 		</JobsContext.Provider>
 		</SessionMermaidContext.Provider>
