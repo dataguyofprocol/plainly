@@ -70,6 +70,9 @@
 	--danger: #b3261e;
 	--danger-soft: rgb(179 38 30 / 0.09);
 	--shadow: rgb(25 28 26 / 0.08);
+	/* The graph canvas's edge ink: a quiet grey between the faint text and
+	   the borders, so the reasoning reads without the brand teal shouting. */
+	--graph-edge: #a3a8a3;
 	/* Emphasis inks default to the regular text color. */
 	--lh-ink-strong: var(--foreground);
 	--lh-ink-italic: var(--foreground);

@@ -8,8 +8,9 @@ import { resolveSettings, slotsConfigured } from "@/src/core";
 // first frame and every navigation re-reads the settings record.
 export const dynamic = "force-dynamic";
 
-export default function KnowledgePage() {
+export default async function KnowledgePage({ searchParams }: { searchParams: Promise<{ idea?: string }> }) {
+	const { idea } = await searchParams;
 	const record = readSettingsRecord();
 	const rendering = resolveSettings(record ?? null).graph.rendering;
-	return <KnowledgeView initialConfigured={slotsConfigured(record?.models)} rendering={rendering} />;
+	return <KnowledgeView initialConfigured={slotsConfigured(record?.models)} rendering={rendering} focusIdeaId={idea} />;
 }

@@ -23,8 +23,11 @@ import type { TurnUsage } from "@/src/core";
 export function KnowledgeView({
 	initialConfigured,
 	rendering = true,
+	focusIdeaId,
 }: {
 	initialConfigured: boolean;
+	/** /knowledge?idea=… — brought forward once the graph loads. */
+	focusIdeaId?: string;
 	/** GRAPH RENDERING off (owner, 2026-10-06): the home's main view is
 	 * the chains view, not the canvas. Read server-side per navigation —
 	 * changing the setting applies on the next visit home. */
@@ -179,6 +182,7 @@ export function KnowledgeView({
 			<main className="absolute inset-0">
 				{rendering ? (
 					<GraphView
+						focusIdeaId={focusIdeaId}
 						chainSelectOpen={chainSelectOpen}
 						practiceSelection={pickedIds}
 						onPracticeSelectionChange={setPracticeProps}

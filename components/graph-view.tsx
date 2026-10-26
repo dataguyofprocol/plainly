@@ -67,7 +67,8 @@ import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, use
 import { NotesImportErrors, useNotesImport } from "@/components/notes-import.tsx";
 import Link from "next/link";
 import { FileTextIcon, ListTreeIcon, Loader2Icon, SearchIcon, SettingsIcon, UploadIcon, WaypointsIcon } from "lucide-react";
-import { incrementalLayout, propositionSessionHref, type GraphCostSummary, type GraphNode, type GraphSnapshot } from "@/src/core";
+import { incrementalLayout, propositionSessionHref, type GraphChain, type GraphCostSummary, type GraphNode, type GraphSnapshot } from "@/src/core";
+import { cn } from "@/lib/utils";
 import { planCostLabel } from "@/components/usage-format";
 import { GraphCanvasRenderer, type GraphRenderSettings } from "./graph-canvas.ts";
 import { usePopoverDismiss } from "@/components/popover-dismiss";
@@ -192,6 +193,26 @@ export function seedMissingNodePositions(
 	});
 	return positions;
 }
+
+/** Pure: an idea's place in the reasoning (v4 node card) — the premises of
+ *  every chain concluding at it ("rests on") and the conclusions of every
+ *  chain it is a premise of ("leads to"), deduplicated, in chain order.
+ *  Exported for tests. */
+export function ideaNeighbours(
+	chains: readonly Pick<GraphChain, "premises" | "conclusion">[],
+	nodeId: string,
+): { restsOn: string[]; leadsTo: string[] } {
+	const restsOn = new Set<string>();
+	const leadsTo = new Set<string>();
+	for (const c of chains) {
+		if (c.conclusion === nodeId) for (const p of c.premises) if (p !== nodeId) restsOn.add(p);
+		if (c.premises.includes(nodeId) && c.conclusion !== nodeId) leadsTo.add(c.conclusion);
+	}
+	return { restsOn: [...restsOn], leadsTo: [...leadsTo] };
+}
+
+/** How many related ideas the card names before "and N more". */
+const NEIGHBOUR_LIMIT = 4;
 
 // ---- Color helpers (canvas wants hex, not oklch) ---------------------------
 
@@ -963,7 +984,11 @@ export function GraphView({
 	practiceSelection,
 	onPracticeSelectionChange,
 	onChainSelectClose,
+	focusIdeaId,
 }: {
+	/** An idea to bring forward on arrival (/knowledge?idea=…, from the home
+	 *  page or the omnibar): the search is seeded with its name. */
+	focusIdeaId?: string;
 	/** PRACTICE SELECT (owner vision, 2026-10-04): the LIFTED, persistent
 	 *  pick set — every check/clear in the chain table (however opened)
 	 *  reports the full node list up immediately; the composer-side chip
@@ -986,6 +1011,16 @@ export function GraphView({
 
 	// Search panel state: the query text + the settings section toggle.
 	const [query, setQuery] = useState("");
+	// The arrival focus (v4): once the snapshot knows the idea, its name
+	// becomes the search — the existing filter brings it forward. Once only:
+	// the learner owns the search after that.
+	const focusAppliedRef = useRef(false);
+	useEffect(() => {
+		if (!focusIdeaId || focusAppliedRef.current || !snapshot) return;
+		const node = snapshot.propositions.find((n) => n.id === focusIdeaId);
+		focusAppliedRef.current = true;
+		if (node) setQuery(node.name);
+	}, [focusIdeaId, snapshot]);
 	// ⌘F (shortcut wave C): the find event focuses the node search —
 	// surface-scoped, dispatched as lh:kbd-find (only this page listens).
 	const searchInputRef = useRef<HTMLInputElement>(null);
@@ -1428,7 +1463,7 @@ export function GraphView({
 			clusters: snapshot.clusters.map((c) => ({ id: c.id, label: c.label, members: c.members })),
 			colors: {
 				node: tokenHex(NODE_COLOR_TOKEN),
-				edge: tokenHex("--ring"),
+				edge: tokenHex("--graph-edge"),
 				label: tokenHex("--muted-foreground"),
 				hoverText: tokenHex("--foreground"),
 			},
@@ -1648,8 +1683,9 @@ export function GraphView({
 					// over home.tsx's drag surface (2026-09-17).
 					className="lh-no-drag absolute z-10 w-80 max-w-[calc(100%-1rem)] rounded-xl border bg-card p-4 text-left shadow-lg"
 				>
-					<div className="text-sm font-medium leading-snug">{selected.node.name}</div>
-					<div className="mt-1 text-xs leading-relaxed text-muted-foreground">{selected.node.statement}</div>
+					{/* The idea is prose — name and statement in the reading serif (v4). */}
+					<div className="font-prose text-[17px] font-medium leading-snug">{selected.node.name}</div>
+					<div className="mt-1.5 font-prose text-sm leading-relaxed text-muted-foreground">{selected.node.statement}</div>
 					{selected.sourceIds.length > 0 ? (
 						<div className="mt-3 flex flex-col gap-1">
 							<div className="text-xs text-muted-foreground">Sessions</div>
@@ -1683,6 +1719,72 @@ export function GraphView({
 					) : (
 						<div className="mt-3 text-xs text-muted-foreground">No sessions recorded.</div>
 					)}
+					{/* The idea's place in the reasoning (v4): what it rests on,
+					    what it leads to — read from the stored chains. */}
+					{(() => {
+						const { restsOn, leadsTo } = ideaNeighbours(snapshot?.chains ?? [], selected.node.id);
+						const name = (id: string) => snapshot?.propositions.find((n) => n.id === id)?.name ?? id;
+						const list = (title: string, ids: string[], empty: string) => (
+							<div className="mt-3 flex flex-col gap-0.5">
+								<div className="text-xs font-semibold text-faint">
+									{title} · {ids.length}
+								</div>
+								{ids.length === 0 ? (
+									<div className="text-xs text-muted-foreground">{empty}</div>
+								) : (
+									<>
+										{ids.slice(0, NEIGHBOUR_LIMIT).map((id) => (
+											<div key={id} className="truncate font-prose text-sm">
+												{name(id)}
+											</div>
+										))}
+										{ids.length > NEIGHBOUR_LIMIT && (
+											<div className="text-xs text-muted-foreground">and {ids.length - NEIGHBOUR_LIMIT} more</div>
+										)}
+									</>
+								)}
+							</div>
+						);
+						return (
+							<>
+								{list("Rests on", restsOn, "A starting point.")}
+								{list("Leads to", leadsTo, "Nothing yet — a good place to go deeper.")}
+							</>
+						);
+					})()}
+					<div className="mt-4 flex gap-2">
+						{onPracticeSelectionChange && (
+							<button
+								type="button"
+								data-testid="node-card-practice"
+								onClick={() => {
+									const props = snapshot?.propositions ?? [];
+									const ids = new Set(practiceSelection ?? []);
+									if (ids.has(selected.node.id)) ids.delete(selected.node.id);
+									else ids.add(selected.node.id);
+									onPracticeSelectionChange(
+										props.filter((n) => ids.has(n.id)).map((n) => ({ id: n.id, name: n.name, statement: n.statement })),
+									);
+								}}
+								className={cn(
+									"flex h-8 items-center rounded-lg border px-3 text-xs font-semibold transition-colors",
+									practiceSelection?.has(selected.node.id)
+										? "border-brand bg-brand-soft text-brand"
+										: "border-border bg-popover hover:bg-accent",
+								)}
+							>
+								{practiceSelection?.has(selected.node.id) ? "In practice set" : "Add to practice"}
+							</button>
+						)}
+						<button
+							type="button"
+							data-testid="node-card-deeper"
+							onClick={() => window.dispatchEvent(new CustomEvent("lh:open-omnibar", { detail: { query: selected.node.name } }))}
+							className="flex h-8 items-center rounded-lg border border-border bg-popover px-3 text-xs font-semibold transition-colors hover:bg-accent"
+						>
+							Go deeper
+						</button>
+					</div>
 				</div>
 			)}
 			{/* The chain table overlay (chains-overlay plan, 2026-09-29):

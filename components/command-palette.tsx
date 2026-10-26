@@ -138,8 +138,11 @@ export function CommandPalette() {
 	const [draft, setDraft] = useState<{ query: string; mode: PaletteMode }>({ query: "", mode: "teach" });
 	const readiness = useStartReadiness();
 	useEffect(() => {
-		const onOpen = () => {
-			setDraft({ query: "", mode: "teach" });
+		// lh:open-omnibar may carry a starting query (the graph card's
+		// "Go deeper" opens the omnibar on the idea's name).
+		const onOpen = (e: Event) => {
+			const query = (e as CustomEvent<{ query?: string } | undefined>).detail?.query ?? "";
+			setDraft({ query, mode: "teach" });
 			setOpen(true);
 		};
 		const events = [kbdEventForAction("open-omnibar"), kbdEventForAction("sessions-search"), "lh:open-omnibar"];
