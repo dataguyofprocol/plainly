@@ -79,3 +79,6 @@ export * from "./coverage.ts";
 // ONE session→markdown formatter — the extractor's view and the user-facing
 // export share it. Pure, browser-safe.
 export * from "./session-markdown.ts";
+// activity.ts (v4 redesign, 2026-10-26): the progress folds — time
+// ledger, session progress, period stats, topics. Pure, browser-safe.
+export * from "./activity.ts";

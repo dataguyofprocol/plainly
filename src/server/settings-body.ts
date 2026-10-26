@@ -23,7 +23,7 @@ import type {
 	ModelsSettings,
 	RoleModelOverride,
 } from "../core/settings.ts";
-import { BACKGROUND_MODEL_ROLES, COMPACTION_THRESHOLD_FLOOR, EXTRACTION_CHUNK_TOKENS_FLOOR, MODEL_SLOTS } from "../core/settings.ts";
+import { BACKGROUND_MODEL_ROLES, COMPACTION_THRESHOLD_FLOOR, DAILY_GOAL_MAX, DAILY_GOAL_MIN, EXTRACTION_CHUNK_TOKENS_FLOOR, MODEL_SLOTS } from "../core/settings.ts";
 import { WRITABLE_TOOL_KEYS } from "../core/pending.ts";
 
 /** Parsed-or-rejected — `ok: false` carries the 400's error message. */
@@ -75,7 +75,7 @@ function asRecord(body: unknown): Record<string, unknown> | null {
 	return body as Record<string, unknown>;
 }
 
-/** general: { autoUpdate?: boolean } */
+/** general: { autoUpdate?: boolean, dailyGoalMinutes?: integer 5..240 } */
 export function parseGeneralSettingsBody(body: unknown): SettingsBodyResult<GeneralSettings> {
 	const raw = asRecord(body);
 	if (!raw) return { ok: false, error: "Invalid JSON body" };
@@ -85,6 +85,13 @@ export function parseGeneralSettingsBody(body: unknown): SettingsBodyResult<Gene
 			return { ok: false, error: "autoUpdate must be a boolean" };
 		}
 		settings.autoUpdate = raw.autoUpdate;
+	}
+	if (raw.dailyGoalMinutes !== undefined) {
+		const goal = raw.dailyGoalMinutes;
+		if (typeof goal !== "number" || !Number.isInteger(goal) || goal < DAILY_GOAL_MIN || goal > DAILY_GOAL_MAX) {
+			return { ok: false, error: `dailyGoalMinutes must be an integer from ${DAILY_GOAL_MIN} to ${DAILY_GOAL_MAX}` };
+		}
+		settings.dailyGoalMinutes = goal;
 	}
 	return { ok: true, settings };
 }

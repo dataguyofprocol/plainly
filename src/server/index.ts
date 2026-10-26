@@ -44,3 +44,7 @@ export { runPiTurn, piTurnResponse, type PiTurnHandle, type PiTurnSpec } from ".
 export * from "./observability.ts";
 export * from "./model-catalog.ts";
 export { sessionCost } from "./pricing.ts";
+// The v4 progress surfaces (redesign, 2026-10-26): the time ledger, period
+// stats, topics, the session list's progress fields, and the suggestions.
+export { recordTimeBeat, chatListItems, activityStats, activityDaily, activityTopics } from "./activity.ts";
+export { suggestionService } from "./suggestions.ts";

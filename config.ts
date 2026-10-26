@@ -29,7 +29,16 @@ export const PATHS = {
 	/** Debug artifacts (env-gated): data/debug/provider-events/<chatId>.jsonl
 	 * raw provider stream recordings (src/agent/provider-events.ts). */
 	debug: path.join(DATA_ROOT, "debug"),
+	/** The active-learning time ledger (v4 redesign, 2026-10-26): one
+	 *  append-only JSONL file per LOCAL month, YYYY-MM.jsonl, lines
+	 *  {chatId, at, seconds} (core/contracts/activity.ts TimeBeat). */
+	time: path.join(DATA_ROOT, "time"),
 } as const;
+
+/** The "next from your graph" suggestions cache (v4 redesign,
+ *  2026-10-26): one small JSON record, read-modify-write — the latest
+ *  generation plus its append-only usage log (src/store/suggestions.ts). */
+export const SUGGESTIONS_FILE = path.join(DATA_ROOT, "suggestions.json");
 
 // ─── Models ────────────────────────────────────────────────────────────────
 // BYOK ALL THE WAY DOWN (owner, 2026-09-22): there are NO factory default

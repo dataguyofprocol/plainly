@@ -25,7 +25,7 @@
  * turn rides one composition.
  */
 
-import type { QuestionAnswerData } from "./question-core.ts";
+import { CONFIDENCE_LEVELS, CONFIDENCE_STOPS, isAcceptedConfidence, type QuestionAnswerData } from "./question-core.ts";
 import type { LhMessage } from "./native-messages.ts";
 import {
 	activeProblemOf,
@@ -39,6 +39,7 @@ import {
 	pendingProblemDismissalOf,
 } from "./native-messages.ts";
 import { QUESTION_TOOLS, toolQuestionKind } from "./pending.ts";
+import { isHintRung, type HintRung } from "./contracts/chat.ts";
 
 /** One client-originated input event (the POST body's `input`). */
 export type ChatInput =
@@ -49,7 +50,7 @@ export type ChatInput =
 	 *  thinking on the ACTIVE problem — one lane (owner 2026-10-05):
 	 *  whether it claims an answer is read from the text. One
 	 *  problem may carry many submissions; each is its own turn. */
-	| { type: "thinking"; problemCallId: string; text: string }
+	| { type: "thinking"; problemCallId: string; text: string; hint?: HintRung }
 	/** The practice move-on signal (owner round 16): the learner's
 	 *  explicit go-ahead during the between-problems pause — the Next
 	 *  chip or Enter on an empty composer. Practice sessions only, and
@@ -167,6 +168,17 @@ export function parseChatInput(input: unknown): ChatInput {
 			if (typeof i.answer !== "object" || i.answer === null) {
 				throw new ChatInputError("answer input requires the graded answer object");
 			}
+			// Confidence (v4 redesign, 2026-10-26): the four labelled levels
+			// or a legacy slider stop — absent is fine (ask/explain, "I don't
+			// know"); any other number is an honest 400.
+			{
+				const confidence = (i.answer as { confidence?: unknown }).confidence;
+				if (confidence !== undefined && !isAcceptedConfidence(confidence)) {
+					throw new ChatInputError(
+						`answer confidence must be one of ${[...CONFIDENCE_LEVELS.map((l) => l.value), ...CONFIDENCE_STOPS].join(", ")}`,
+					);
+				}
+			}
 			return { type: "answer", toolCallId: i.toolCallId, answer: i.answer as QuestionAnswerData };
 		case "continue":
 			return { type: "continue" };
@@ -174,10 +186,22 @@ export function parseChatInput(input: unknown): ChatInput {
 			if (typeof i.problemCallId !== "string" || i.problemCallId.length === 0) {
 				throw new ChatInputError("thinking input requires problemCallId");
 			}
-			if (typeof i.text !== "string" || i.text.trim().length === 0) {
+			// The optional hint rung (v4 redesign, 2026-10-26): 1|2|3 or
+			// absent — anything else is an honest 400, never a silent drop.
+			if (i.hint !== undefined && !isHintRung(i.hint)) {
+				throw new ChatInputError("thinking input's hint must be 1, 2, or 3");
+			}
+			// A hint request may arrive with no working yet (the bare "I'm
+			// stuck"); a plain submission still needs text.
+			if (typeof i.text !== "string" || (i.text.trim().length === 0 && i.hint === undefined)) {
 				throw new ChatInputError("thinking input requires non-empty text");
 			}
-			return { type: "thinking", problemCallId: i.problemCallId, text: i.text };
+			return {
+				type: "thinking",
+				problemCallId: i.problemCallId,
+				text: i.text,
+				...(i.hint !== undefined ? { hint: i.hint as HintRung } : {}),
+			};
 		case "next":
 			return { type: "next" };
 		default:
@@ -215,7 +239,7 @@ export function inputAppends(
 			if (!active || active.toolCallId !== input.problemCallId) {
 				throw new ChatInputError("thinking input targets no active problem");
 			}
-			return [...dismissalConclusion(record), newThinkingMessage(input.problemCallId, input.text)];
+			return [...dismissalConclusion(record), newThinkingMessage(input.problemCallId, input.text, input.hint)];
 		}
 		case "next": {
 			// Honest 400s, the thinking gate's discipline: the signal is a

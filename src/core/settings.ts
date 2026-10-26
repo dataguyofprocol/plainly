@@ -233,6 +233,10 @@ export const ROLE_SLOT: Readonly<Record<ModelRole, ModelSlotName>> = {
 export interface GeneralSettings {
 	/** Auto-update the app (default ON). Mechanism ships in a later wave. */
 	autoUpdate?: boolean;
+	/** The daily active-learning goal in minutes (v4 redesign, owner
+	 *  2026-10-26): the home's week strip marks a day met at >= this.
+	 *  Integer DAILY_GOAL_MIN..DAILY_GOAL_MAX, factory 30. */
+	dailyGoalMinutes?: number;
 }
 
 /** Agent settings — everything about the non-conversation machinery. */
@@ -396,7 +400,7 @@ export interface FactorySettings {
 
 export const FACTORY_SETTINGS: FactorySettings = {
 	version: CURRENT_SETTINGS_VERSION,
-	general: { autoUpdate: true },
+	general: { autoUpdate: true, dailyGoalMinutes: 30 },
 	appearance: {
 		// Light only since the v4 redesign (2026-10-26): `mode`, `background`
 		// and the emphasis inks stay in the schema (old records still parse)
@@ -440,10 +444,21 @@ function sanitizeHexOrNull(value: unknown): string | null {
 const boolOrDrop = (value: unknown): boolean | undefined =>
 	typeof value === "boolean" ? value : undefined;
 
+/** The daily goal's bounds (v4 redesign): five minutes is the smallest
+ *  goal worth a streak, four hours the largest honest one. The sanitizer
+ *  clamps; the PUT rejects outside them. */
+export const DAILY_GOAL_MIN = 5;
+export const DAILY_GOAL_MAX = 240;
+
 function sanitizeGeneral(raw: Record<string, unknown>): GeneralSettings {
 	const out: GeneralSettings = {};
 	const autoUpdate = boolOrDrop(raw.autoUpdate);
 	if (autoUpdate !== undefined) out.autoUpdate = autoUpdate;
+	// clamp-never-reject (the sanitizer's discipline): a finite number
+	// rounds and clamps into range; anything else drops to the factory 30.
+	if (typeof raw.dailyGoalMinutes === "number" && Number.isFinite(raw.dailyGoalMinutes)) {
+		out.dailyGoalMinutes = clamp(Math.round(raw.dailyGoalMinutes), DAILY_GOAL_MIN, DAILY_GOAL_MAX);
+	}
 	return out;
 }
 

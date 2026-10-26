@@ -17,6 +17,7 @@ import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import { activeProblemOf, danglingQuestionOf } from "../core/native-messages.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
+import { chatProgressOf } from "../core/activity.ts";
 
 function chatFile(id: string): string {
 	if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new Error(`Invalid chat id: ${id}`);
@@ -84,7 +85,7 @@ function listChats(): ChatSummary[] {
 			.filter((f) => f.endsWith(".json"))
 			.map((f) => getChat(f.slice(0, -5)))
 			.filter((r): r is ChatRecord => r !== null)
-			.map(({ messages, tree, turns, extractions, ...summary }) => {
+			.map(({ messages, tree, turns, extractions, ...summary }): ChatSummary | null => {
 				// Per-record isolation (Wave B): a record whose messages fail the
 				// projection (e.g. pre-Wave-B UIMessage-format scratch — the
 				// zero-back-compat wipe makes these "corrupt") must not blank the
@@ -107,6 +108,15 @@ function listChats(): ChatSummary[] {
 						// NOT record-derived — the API route merges it (ChatListItem).
 						phase: phaseAt3Lh(messages),
 						pendingQuestion: danglingQuestionOf(messages) !== null,
+						// The practice "Problem waiting" bit: a cleanly-posed
+						// problem with no conclude (activeProblemOf). Declared on
+						// ChatSummary since practice sessions landed but never set
+						// here until the v4 progress fold (2026-10-26).
+						pendingProblem: (summary.kind ?? "teach") === "practice" && activeProblemOf(messages) !== null,
+						// The v4 progress fold (core/activity.ts): computed HERE
+						// because the record is already parsed — the chats route
+						// unpacks it onto the list item with liveness folded in.
+						progress: chatProgressOf({ kind: summary.kind, tree, messages }),
 					};
 				} catch (err) {
 					console.error(`[chat ${summary.id}] summary projection failed:`, err);
