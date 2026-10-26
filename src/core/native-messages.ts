@@ -39,6 +39,8 @@ import { QUESTION_TOOLS } from "./pending.ts";
 import {
 	CONCLUDE_ACK_TEXT,
 	HANDOFF_TEXT,
+	hintRequestText,
+	type HintRung,
 	NEXT_PROBLEM_TEXT,
 	THINKING_LABEL,
 } from "./contracts/chat.ts";
@@ -243,16 +245,42 @@ export function newGraphContextMessage(picks: readonly GraphContextPick[], chain
  *  content label is the single "Your thinking"; `details` keeps the raw
  *  payload for the transcript card. One problem may carry many
  *  submissions. */
-export function newThinkingMessage(problemCallId: string, text: string): LhMarkerMessage {
+export function newThinkingMessage(problemCallId: string, text: string, hint?: HintRung): LhMarkerMessage {
+	// HINT REQUESTS (v4 redesign, owner 2026-10-26): an explicit rung rides
+	// the same lane — the request line leads (hintRequestText, single-
+	// sourced in contracts), the working follows under the usual label.
+	// A bare request (no working yet — "I'm stuck") carries the line only;
+	// the doctrine starts such a request at the top of its ladder.
+	const thinking = text.trim().length > 0 || !hint ? `${THINKING_LABEL}:\n${text}` : "";
+	const content = hint ? [hintRequestText(hint), thinking].filter(Boolean).join("\n\n") : thinking;
 	return {
 		id: newMessageId(),
 		role: "custom",
 		customType: "practice-thinking",
-		content: `${THINKING_LABEL}:\n${text}`,
+		content,
 		display: true,
-		details: { problemCallId, text },
+		// `hint` only when present — pre-hint markers keep their exact shape.
+		details: hint ? { problemCallId, text, hint } : { problemCallId, text },
 		timestamp: Date.now(),
 	};
+}
+
+/** The hint rungs the learner explicitly requested on one problem, in
+ *  request order (v4 redesign, 2026-10-26): read off the practice-thinking
+ *  markers' `details.hint` — submissions without a rung (plain thinking,
+ *  pre-hint records) contribute nothing. `.length` is the hints used;
+ *  the max is the deepest rung reached (the dock's next-rung seam). */
+export function practiceHintsUsed(messages: readonly LhMessage[], problemCallId: string): HintRung[] {
+	const rungs: HintRung[] = [];
+	for (const m of messages) {
+		if ((m as { role?: string }).role !== "custom") continue;
+		const marker = m as LhMarkerMessage;
+		if (marker.customType !== "practice-thinking") continue;
+		const details = marker.details as { problemCallId?: unknown; hint?: unknown } | undefined;
+		if (details?.problemCallId !== problemCallId) continue;
+		if (details.hint === 1 || details.hint === 2 || details.hint === 3) rungs.push(details.hint);
+	}
+	return rungs;
 }
 
 /** The learner's explicit move-on signal (owner round 16): appended by

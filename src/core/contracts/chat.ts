@@ -10,6 +10,7 @@ import type { LhMessage } from "../native-messages.ts";
 import type { Phase3 } from "../phases.ts";
 import type { PlanNodeStatus, PlanTree } from "./plan.ts";
 import type { EmissionStats } from "./graph.ts";
+import type { ChatAnswerStats, ChatPlanProgress, ChatProgress, ChatState, PracticeSetProgress } from "./activity.ts";
 
 // ─── Chat records (the session store's on-disk format) ───────────────────────
 
@@ -203,6 +204,39 @@ export const HANDOFF_TEXT =
  *  not declared by a button. */
 export const THINKING_LABEL = "Your thinking";
 
+/** The learner's explicit hint request (v4 redesign, owner 2026-10-26):
+ *  the practice dock's three escalating buttons — 1 = Nudge, 2 = Bigger
+ *  hint, 3 = First step. A rung rides a thinking submission
+ *  ({type:"thinking", hint}); the marker records it in `details.hint`
+ *  and the model reads the request line below AHEAD of the thinking
+ *  label. The rungs are the LEARNER's ask, not the doctrine's R0–R5
+ *  ladder: the doctrine (practice §VI) still picks the actual rung —
+ *  the request bounds how much the learner is asking to be given. */
+export type HintRung = 1 | 2 | 3;
+
+export const HINT_RUNGS: ReadonlyArray<{ rung: HintRung; label: string }> = [
+	{ rung: 1, label: "Nudge" },
+	{ rung: 2, label: "Bigger hint" },
+	{ rung: 3, label: "First step" },
+];
+
+const HINT_REQUEST_ASK: Record<HintRung, string> = {
+	1: "a nudge",
+	2: "a bigger hint",
+	3: "the first step",
+};
+
+/** The model-facing request line (single-sourced here per the marker
+ *  law): "[Hint request — rung 2 of 3: a bigger hint]". */
+export function hintRequestText(rung: HintRung): string {
+	return `[Hint request — rung ${rung} of 3: ${HINT_REQUEST_ASK[rung]}]`;
+}
+
+/** Narrow an unknown value to a hint rung (the input parser's gate). */
+export function isHintRung(value: unknown): value is HintRung {
+	return value === 1 || value === 2 || value === 3;
+}
+
 /** The conclude tool's ack — shared by the executed call (agent layer) and
  *  the dismissal-synthesized pair (input-events), so a concluded problem
  *  reads identically to the model however it concluded. Owner round 16:
@@ -275,6 +309,12 @@ export interface ChatSummary {
 	 *  summary spread (the picker never needs it from here; the full record
 	 *  is its source). */
 	settings?: ChatSettings;
+	/** The record-derived progress fold (v4 redesign, 2026-10-26 —
+	 *  core/activity.ts chatProgressOf), computed where listChats already
+	 *  holds the parsed record. The chats route unpacks it onto the
+	 *  ChatListItem fields below and never ships it nested. Optional:
+	 *  a store double (tests) may omit it. */
+	progress?: ChatProgress;
 }
 
 /** The sidebar's session row: a summary + live liveness. The chats list
@@ -291,6 +331,23 @@ export interface ChatListItem extends ChatSummary {
 	 *  route attaches it from the compaction registry — never
 	 *  record-derived (the marker persists, the RUN is ephemeral). */
 	compacting: boolean;
+	// ─── v4 progress fields (redesign, 2026-10-26) ────────────────────────
+	// Always populated by GET /api/chats; OPTIONAL in the type so older
+	// constructions (tests, optimistic rows) stay valid — read absent as
+	// "unknown". Definitions: contracts/activity.ts.
+	/** working | waiting | finished | paused (busy folded in). */
+	state?: ChatState;
+	/** The pending question's text (quiz/ask/explain/probe/recall), or the
+	 *  active practice problem's statement — plain text, ≤ ~140 chars. */
+	pendingQuestionText?: string | null;
+	/** Teach only (null on practice / no plan). */
+	plan?: ChatPlanProgress | null;
+	/** Active minutes from the time ledger, rounded. */
+	minutes?: number;
+	/** Teach only (null on practice). */
+	answers?: ChatAnswerStats | null;
+	/** Practice only (null on teach). */
+	practiceSet?: PracticeSetProgress | null;
 }
 
 // ─── Artifact renderer registry (client extension point) ────────────────────

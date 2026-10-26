@@ -500,6 +500,35 @@ export interface AnswerRequest {
 export const CONFIDENCE_STOPS: readonly number[] = [0, 30, 50, 70, 90, 100];
 export const DEFAULT_CONFIDENCE_INDEX = 2;
 
+/** The FOUR labelled confidence levels (v4 redesign, owner 2026-10-26):
+ *  NEW answers carry one of these values. Words first — the learner picks
+ *  how sure he is, the percentage is what the record (and the teacher,
+ *  shared/25-confidence.md) reads. No coin-flip midpoint by design: 50
+ *  is "Unsure", not a resting default. CONFIDENCE_STOPS above stays
+ *  exported for rendering OLD answers (records keep their raw number). */
+export const CONFIDENCE_LEVELS: ReadonlyArray<{ label: string; value: number }> = [
+	{ label: "Guessing", value: 25 },
+	{ label: "Unsure", value: 50 },
+	{ label: "Fairly sure", value: 75 },
+	{ label: "Certain", value: 95 },
+];
+
+/** Answer-side confidence validation: the four levels AND the legacy
+ *  slider stops — old records (and an old client mid-upgrade) stay
+ *  valid; anything else is refused at the input boundary. */
+export function isAcceptedConfidence(value: unknown): value is number {
+	return (
+		typeof value === "number" &&
+		(CONFIDENCE_LEVELS.some((l) => l.value === value) || CONFIDENCE_STOPS.includes(value))
+	);
+}
+
+/** The level label for a stored confidence — null for legacy stop values
+ *  (0/30/70/90/100) and anything off the level grid (render the number). */
+export function confidenceLabel(value: number): string | null {
+	return CONFIDENCE_LEVELS.find((l) => l.value === value)?.label ?? null;
+}
+
 // ─── dock selection (the client state machine, pure for tests) ─────────────
 
 /** The question dock's selection state (0-based indices in display order). */
