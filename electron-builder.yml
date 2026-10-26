@@ -1,4 +1,4 @@
-# electron-builder config — LearnHarness desktop (macOS arm64; Windows/Linux x64).
+# electron-builder config — Plainly desktop (macOS arm64; Windows/Linux x64).
 #
 # Shape (fact-checked 2026-09-17):
 #   - the app's real server (.next/standalone, curated by
@@ -6,11 +6,10 @@
 #     because native .node/dylib can't dlopen from a read-only archive and
 #     server.js process.chdir()s into its own dir;
 #   - the asar holds only the shell (electron/main.cjs + package.json);
-#   - signed + notarized since 2026-10-08 (Developer ID Application cert in
-#     the login keychain; notary credentials in the LH_NOTARY keychain
-#     profile; the profile + team env vars are baked into desktop:dist).
-appId: com.learnharness.LearnHarness
-productName: LearnHarness
+#   - Plainly fork (2026-10-27): macOS builds are ad-hoc signed and NOT
+#     notarized until the fork has its own Developer ID (owner ruling).
+appId: app.plainly.Plainly
+productName: Plainly
 directories:
   output: dist
 # Icons (owner ruling, 2026-10-13) — per-platform sources in build/:
@@ -125,17 +124,22 @@ mac:
   # Laid for the STT milestone (researcher-verified): the TCC mic prompt
   # reads this string; macOS asks regardless of Electron's own handlers.
   extendInfo:
-    NSMicrophoneUsageDescription: "LearnHarness uses the microphone only for speech-to-text input into your sessions."
-  hardenedRuntime: true
+    NSMicrophoneUsageDescription: "Plainly uses the microphone only for speech-to-text input into your sessions."
+  # Hardened runtime is off while ad-hoc signed: its library validation
+  # rejects Electron's pre-signed frameworks (different Team ID) and the
+  # server's native modules. It is only required for notarization — turn
+  # it back on together with notarize.
+  hardenedRuntime: false
   entitlements: build/entitlements.mac.plist
-  # Signing + notarization (flipped 2026-10-08): identity auto-detects the
-  # Developer ID Application certificate from the login keychain;
-  # notarize: true makes electron-builder sign → submit to Apple's notary
-  # service → staple the ticket, all inside this one build (credentials
-  # via the LH_NOTARY keychain profile, env baked into desktop:dist).
-  # Adds minutes per build (Apple's scan queue). Verification battery:
-  # codesign --verify --deep / spctl --assess / stapler validate.
-  notarize: true
+  # Signing (Plainly fork, owner ruling 2026-10-27): ad-hoc ("-") until the
+  # fork has its own Developer ID. Apple Silicon refuses to run unsigned
+  # code, so ad-hoc is the floor; users right-click → Open on first launch.
+  # Consequence: Squirrel.Mac only installs updates for Developer ID-signed
+  # apps, so macOS auto-update is off in practice until signing returns.
+  # To restore: drop identity, set notarize: true, and supply the
+  # CSC_*/APPLE_* credentials (see docs/desktop-release.md).
+  identity: "-"
+  notarize: false
 dmg:
   title: "${productName} ${version}"
   # Owner artwork: 540×380 at 1×; the sibling background@2x.png is
@@ -188,7 +192,7 @@ publish:
   # would be a leak. desktop:dist passes no --publish flag, so builds never
   # upload; publishing happens at release time (GH_TOKEN + --publish).
   - provider: github
-    owner: amosblomqvist
-    repo: learnharness
+    owner: dataguyofprocol
+    repo: plainly
     # All three CI jobs contribute assets; only the owner publishes it.
     releaseType: draft

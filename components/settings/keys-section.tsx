@@ -523,7 +523,7 @@ export function KeysSection({
 					</div>
 				)}
 				{unknownRows.length > 0 && <div data-testid="group-unknown-keys">
-					{unknownRows.map((status) => <div key={status.id} data-testid={`unknown-${status.id}`} className="st-unknown" title="Not a provider LearnHarness recognises — kept as is">
+					{unknownRows.map((status) => <div key={status.id} data-testid={`unknown-${status.id}`} className="st-unknown" title="Not a provider Plainly recognises — kept as is">
 						<span>{status.id}</span>
 						<span className="st-mask">{status.masked}</span>
 					</div>)}

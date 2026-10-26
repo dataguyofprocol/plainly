@@ -1,5 +1,5 @@
 // Regenerate the Windows/Linux icon set from the flat design source
-// (build/icon-flat.svg — the owner's Affinity export, rounded squircle
+// (build/icon-flat.svg — the Plainly tile, 2026-10-27; rounded squircle
 // with baked transparency, owner ruling 2026-10-13).
 //
 //   build/icon.ico  — Windows (.ico with 16/24/32/48/64/128/256 PNG entries)

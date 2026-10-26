@@ -1,6 +1,6 @@
 # Development guide
 
-The developer README (split out of the storefront README, 2026-10-10). Everything below is for people working ON LearnHarness, not using it.
+The developer README (split out of the storefront README, 2026-10-10). Everything below is for people working ON Plainly, not using it.
 
 A standalone learning app (web + Electron desktop): a **teacher agent** (Next.js; the Vercel AI SDK's `UIMessage` protocol end-to-end, LLM engine [pi-ai](docs/pi-engine-swap.md) via OpenRouter), probe→teach lessons with graded quiz/ask interactions, a formal **session plan tree** the teacher authors once (`plan_init`) and whose progress is derived from tagged quiz calls, and a persistent cross-session **knowledge graph** of what the learner knows — the graph is the app's home page.
 
@@ -24,7 +24,7 @@ npm run lint         # eslint — includes the import law (architecture §2)
 npm run typecheck    # tsc --noEmit
 
 npm run desktop:dev    # next dev + Electron shell pointed at it
-npm run desktop:dist   # local signed/notarized macOS arm64 build (LH_NOTARY keychain)
+npm run desktop:dist   # local macOS arm64 build (ad-hoc signed, not notarized)
 
 # one-shot data scripts (run from the master tree only — data never crosses trees)
 npx tsx --env-file=.env.local scripts/import-notes.ts <dir>   # bulk-import notes → graph

@@ -30,6 +30,7 @@ const { attachChatGPTChild, trustedSender, chatGPTControl } = require("./chatgpt
 const { createSubscriptions, loadSubscriptionSDK } = require("./subscriptions.cjs");
 const { attachSubscriptionChild, subscriptionControl } = require("./subscription-ipc.cjs");
 const { desktopAPIHeaders } = require("./desktop-api.cjs");
+const { migrateUserData } = require("./migrate-data.cjs");
 const { randomBytes } = require("node:crypto");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
@@ -41,14 +42,14 @@ const path = require("node:path");
 // renderer owns the number; this is the IPC widen target).
 const SIDEBAR_AUTOCLOSE = 880;
 
-const PRODUCT_NAME = "LearnHarness";
+const PRODUCT_NAME = "Plainly";
 
-// APP NAME → userData (owner, 2026-10-10): the Application Support dir is
-// exactly "LearnHarness" in dev AND packaged. Packaged Electron would
-// otherwise derive it from package.json "name" (now lowercase
-// "learnharness"), and productName metadata alone doesn't reach app.name.
-// Must run before the LH_DEV_URL suffix below — dev becomes
-// "LearnHarness-dev".
+// APP NAME → userData (owner, 2026-10-10; renamed 2026-10-27): the
+// Application Support dir is exactly "Plainly" in dev AND packaged.
+// Packaged Electron would otherwise derive it from package.json "name"
+// (lowercase "plainly"), and productName metadata alone doesn't reach
+// app.name. Must run before the LH_DEV_URL suffix below — dev becomes
+// "Plainly-dev".
 app.setName(PRODUCT_NAME);
 const AUTH_FILE = () => path.join(app.getPath("userData"), "auth.json");
 const DATA_DIR = () => path.join(app.getPath("userData"), "data");
@@ -129,6 +130,15 @@ if (process.argv.includes("--browser-service")) {
 				win.focus();
 			}
 		});
+		// After the lock, so only one instance ever copies; before main(), so
+		// nothing has read userData yet. Failure is logged and the app starts
+		// with an empty folder — the LearnHarness copy stays where it was.
+		try {
+			const result = migrateUserData(app.getPath("userData"));
+			if (result === "copied") log("data migration: copied LearnHarness userData into Plainly");
+		} catch (err) {
+			log(`data migration failed: ${err?.message ?? err}`);
+		}
 		main();
 	}
 }
@@ -456,7 +466,7 @@ function checkForUpdates({ manual = false } = {}) {
 			// update-downloaded. Manual checks additionally answer directly.
 			if (!manual) return;
 			const version = result?.updateInfo?.version;
-			if (!version) dialog.showMessageBox({ type: "info", message: "You're up to date.", detail: `LearnHarness ${app.getVersion()} is the latest version.` });
+			if (!version) dialog.showMessageBox({ type: "info", message: "You're up to date.", detail: `Plainly ${app.getVersion()} is the latest version.` });
 		})
 		.catch((err) => {
 			log(`update check failed: ${err?.message ?? err}`);
@@ -525,6 +535,12 @@ function applyZoom(win, factor) {
 /** macOS needs an application menu with the Edit roles — without one,
  *  Cmd+C/V/A do nothing in the renderer. Everything else stays minimal. */
 function installMenu() {
+	// AGPL attribution (owner, 2026-10-27): the About panel credits upstream.
+	app.setAboutPanelOptions({
+		applicationName: PRODUCT_NAME,
+		applicationVersion: app.getVersion(),
+		credits: "Plainly is a fork of LearnHarness by Amos Blomqvist.\nFree software under the GNU AGPL-3.0.",
+	});
 	const template = [
 		{
 			label: app.name,

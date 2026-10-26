@@ -111,9 +111,9 @@ export function SidebarCard({
 			<aside className="side" aria-label="Navigation">
 				<div className="sidein glass">
 					<div className="side-brand lh-drag">
-						<Link href="/" className="side-logo" aria-label="LearnHarness home">
+						<Link href="/" className="side-logo" aria-label="Plainly home">
 							<LogoMark size={24} />
-							<span>LearnHarness</span>
+							<span>Plainly</span>
 						</Link>
 					</div>
 					<nav className="side-nav" aria-label="Places">
@@ -502,7 +502,7 @@ function RailNav({
 	return (
 		<nav ref={railRef} className="rail" aria-label="App">
 			<div className="rail-lights lh-drag" aria-hidden="true" />
-			<Link className="ri logo" href="/" aria-label="LearnHarness home">
+			<Link className="ri logo" href="/" aria-label="Plainly home">
 				<LogoMark size={28} />
 			</Link>
 			<Link className={`ri ${active === "home" ? "on" : ""}`} href="/" aria-label="Home" aria-current={active === "home" ? "page" : undefined}>

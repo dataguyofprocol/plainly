@@ -23,7 +23,7 @@ const prose = Literata({ subsets: ["latin"], variable: "--font-literata", style:
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains" });
 
 export const metadata: Metadata = {
-	title: "Learning Harness",
+	title: "Plainly",
 	description: "A teacher agent with a memory — sessions, quizzes, and a knowledge graph of what you know.",
 };
 

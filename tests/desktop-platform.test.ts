@@ -109,10 +109,10 @@ describe("desktop packaging policy", () => {
 
 	it("deb has public maintainer metadata and a matching desktop identity", () => {
 		const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
-		assert.equal(pkg.author.name, "Amos Blomqvist");
-		assert.equal(pkg.author.email, "255718537+amosblomqvist@users.noreply.github.com");
-		assert.equal(pkg.homepage, "https://github.com/amosblomqvist/learnharness");
-		assert.equal(pkg.desktopName, "learnharness.desktop");
+		assert.equal(pkg.author.name, "Parth Batra");
+		assert.equal(pkg.author.email, "126749808+dataguyofprocol@users.noreply.github.com");
+		assert.equal(pkg.homepage, "https://github.com/dataguyofprocol/plainly");
+		assert.equal(pkg.desktopName, "plainly.desktop");
 	});
 });
 

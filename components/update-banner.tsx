@@ -39,7 +39,7 @@ export default function UpdateBanner() {
 				<span className="st-text grow-1">
 					<span className="ub-t">Update ready</span>
 					<span className="ub-d">
-						LearnHarness {ready.version ?? "update"} installs when you restart.
+						Plainly {ready.version ?? "update"} installs when you restart.
 					</span>
 				</span>
 				<button type="button" onClick={() => window.lh?.installUpdate?.()} className="btn sm brand">

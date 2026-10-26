@@ -170,7 +170,7 @@ export function Home({ initialConfigured, initialMode = "teach" }: { initialConf
 								</span>
 								<span className="hm-setup-t">
 									<b>{readiness.zeroKeys ? "Connect a provider to start" : "Choose your models to start"}</b>
-									<span>LearnHarness runs on your own key: you pay the provider directly, and the key stays on this Mac.</span>
+									<span>Plainly runs on your own key: you pay the provider directly, and the key stays on this Mac.</span>
 								</span>
 								<button type="button" className="btn" data-testid="setup-cta" onClick={needSetup}>
 									{readiness.zeroKeys ? "Add a provider key" : "Set up models"}

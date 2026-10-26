@@ -234,17 +234,19 @@ export function Icon({
 }
 
 /**
- * The LearnHarness mark: two ideas joined by the link that connects them,
- * on a brand tile. Drawn on a 24px grid; stays crisp from 16 to 32px.
+ * The Plainly mark: a tangled line above, the same idea said plainly below,
+ * ending in an amber full stop. Drawn on a 24px grid; the line and dot sit
+ * on whole pixels so they stay crisp from 16 to 32px. The amber is the
+ * app icon's, not a theme token.
  */
 export function LogoMark({ size = 22 }: { size?: number }) {
 	return (
 		<svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flex: "none" }}>
 			<rect width="24" height="24" rx="7" fill="var(--brand)" />
 			<rect x="0.5" y="0.5" width="23" height="23" rx="6.5" stroke="rgb(255 255 255 / 0.14)" />
-			<circle cx="8.25" cy="15.75" r="3.25" fill="var(--on-ink)" />
-			<circle cx="16" cy="8" r="2.5" stroke="var(--on-ink)" strokeWidth="1.75" />
-			<path d="M10.6 13.4l3.6-3.6" stroke="var(--on-ink)" strokeWidth="1.75" strokeLinecap="round" />
+			<path d="M5 9q2.333-2.5 4.667 0t4.667 0t4.666 0" stroke="var(--on-ink)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" />
+			<path d="M5 15H13" stroke="var(--on-ink)" strokeWidth="2" strokeLinecap="round" />
+			<circle cx="18" cy="15" r="2" fill="#F2B95B" />
 		</svg>
 	);
 }

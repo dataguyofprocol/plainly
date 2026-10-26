@@ -1,19 +1,19 @@
 ---
-name: learnharness
-description: Read and understand a person's local LearnHarness learning data—teaching and practice sessions, answers, confidence, learner thinking, propositions, and reasoning chains. Use when a request benefits from their learning history or asks to explore, connect, or analyze that history.
+name: plainly
+description: Read and understand a person's local Plainly learning data—teaching and practice sessions, answers, confidence, learner thinking, propositions, and reasoning chains. Use when a request benefits from their learning history or asks to explore, connect, or analyze that history.
 license: AGPL-3.0-only
-compatibility: Python 3.10+ and access to the user's local LearnHarness data folder. Standard library only; no network, running app, or repository checkout required.
+compatibility: Python 3.10+ and access to the user's local Plainly data folder. Standard library only; no network, running app, or repository checkout required.
 ---
 
-# LearnHarness learning data
+# Plainly learning data
 
 This skill is a field guide and a few convenient readers for the user's learning
 record. Use that record in service of the user's request. It can inform many kinds
 of work; it does not require a particular study, assessment, or reporting workflow.
 
-## What LearnHarness is
+## What Plainly is
 
-LearnHarness is an agent harness for learning. Its teaching agents first probe the
+Plainly is an agent harness for learning. Its teaching agents first probe the
 learner's current understanding and clarify the goal, then plan a dependency path
 between them. Teaching builds understanding one reasoning step at a time, checking
 and repairing gaps along the way. The aim is for the goal to feel obviously true,
@@ -51,7 +51,7 @@ JSON/JSONL; use your own read-only analysis when the bundled readers aren't enou
 
 ## Read-only boundary
 
-**Never modify LearnHarness's data.** This applies to the bundled scripts and any
+**Never modify Plainly's data.** This applies to the bundled scripts and any
 ad hoc analysis you perform. Do not migrate, repair, reformat, delete, import into,
 regenerate, or write back to the record. Do not create indexes, caches, reports, or
 analysis scripts inside the data folder. If the user requests a report file, use a
@@ -75,15 +75,16 @@ The default is the normal installed application's data folder:
 
 | OS | Data folder |
 | --- | --- |
-| macOS | `~/Library/Application Support/LearnHarness/data` |
-| Windows | `%APPDATA%\LearnHarness\data` |
-| Linux | `$XDG_CONFIG_HOME/LearnHarness/data`, or `~/.config/LearnHarness/data` |
+| macOS | `~/Library/Application Support/Plainly/data` |
+| Windows | `%APPDATA%\Plainly\data` |
+| Linux | `$XDG_CONFIG_HOME/Plainly/data`, or `~/.config/Plainly/data` |
 
 This is the directory **containing** `chats/` and `graph/`, not their parent
-`LearnHarness/` profile directory. For a moved installation, backup, development
-copy, or an app configured with `LH_DATA_DIR`, use `--data-dir` explicitly. Readers
-print the selected directory and never create a missing folder or silently switch
-to another copy.
+`Plainly/` profile directory. Plainly was previously called LearnHarness: when the
+`Plainly` folder does not exist, the readers use the same location under
+`LearnHarness/` instead and print which one they chose. For a moved installation,
+backup, development copy, or an app configured with `LH_DATA_DIR`, use `--data-dir`
+explicitly. Readers print the selected directory and never create a missing folder.
 
 ## Small readers
 
