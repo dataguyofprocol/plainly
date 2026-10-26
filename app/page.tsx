@@ -7,8 +7,9 @@ import { slotsConfigured } from "@/src/core";
 // the record (dynamic routes aren't cached client-side).
 export const dynamic = "force-dynamic";
 
-export default function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
+	const { mode } = await searchParams;
 	// First-run gate (model-slots wave): sessions cannot start until the
 	// models are picked — the home shows the setup card until they are.
-	return <Home initialConfigured={slotsConfigured(readSettingsRecord()?.models)} />;
+	return <Home initialConfigured={slotsConfigured(readSettingsRecord()?.models)} initialMode={mode === "practice" ? "practice" : "teach"} />;
 }

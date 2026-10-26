@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { JetBrains_Mono, Literata, Manrope } from "next/font/google";
 import "katex/dist/katex.min.css";
 import "./globals.css";
-import { AppShell, SidebarProvider } from "@/components/sidebar";
+import { AppShell, ShellProvider } from "@/components/sidebar";
+import "./v4.css";
 import { ActivityProvider } from "@/components/activity-dock";
 import { ServerEventsProvider } from "@/components/server-events";
 import { AppearanceProvider } from "@/components/settings/appearance";
@@ -28,11 +29,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 				 and pages all subscribe as the polls retire (push S3, 2026-10-02). */}
 			<ServerEventsProvider>
 				<AppearanceProvider>
-					<SidebarProvider>
+					<ShellProvider>
 						<ActivityProvider>
 							<AppShell>{children}</AppShell>
 						</ActivityProvider>
-					</SidebarProvider>
+					</ShellProvider>
 				</AppearanceProvider>
 			</ServerEventsProvider>
 			{/* Auto-update banner (Wave C): fixed card, Electron-only pushes. */}

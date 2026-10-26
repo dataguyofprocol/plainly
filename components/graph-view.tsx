@@ -63,12 +63,13 @@
  * camera never moves.
  */
 
-import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { NotesImportErrors, useNotesImport } from "@/components/notes-import.tsx";
 import Link from "next/link";
 import { FileTextIcon, ListTreeIcon, Loader2Icon, SearchIcon, SettingsIcon, UploadIcon, WaypointsIcon } from "lucide-react";
 import { incrementalLayout, propositionSessionHref, type GraphChain, type GraphCostSummary, type GraphNode, type GraphSnapshot } from "@/src/core";
 import { cn } from "@/lib/utils";
+import { topicColor } from "@/components/v4/data";
 import { planCostLabel } from "@/components/usage-format";
 import { GraphCanvasRenderer, type GraphRenderSettings } from "./graph-canvas.ts";
 import { usePopoverDismiss } from "@/components/popover-dismiss";
@@ -209,6 +210,17 @@ export function ideaNeighbours(
 		if (c.premises.includes(nodeId) && c.conclusion !== nodeId) leadsTo.add(c.conclusion);
 	}
 	return { restsOn: [...restsOn], leadsTo: [...leadsTo] };
+}
+
+/** The v4 Knowledge page's camera handle on the canvas. */
+export interface GraphViewApi {
+	zoomIn: () => void;
+	zoomOut: () => void;
+	fit: () => void;
+	frame: (ids: readonly string[]) => void;
+	zoomPercent: () => number;
+	/** Register the page's zoom-readout refresh (called on camera moves). */
+	onZoom: (cb: () => void) => void;
 }
 
 /** How many related ideas the card names before "and N more". */
@@ -985,7 +997,24 @@ export function GraphView({
 	onPracticeSelectionChange,
 	onChainSelectClose,
 	focusIdeaId,
+	variant = "legacy",
+	query: queryProp,
+	onSelectIdea,
+	apiRef,
+	highlight,
 }: {
+	/** "v4" (rebuild, 2026-10-26): the canvas alone — the Knowledge4 page
+	 *  owns the search, the detail card, the zoom controls and the topic
+	 *  list; nodes, edges and regions wear their topic colours. */
+	variant?: "legacy" | "v4";
+	/** v4: the page's search text (controlled). */
+	query?: string;
+	/** v4: a node was picked (or the stage clicked — null). */
+	onSelectIdea?: (idea: { node: GraphNode; sourceIds: string[] } | null) => void;
+	/** v4: the camera controls the page drives. */
+	apiRef?: React.Ref<GraphViewApi>;
+	/** v4: the selected idea's chain to draw in the accent. */
+	highlight?: { ids: ReadonlySet<string>; selected: string | null } | null;
 	/** An idea to bring forward on arrival (/knowledge?idea=…, from the home
 	 *  page or the omnibar): the search is seeded with its name. */
 	focusIdeaId?: string;
@@ -1008,9 +1037,16 @@ export function GraphView({
 	// constructed once, so they read through this ref, never a closure).
 	const snapshotRef = useRef<GraphSnapshot | null>(null);
 	snapshotRef.current = snapshot;
+	const onSelectIdeaRef = useRef(onSelectIdea);
+	onSelectIdeaRef.current = onSelectIdea;
+	const v4Ref = useRef(variant === "v4");
+	v4Ref.current = variant === "v4";
+	const onZoomRef = useRef<(() => void) | null>(null);
 
 	// Search panel state: the query text + the settings section toggle.
-	const [query, setQuery] = useState("");
+	const [internalQuery, setQuery] = useState("");
+	const v4 = variant === "v4";
+	const query = queryProp ?? internalQuery;
 	// The arrival focus (v4): once the snapshot knows the idea, its name
 	// becomes the search — the existing filter brings it forward. Once only:
 	// the learner owns the search after that.
@@ -1389,8 +1425,12 @@ export function GraphView({
 						sourceIds: snap.nodeSessions[node.id] ?? [],
 						anchor: pos,
 					});
+					onSelectIdeaRef.current?.({ node, sourceIds: snap.nodeSessions[node.id] ?? [] });
 				},
-				onStageClick: () => setSelected(null),
+				onStageClick: () => {
+					setSelected(null);
+					onSelectIdeaRef.current?.(null);
+				},
 				// Right-click → the node context menu (node interlude). Null
 				// (empty stage) closes a stale menu; a pick opens one anchored
 				// at the pointer. The name comes from the snapshot — what the
@@ -1409,9 +1449,12 @@ export function GraphView({
 				// context menu closes with it: a menu floating over a moved
 				// graph is anchored to nothing.
 				onCameraMove: (t) => {
-					setSelected(null);
+					// The legacy card is anchored to its node; the v4 card is
+					// pinned to the corner and survives camera moves.
+					if (!v4Ref.current) setSelected(null);
 					setCtxNode(null);
 					persistCamera(t);
+					onZoomRef.current?.();
 				},
 				// Live physics settled: persist the new rest state. Fire-and-
 				// forget — the next snapshot fetch carries the ledger anyway.
@@ -1450,17 +1493,26 @@ export function GraphView({
 		const renderer = rendererRef.current;
 		const positions = posRef.current;
 		if (!renderer || !snapshot || snapshot.nodes.length === 0 || !positions) return;
+		// v4: every node, edge and region in its topic's colour (the same
+		// stable colour the topic list and the home page use).
+		const colorOf = new Map<string, string>();
+		if (v4) for (const c of snapshot.clusters) for (const m of c.members) colorOf.set(m, topicColor(c.id));
 		renderer.setData({
 			nodes: snapshot.nodes.map((n) => ({
 				id: n.id,
 				x: positions.get(n.id)?.x ?? 0,
 				y: positions.get(n.id)?.y ?? 0,
 				label: n.name,
+				color: v4 ? (colorOf.get(n.id) ?? "#8a918c") : undefined,
 			})),
-			edges: snapshot.edges.map((e) => ({ from: e.from, to: e.to })),
+			edges: snapshot.edges.map((e) => ({
+				from: e.from,
+				to: e.to,
+				color: v4 ? `${colorOf.get(e.from) ?? colorOf.get(e.to) ?? "#8a918c"}66` : undefined,
+			})),
 			logicalEdges: snapshot.logicalEdges.map((e) => ({ from: e.from, to: e.to })),
 			impLinks: snapshot.impLinks,
-			clusters: snapshot.clusters.map((c) => ({ id: c.id, label: c.label, members: c.members })),
+			clusters: snapshot.clusters.map((c) => ({ id: c.id, label: c.label, members: c.members, color: v4 ? topicColor(c.id) : undefined })),
 			colors: {
 				node: tokenHex(NODE_COLOR_TOKEN),
 				edge: tokenHex("--graph-edge"),
@@ -1470,14 +1522,35 @@ export function GraphView({
 			// Match the app typography (Geist via the body's stack).
 			fontFamily: getComputedStyle(document.body).fontFamily,
 		});
-	}, [snapshot, isEmpty]);
+	}, [snapshot, isEmpty, v4]);
+
+	// v4 feeds: the chain highlight, and the page's camera handle.
+	useEffect(() => {
+		rendererRef.current?.setHighlight(highlight?.ids ?? null, highlight?.selected ?? null);
+	}, [highlight, isEmpty]);
+	useImperativeHandle(
+		apiRef,
+		() => ({
+			zoomIn: () => rendererRef.current?.zoomBy(1.4),
+			zoomOut: () => rendererRef.current?.zoomBy(1 / 1.4),
+			fit: () => rendererRef.current?.fit(),
+			frame: (ids: readonly string[]) => rendererRef.current?.frameNodes(ids),
+			zoomPercent: () => rendererRef.current?.zoomPercent() ?? 100,
+			onZoom: (cb: () => void) => {
+				onZoomRef.current = cb;
+			},
+		}),
+		[],
+	);
 
 	// Feed #2 — settings: just marks the frame dirty. No rebuild, no
 	// re-layout, no camera touch (the whole point of the new renderer).
 	const deferredSettings = useDeferredValue(settings);
 	useEffect(() => {
-		rendererRef.current?.setSettings(deferredSettings);
-	}, [deferredSettings, isEmpty]);
+		// v4: Knowledge4's discs read at a glance — the world-unit node
+		// size the dark canvas tuned (2) is a pinprick on the light ground.
+		rendererRef.current?.setSettings(v4 ? { ...deferredSettings, nodeSize: Math.max(deferredSettings.nodeSize * 3, 6) } : deferredSettings);
+	}, [deferredSettings, isEmpty, v4]);
 
 	// Feed #3 — visibility: hidden nodes drop out of rendering, picking,
 	// hover, AND labels; edges drop when either endpoint is hidden.
@@ -1626,6 +1699,8 @@ export function GraphView({
 			    against the full-bleed parent) — the row NEVER wraps (owner
 			    rejected the two-row fold); in narrow windows the search is
 			    the flexible element and shrinks instead. */}
+			{!v4 && (
+			<>
 			<div className="lh-no-drag lh-wco-floating absolute right-2 top-2 z-10 flex max-w-[calc(100%-5.5rem)] flex-col items-end gap-2">
 			{/* z-20 (2026-09-20): the row paints above the cost number below
 			    it — without this, the later-in-DOM cost control layered over
@@ -1672,7 +1747,9 @@ export function GraphView({
 			))}
 			</div>
 
-			{selected && !isEmpty && (
+			</>
+			)}
+			{selected && !isEmpty && !v4 && (
 				<div
 					ref={cardRef}
 					// Positioned imperatively in the layout effect above; hidden
@@ -1801,7 +1878,7 @@ export function GraphView({
 			    covers. (DeleteNodeDialog is body-portaled — DOM-irrelevant
 			    here.) */}
 			<ChainTableOverlay
-				open={chainsOpen && !isEmpty}
+				open={chainsOpen && !isEmpty && !v4}
 				nodes={snapshot?.propositions ?? []}
 				chains={snapshot?.chains ?? []}
 				sessions={snapshot?.sessions ?? {}}

@@ -83,6 +83,8 @@ export interface CanvasNode {
 	x: number;
 	y: number;
 	label: string;
+	/** v4 (2026-10-26): the node's topic colour; absent = colors.node. */
+	color?: string;
 }
 
 /** One directed edge of the DERIVED view (chains-primary, 2026-09-30):
@@ -95,6 +97,8 @@ export interface CanvasNode {
 export interface CanvasEdge {
 	from: string;
 	to: string;
+	/** v4: the edge's ink (its topic colour, translucent); absent = colors.edge. */
+	color?: string;
 }
 
 /** Implication-node ids (the mint law: newGraphChainId in core/graph.ts).
@@ -108,6 +112,9 @@ export interface CanvasCluster {
 	id: string;
 	label: string | null;
 	members: string[];
+	/** v4: the topic colour for the region tint and its label; absent =
+	 *  the id-hashed hue. */
+	color?: string;
 }
 
 /** Theme colors, resolved to #rrggbb by the caller (canvas wants hex,
@@ -494,6 +501,10 @@ export function pickNearest<T extends { id: string; x: number; y: number }>(
 
 // ─── Canvas text helpers (ported verbatim) ─────────────────────────────────
 
+function isVisibleId(visible: ReadonlySet<string> | null | undefined, id: string): boolean {
+	return !visible || visible.has(id);
+}
+
 /** "#rrggbb" + alpha → "rgba(...)". */
 function rgbaFromHex(hex: string, alpha: number): string {
 	const r = Number.parseInt(hex.slice(1, 3), 16);
@@ -639,11 +650,18 @@ export class GraphCanvasRenderer {
 	private nodesPath: Path2D | null = null;
 	private shaftsPath: Path2D = new Path2D();
 	private headsPath: Path2D = new Path2D();
+	/** v4 colour buckets (one Path2D per colour, one fill each) — empty
+	 *  when no node or edge carries a colour (the legacy one-fill path). */
+	private nodeBuckets = new Map<string, Path2D>();
+	private edgeBuckets = new Map<string, { shafts: Path2D; heads: Path2D }>();
+	/** v4 highlight: the selected idea's chain (ids) — its edges redraw in
+	 *  the accent on top, its nodes get a ring; null = nothing selected. */
+	private highlight: { ids: ReadonlySet<string>; selected: string | null; accent: string } | null = null;
 	private regionCanvas: HTMLCanvasElement | null = null;
 	/** World rect the bitmap covers (drawImage target coords). */
 	private regionRect: { minX: number; minY: number; w: number; h: number } | null = null;
 	/** Region labels: cluster centroid + hue, computed at splat build. */
-	private regionMeta: { id: string; label: string | null; lines: string[] | null; cx: number; cy: number; hue: number }[] = [];
+	private regionMeta: { id: string; label: string | null; lines: string[] | null; cx: number; cy: number; hue: number; color?: string }[] = [];
 	private regionTuning: RegionTuning = DEFAULT_REGION_TUNING;
 	private physicsTuning: PhysicsTuning = DEFAULT_PHYSICS_TUNING;
 	/** Gravity center for the live sim (graph bbox centroid at setData). */
@@ -864,6 +882,52 @@ export class GraphCanvasRenderer {
 		this.visible = visible;
 		this.geoVersion++; // member visibility changes hulls + paths
 		this.markDirty();
+	}
+
+	/** v4: highlight the selected idea's chain (null clears). */
+	setHighlight(ids: ReadonlySet<string> | null, selected: string | null = null, accent = "#156e62"): void {
+		this.highlight = ids && ids.size > 0 ? { ids, selected, accent } : null;
+		this.markDirty();
+	}
+
+	/** v4 zoom controls: scale about the viewport centre. */
+	zoomBy(factor: number): void {
+		select(this.canvas).call(this.zoomBehavior.scaleBy, factor);
+	}
+
+	/** v4: frame a set of nodes (a topic, or an idea and its chain). */
+	frameNodes(ids: readonly string[], padding = 80): void {
+		if (!this.data) return;
+		let minX = Infinity;
+		let minY = Infinity;
+		let maxX = -Infinity;
+		let maxY = -Infinity;
+		for (const id of ids) {
+			const n = this.nodeById.get(id);
+			if (!n) continue;
+			if (n.x < minX) minX = n.x;
+			if (n.y < minY) minY = n.y;
+			if (n.x > maxX) maxX = n.x;
+			if (n.y > maxY) maxY = n.y;
+		}
+		if (!Number.isFinite(minX)) return;
+		const w = this.canvas.clientWidth;
+		const h = this.canvas.clientHeight;
+		if (w < 10 || h < 10) return;
+		// A lone node (or a tight cluster) frames at a readable zoom, never
+		// an infinite one: pad the box to at least a quarter of the graph.
+		const span = this.worldBBox ? Math.max(this.worldBBox.maxX - this.worldBBox.minX, this.worldBBox.maxY - this.worldBBox.minY) / 4 : 200;
+		const cx = (minX + maxX) / 2;
+		const cy = (minY + maxY) / 2;
+		const halfW = Math.max((maxX - minX) / 2, span / 2);
+		const halfH = Math.max((maxY - minY) / 2, span / 2);
+		const t = fitTransform({ minX: cx - halfW, maxX: cx + halfW, minY: cy - halfH, maxY: cy + halfH }, w, h, padding);
+		select(this.canvas).call(this.zoomBehavior.transform, zoomIdentity.translate(t.x, t.y).scale(t.k));
+	}
+
+	/** v4: the zoom as a percentage of the fit zoom (the controls' readout). */
+	zoomPercent(): number {
+		return this.kFit > 0 ? Math.round((this.transform.k / this.kFit) * 100) : 100;
 	}
 
 	/** Frame the whole graph (padding included). Keeps the camera on later
@@ -1239,12 +1303,20 @@ export class GraphCanvasRenderer {
 		// Node discs: one Path2D, one fill() per frame. Implication nodes
 		// are pure geometry — never a disc, never a label, never picked.
 		const nodesPath = new Path2D();
+		const nodeBuckets = new Map<string, Path2D>();
 		for (const n of data.nodes) {
 			if (!isVisible(n.id) || isImpNodeId(n.id)) continue;
 			nodesPath.moveTo(n.x + nodeR, n.y);
 			nodesPath.arc(n.x, n.y, nodeR, 0, Math.PI * 2);
+			if (n.color) {
+				let b = nodeBuckets.get(n.color);
+				if (!b) nodeBuckets.set(n.color, (b = new Path2D()));
+				b.moveTo(n.x + nodeR, n.y);
+				b.arc(n.x, n.y, nodeR, 0, Math.PI * 2);
+			}
 		}
 		this.nodesPath = nodesPath;
+		this.nodeBuckets = nodeBuckets;
 
 		// Edge shafts + arrowheads (rendering arc, owner 2026-09-30): all
 		// arrows are PLAIN single shafts — the old double-shaft glyph is
@@ -1257,6 +1329,7 @@ export class GraphCanvasRenderer {
 		const arrowLen = settings.arrowLength;
 		const shafts = new Path2D();
 		const heads = new Path2D();
+		const edgeBuckets = new Map<string, { shafts: Path2D; heads: Path2D }>();
 		for (const e of data.edges) {
 			if (!isVisible(e.from) || !isVisible(e.to)) continue;
 			const a = this.nodeById.get(e.from);
@@ -1266,21 +1339,30 @@ export class GraphCanvasRenderer {
 			const outOfImp = isImpNodeId(e.from);
 			const g = arrowGeometry(a, b, outOfImp ? 0 : nodeR, intoImp ? 0 : nodeR, arrowLen);
 			if (!g) continue;
-			shafts.moveTo(g.shaftFrom.x, g.shaftFrom.y);
-			if (intoImp) {
-				// toRadius 0 put the tip AT the imp node's center: the
-				// headless shaft terminates there (no head triangle).
-				shafts.lineTo(g.tip.x, g.tip.y);
-			} else {
-				shafts.lineTo(g.shaftTo.x, g.shaftTo.y);
-				heads.moveTo(g.tip.x, g.tip.y);
-				heads.lineTo(g.left.x, g.left.y);
-				heads.lineTo(g.right.x, g.right.y);
-				heads.closePath();
+			const targets: Array<{ shafts: Path2D; heads: Path2D }> = [{ shafts, heads }];
+			if (e.color) {
+				let bucket = edgeBuckets.get(e.color);
+				if (!bucket) edgeBuckets.set(e.color, (bucket = { shafts: new Path2D(), heads: new Path2D() }));
+				targets.push(bucket);
+			}
+			for (const t of targets) {
+				t.shafts.moveTo(g.shaftFrom.x, g.shaftFrom.y);
+				if (intoImp) {
+					// toRadius 0 put the tip AT the imp node's center: the
+					// headless shaft terminates there (no head triangle).
+					t.shafts.lineTo(g.tip.x, g.tip.y);
+				} else {
+					t.shafts.lineTo(g.shaftTo.x, g.shaftTo.y);
+					t.heads.moveTo(g.tip.x, g.tip.y);
+					t.heads.lineTo(g.left.x, g.left.y);
+					t.heads.lineTo(g.right.x, g.right.y);
+					t.heads.closePath();
+				}
 			}
 		}
 		this.shaftsPath = shafts;
 		this.headsPath = heads;
+		this.edgeBuckets = edgeBuckets;
 
 		// Cluster regions are NOT built here: they rasterize into their own
 		// low-res bitmap (see buildRegions), on their own rebuild schedule
@@ -1414,6 +1496,7 @@ export class GraphCanvasRenderer {
 					cx: sumX / members,
 					cy: sumY / members,
 					hue: clusterHue(cluster.id),
+					color: cluster.color,
 					lines: null,
 				});
 			}
@@ -1505,7 +1588,8 @@ export class GraphCanvasRenderer {
 			// counted spot (user report 2026-09-14). At alpha 1 the alpha
 			// channel is a pure coverage indicator: overlaps of any count
 			// contribute exactly 1.0.
-			rctx.strokeStyle = `hsla(${hue}, 65%, 60%, 1)`;
+			const tint = cluster.color ?? `hsla(${hue}, 65%, 60%, 1)`;
+			rctx.strokeStyle = tint;
 			rctx.beginPath();
 			// Endpoints actually covered by a stroke's round caps.
 			const touched = new Set<string>();
@@ -1534,7 +1618,7 @@ export class GraphCanvasRenderer {
 			// radius as a round cap = dilation) covers exactly the members no
 			// stroke reached: every member is painted by its edges' caps OR
 			// one disc, never both — the no-double-counting rule survives.
-			rctx.fillStyle = `hsla(${hue}, 65%, 60%, 1)`;
+			rctx.fillStyle = tint;
 			const discR = dilationW / cell;
 			for (const id of cluster.members) {
 				if (touched.has(id) || !isVisible(id)) continue;
@@ -1653,17 +1737,80 @@ export class GraphCanvasRenderer {
 		// A true 0-width stroke is undefined on canvas: the ratio's 0 end
 		// floors to a hairline (0.5px on screen — hiding is the toggle's).
 		if (settings.edgeWidth > 0) {
-			ctx.strokeStyle = data.colors.edge;
-			ctx.fillStyle = data.colors.edge;
 			ctx.lineWidth = settings.edgeWidth / k;
 			ctx.lineCap = "round";
-			ctx.stroke(this.shaftsPath);
-			ctx.fill(this.headsPath);
+			if (this.edgeBuckets.size > 0) {
+				// v4: each topic's edges in its own translucent ink.
+				for (const [color, b] of this.edgeBuckets) {
+					ctx.strokeStyle = color;
+					ctx.fillStyle = color;
+					ctx.stroke(b.shafts);
+					ctx.fill(b.heads);
+				}
+			} else {
+				ctx.strokeStyle = data.colors.edge;
+				ctx.fillStyle = data.colors.edge;
+				ctx.stroke(this.shaftsPath);
+				ctx.fill(this.headsPath);
+			}
 		}
 
-		// 4. Nodes: one cached Path2D, one fill.
-		ctx.fillStyle = data.colors.node;
-		ctx.fill(this.nodesPath);
+		// 3b. The selected idea's chain (v4): its edges again, on top, in
+		// the accent and thicker — the reasoning reads out of the graph.
+		if (this.highlight) {
+			const hl = this.highlight;
+			const hot = new Path2D();
+			for (const e of data.edges) {
+				if (!hl.ids.has(e.from) || !hl.ids.has(e.to)) continue;
+				const a = this.nodeById.get(e.from);
+				const b = this.nodeById.get(e.to);
+				if (!a || !b) continue;
+				hot.moveTo(a.x, a.y);
+				hot.lineTo(b.x, b.y);
+			}
+			ctx.strokeStyle = hl.accent;
+			ctx.lineWidth = 2.2 / k;
+			ctx.stroke(hot);
+		}
+
+		// 4. Nodes: one cached Path2D per colour, one fill each; v4 nodes
+		// carry a white outline (Knowledge4's 1.5px rim).
+		if (this.nodeBuckets.size > 0) {
+			ctx.fillStyle = data.colors.node;
+			ctx.fill(this.nodesPath);
+			for (const [color, path] of this.nodeBuckets) {
+				ctx.fillStyle = color;
+				ctx.fill(path);
+			}
+			ctx.strokeStyle = "#ffffff";
+			ctx.lineWidth = Math.min(1.5 / k, nodeR * 0.3);
+			ctx.stroke(this.nodesPath);
+		} else {
+			ctx.fillStyle = data.colors.node;
+			ctx.fill(this.nodesPath);
+		}
+		if (this.highlight) {
+			const hl = this.highlight;
+			ctx.strokeStyle = hl.accent;
+			for (const id of hl.ids) {
+				const n = this.nodeById.get(id);
+				if (!n || isImpNodeId(id) || !isVisibleId(this.visible, id)) continue;
+				ctx.lineWidth = (id === hl.selected ? 3 : 2) / k;
+				ctx.beginPath();
+				ctx.arc(n.x, n.y, nodeR + (id === hl.selected ? 4 : 2.5) / k, 0, Math.PI * 2);
+				ctx.stroke();
+			}
+			// The chain's names (Knowledge4): every lit idea is labelled,
+			// whatever the zoom gate says about the rest of the graph.
+			ctx.save();
+			ctx.font = this.worldLabelFont;
+			for (const id of hl.ids) {
+				const n = this.nodeById.get(id);
+				if (!n || isImpNodeId(id) || !isVisibleId(this.visible, id)) continue;
+				drawNameLines(ctx, n.x, n.y, this.labelLines.get(id) ?? [n.label], this.world, data.colors.hoverText);
+			}
+			ctx.restore();
+		}
 
 		// 6. Node labels — one global gate, faded together. World-scaled
 		// with the graph (they grow as you zoom in, Obsidian-style).
@@ -1727,7 +1874,7 @@ export class GraphCanvasRenderer {
 				if (!rm.lines) continue;
 				// Light ground (v4): the label is a deep shade of its region's
 				// hue — the pale 78% tint was tuned for the retired dark canvas.
-				ctx.fillStyle = `hsla(${rm.hue}, 45%, 30%, 0.9)`;
+				ctx.fillStyle = rm.color ?? `hsla(${rm.hue}, 45%, 30%, 0.9)`;
 				const firstOffset = (-(rm.lines.length - 1) / 2) * lineH;
 				for (let i = 0; i < rm.lines.length; i++) {
 					ctx.fillText(rm.lines[i]!, rm.cx, rm.cy + firstOffset + i * lineH);

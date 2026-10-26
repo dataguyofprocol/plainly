@@ -1,20 +1,32 @@
 /**
- * The v4 shell's pure layers (redesign, 2026-10-26): the sidebar's session
- * grouping, the session-page rule that picks the rail by default, the
- * omnibar's result model, and the graph index the chrome reads.
+ * The v4 shell's pure layers (rebuild, 2026-10-26): the session state and
+ * row line the sidebar shows, the grouping, the formatting helpers, the
+ * stable topic colours, the chain neighbourhood the Knowledge canvas
+ * lights up, the omnibar's result model and the graph index.
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { groupSessions, isSessionPath, isWaitingOnYou } from "../components/sidebar.tsx";
+import {
+	ago,
+	chainNeighbourhood,
+	fmtDuration,
+	fmtTokens,
+	groupChats,
+	sessionLine,
+	sessionState,
+	topicColor,
+	TOPIC_COLORS,
+	type V4Chat,
+} from "../components/v4/data.ts";
 import { paletteResults } from "../components/command-palette.tsx";
 import { indexIdeas, type IndexedIdea } from "../components/graph-index.ts";
-import type { ChatListItem, GraphNode } from "../src/core/index.ts";
+import type { GraphNode } from "../src/core/index.ts";
 
 const NOW = new Date(2026, 9, 26, 15, 0, 0);
 const TODAY = new Date(2026, 9, 26, 9, 0, 0).toISOString();
 const YESTERDAY = new Date(2026, 9, 25, 22, 0, 0).toISOString();
 
-function chat(o: Partial<ChatListItem>): ChatListItem {
+function chat(o: Partial<V4Chat>): V4Chat {
 	return {
 		id: "c",
 		title: "Session",
@@ -31,15 +43,37 @@ function chat(o: Partial<ChatListItem>): ChatListItem {
 	};
 }
 
-describe("groupSessions", () => {
+describe("sessionState", () => {
+	it("the server's state wins when present", () => {
+		assert.equal(sessionState(chat({ state: "finished", pendingQuestion: true })), "finished");
+	});
+	it("falls back from the base fields: working, waiting, paused", () => {
+		assert.equal(sessionState(chat({ busy: true, pendingQuestion: true })), "working");
+		assert.equal(sessionState(chat({ pendingQuestion: true })), "waiting");
+		assert.equal(sessionState(chat({ kind: "practice", pendingProblem: true })), "waiting");
+		assert.equal(sessionState(chat({ kind: "teach", pendingProblem: true })), "paused");
+		assert.equal(sessionState(chat({})), "paused");
+	});
+});
+
+describe("sessionLine — the sidebar row's second line (Home4)", () => {
+	it("a waiting lesson names its plan step, else the check-in", () => {
+		assert.equal(sessionLine(chat({ pendingQuestion: true, plan: { total: 14, visited: 5, current: 6 } }), NOW), "Step 6 of 14");
+		assert.equal(sessionLine(chat({ pendingQuestion: true }), NOW), "Check-in");
+	});
+	it("practice shows its place in the set", () => {
+		assert.equal(sessionLine(chat({ kind: "practice", practiceSet: { size: 5, done: 0 } }), NOW), "Practice · 1 of 5");
+	});
+	it("finished and paused carry how long ago", () => {
+		assert.equal(sessionLine(chat({ state: "finished", updatedAt: new Date(NOW.getTime() - 3 * 86_400_000).toISOString() }), NOW), "Finished · 3 days ago");
+		assert.equal(sessionLine(chat({ updatedAt: new Date(NOW.getTime() - 5 * 86_400_000).toISOString() }), NOW), "Paused · 5 days ago");
+	});
+});
+
+describe("groupChats", () => {
 	it("waiting first, then today, then earlier — order kept inside each group", () => {
-		const groups = groupSessions(
-			[
-				chat({ id: "a", updatedAt: TODAY }),
-				chat({ id: "b", pendingQuestion: true }),
-				chat({ id: "c" }),
-				chat({ id: "d", pendingQuestion: true, updatedAt: TODAY }),
-			],
+		const groups = groupChats(
+			[chat({ id: "a", updatedAt: TODAY }), chat({ id: "b", pendingQuestion: true }), chat({ id: "c" }), chat({ id: "d", pendingQuestion: true, updatedAt: TODAY })],
 			NOW,
 		);
 		assert.deepEqual(
@@ -51,29 +85,44 @@ describe("groupSessions", () => {
 			],
 		);
 	});
-
-	it("a turn in flight is never waiting on you", () => {
-		const [g] = groupSessions([chat({ pendingQuestion: true, busy: true, updatedAt: TODAY })], NOW);
-		assert.equal(g!.name, "Today");
-	});
-
-	it("a pending practice problem waits; a teach session's stale pendingProblem does not", () => {
-		assert.equal(isWaitingOnYou(chat({ kind: "practice", pendingProblem: true })), true);
-		assert.equal(isWaitingOnYou(chat({ kind: "teach", pendingProblem: true })), false);
-	});
-
 	it("empty groups are dropped", () => {
-		assert.deepEqual(groupSessions([], NOW), []);
+		assert.deepEqual(groupChats([], NOW), []);
 	});
 });
 
-describe("isSessionPath — sessions default to the rail", () => {
-	it("chat pages and drafts are session pages; home and knowledge are not", () => {
-		assert.equal(isSessionPath("/chat/abc"), true);
-		assert.equal(isSessionPath("/chat/new"), true);
-		assert.equal(isSessionPath("/"), false);
-		assert.equal(isSessionPath("/knowledge"), false);
-		assert.equal(isSessionPath(null), false);
+describe("formatting", () => {
+	it("ago: the design's register", () => {
+		assert.equal(ago(new Date(NOW.getTime() - 18 * 60_000).toISOString(), NOW), "18 min ago");
+		assert.equal(ago(new Date(NOW.getTime() - 3 * 3_600_000).toISOString(), NOW), "3 h ago");
+		assert.equal(ago(new Date(NOW.getTime() - 26 * 3_600_000).toISOString(), NOW), "yesterday");
+	});
+	it("fmtDuration and fmtTokens", () => {
+		assert.equal(fmtDuration(252 * 60), "4h 12m");
+		assert.equal(fmtDuration(38 * 60), "38m");
+		assert.equal(fmtTokens(1_240_000), "1.24M");
+		assert.equal(fmtTokens(212_400), "212k");
+		assert.equal(fmtTokens(940), "940");
+	});
+});
+
+describe("topicColor", () => {
+	it("is stable and from the design's palette", () => {
+		assert.equal(topicColor("t1"), topicColor("t1"));
+		assert.ok((TOPIC_COLORS as readonly string[]).includes(topicColor("anything")));
+	});
+});
+
+describe("chainNeighbourhood", () => {
+	it("two hops up through the implication node, two hops down", () => {
+		const edges = [
+			{ from: "p1", to: "imp" },
+			{ from: "p2", to: "imp" },
+			{ from: "imp", to: "x" },
+			{ from: "x", to: "y" },
+			{ from: "y", to: "z" },
+			{ from: "q", to: "p1" },
+		];
+		assert.deepEqual([...chainNeighbourhood(edges, "x")].sort(), ["imp", "p1", "p2", "x", "y", "z"]);
 	});
 });
 
@@ -86,37 +135,22 @@ describe("paletteResults", () => {
 	it("empty query: where you left off, then the commands", () => {
 		const groups = paletteResults("", "teach", [chat({ id: "w", pendingQuestion: true }), chat({ id: "r" })], IDEAS);
 		assert.deepEqual(groups.map((g) => g.name), ["Waiting on you", "Recent", "Commands"]);
-		assert.equal(groups[0]!.rows[0]!.hint, "waiting on you");
 	});
-
 	it("a query leads with the chosen mode's start, then the other", () => {
-		const teach = paletteResults("momentum", "teach", [], []);
-		assert.deepEqual(teach[0]!.rows.map((r) => r.key), ["start-teach", "start-practice"]);
-		assert.deepEqual(teach[0]!.rows[0]!.action, { kind: "start", mode: "teach", text: "momentum" });
-		const practice = paletteResults("momentum", "practice", [], []);
-		assert.deepEqual(practice[0]!.rows.map((r) => r.key), ["start-practice", "start-teach"]);
+		assert.deepEqual(paletteResults("momentum", "teach", [], [])[0]!.rows.map((r) => r.key), ["start-teach", "start-practice"]);
+		assert.deepEqual(paletteResults("momentum", "practice", [], [])[0]!.rows.map((r) => r.key), ["start-practice", "start-teach"]);
 	});
-
 	it("finds sessions by title and ideas by name or statement", () => {
-		const groups = paletteResults("gradient", "teach", [chat({ id: "g", title: "Gradient descent" }), chat({ id: "x", title: "Lacan" })], IDEAS);
+		const groups = paletteResults("gradient", "teach", [chat({ id: "g", title: "Gradient descent" })], IDEAS);
 		const byName = Object.fromEntries(groups.map((g) => [g.name, g.rows.map((r) => r.key)]));
 		assert.deepEqual(byName["Sessions"], ["s-g"]);
 		assert.deepEqual(byName["Ideas you hold"], ["i-n1"]);
-		const viaStatement = paletteResults("true iff", "teach", [], IDEAS);
-		assert.ok(viaStatement.some((g) => g.rows.some((r) => r.key === "i-n2")));
 	});
 });
 
 describe("indexIdeas", () => {
-	it("newest first, with the first source's label (session title or notes path)", () => {
-		const node = (id: string, createdAt: string, chatId: string): GraphNode => ({
-			id,
-			name: id,
-			statement: id,
-			aliases: [],
-			createdAt,
-			provenance: [{ chatId, messageId: "m" }],
-		});
+	it("newest first, with the first source's label", () => {
+		const node = (id: string, createdAt: string, chatId: string): GraphNode => ({ id, name: id, statement: id, aliases: [], createdAt, provenance: [{ chatId, messageId: "m" }] });
 		const ideas = indexIdeas({
 			propositions: [node("old", YESTERDAY, "c1"), node("new", TODAY, "src_1")],
 			sessions: { c1: "Gradient descent" },

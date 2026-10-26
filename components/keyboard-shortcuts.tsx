@@ -117,7 +117,10 @@ export function KeyboardShortcuts() {
 			// ride the window event for the mounted surface to catch.
 			switch (action) {
 				case "new-session":
-					handlersRef.current.router.push("/chat/new");
+					// v4: a new lesson starts from the home omnibar — go there
+					// and put the cursor in it.
+					handlersRef.current.router.push("/");
+					window.setTimeout(() => window.dispatchEvent(new CustomEvent("lh:focus-omnibar")), 150);
 					break;
 				case "open-settings":
 					// Settings-app wave: the dialog is the surface, the URL is

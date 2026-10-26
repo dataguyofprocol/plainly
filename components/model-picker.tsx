@@ -81,7 +81,21 @@ export function catalogLimits(catalog: Pick<ModelCatalogResponse, "models">): Ma
  * changing the new-session default. Unpicked reads "—" (the
  * no-factory-fallback language: the UI never presents a default model).
  */
-export function ModelControl({ chatId, onModelChange }: { chatId?: string; onModelChange?: (model: string | undefined) => void }) {
+export function ModelControl({
+	chatId,
+	onModelChange,
+	variant = "pills",
+	className,
+}: {
+	chatId?: string;
+	onModelChange?: (model: string | undefined) => void;
+	/** "chip" (v4 rebuild): ONE trigger — "● model · level ▾" — whose menu
+	 *  carries the model list and a Thinking switch below it (Lesson4's
+	 *  model menu). "pills" is the legacy two-pill pair. */
+	variant?: "pills" | "chip";
+	/** The chip's own class (the v4 screens pass .mini or .mchip). */
+	className?: string;
+}) {
 	const { catalog, refresh } = useModelCatalog();
 	const [models, setModels] = useState<ModelsSettings | undefined>();
 	const [session, setSession] = useState<ChatSettings | undefined>();
@@ -311,6 +325,69 @@ export function ModelControl({ chatId, onModelChange }: { chatId?: string; onMod
 		setError(null);
 		if (kind === "model") refresh();
 	};
+
+	if (variant === "chip") {
+		const levelLabel = effectiveLevel === undefined ? null : (THINKING_LABEL[effectiveLevel] ?? effectiveLevel).toLowerCase();
+		return (
+			<div ref={containerRef} style={{ position: "relative" }} data-testid="model-control">
+				<Hint label="Model and thinking" action="open-model-picker" side="bottom">
+					<button
+						type="button"
+						data-testid="stats-model"
+						className={className ?? "mini"}
+						aria-haspopup="true"
+						aria-expanded={open === "model"}
+						onClick={() => openMenu("model")}
+					>
+						<span className="dot" style={{ background: "var(--accent)", width: 6, height: 6 }} />
+						<span>{effectiveId ? prettyModel(effectiveId) : "Choose a model"}</span>
+						{levelLabel && <span style={{ color: "var(--faint)" }}>· {levelLabel}</span>}
+						<span aria-hidden style={{ fontSize: 10 }}>▾</span>
+					</button>
+				</Hint>
+				{open === "model" && (
+					<MenuShell
+						anchorRef={containerRef}
+						testid="model-menu"
+						preferredSide="down"
+						menuClass="pop flex w-[22rem] flex-col rounded-[14px] p-2 text-xs"
+					>
+						{error && <div className="mb-1.5 text-destructive">{error}</div>}
+						<ModelMenuList
+							models={catalog?.models}
+							effectiveId={effectiveId}
+							effectiveProvider={effectiveProvider}
+							onPick={pickModel}
+							footer={
+								catalog && catalog.models.length === 0
+									? "No models — add a provider key in Keys"
+									: chatId
+										? "This session's model"
+										: "Strong tier — the default for new sessions"
+							}
+						/>
+						{levels.length > 0 && (
+							<>
+								<div style={{ padding: "8px 10px 4px", fontSize: 11.5, fontWeight: 600, color: "var(--faint)" }}>Thinking</div>
+								<div className="seg" style={{ margin: "0 6px 4px" }} data-testid="thinking-seg">
+									{levels.map((level) => (
+										<button
+											key={level}
+											type="button"
+											className={level === effectiveLevel ? "on" : ""}
+											onClick={() => apply(effectiveProvider ?? "", effectiveId ?? "", level as ThinkingLevel)}
+										>
+											{THINKING_LABEL[level] ?? level}
+										</button>
+									))}
+								</div>
+							</>
+						)}
+					</MenuShell>
+				)}
+			</div>
+		);
+	}
 
 	return (
 		<div ref={containerRef} className="relative flex items-center gap-1.5" data-testid="model-control">
