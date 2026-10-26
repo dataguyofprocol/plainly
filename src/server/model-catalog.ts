@@ -48,6 +48,8 @@ import type {
 } from "../core/contracts/models.ts";
 import type { EffectiveModelSpec, EffectiveSlot } from "../core/settings-resolution.ts";
 import { AUTH_PROVIDER_KEYS } from "../core/auth-keys.ts";
+import { customProviderEnvVar, isCustomProviderId } from "../core/custom-providers.ts";
+import { customProviderEntries, customProviderKeyPresent } from "./custom-providers.ts";
 import { BACKGROUND_MODEL_ROLES, MODEL_SLOTS, type BackgroundModelRole, type ModelSlotName, type ModelsSettings } from "../core/settings.ts";
 
 /** The picker's client-safe model entry (contract: core/contracts/models.ts). */
@@ -133,15 +135,24 @@ export function catalogSlots(): SlotPins {
 /** The providers surface (model slots wave, 2026-09-20): one row per
  *  plain-key model provider (core/auth-keys.ts's pi-ai-derived table),
  *  with keyPresent read env-wins through the keys seam, fresh per call —
- *  saving a key immediately federates the provider into the picker. */
+ *  saving a key immediately federates the provider into the picker.
+ *  Custom endpoints (custom-endpoint wave, 2026-10-26) are always present:
+ *  a stored key or keyless by design (`keyless` says which). */
 export function catalogProviders(): CatalogProvider[] {
-	return AUTH_PROVIDER_KEYS.map((p) => ({
+	return AUTH_PROVIDER_KEYS.map((p): CatalogProvider => ({
 		id: p.id,
 		envVar: p.envVar,
 		keyPresent: keyValue(p.envVar) !== undefined,
 	})).concat([
 		{ id: "chatgpt", envVar: "", keyPresent: chatGPTConnected() },
 		...NATIVE_SUBSCRIPTIONS.map((p) => ({ id: p.logicalId, envVar: "", keyPresent: nativeSubscriptionConnected(p.providerId) })),
+		...customProviderEntries().map((e) => ({
+			id: e.id,
+			envVar: customProviderEnvVar(e.id),
+			keyPresent: true,
+			name: e.name,
+			keyless: !customProviderKeyPresent(e.id),
+		})),
 	]).sort((a, b) => a.id.localeCompare(b.id));
 }
 
@@ -169,6 +180,9 @@ export function toModelDto(model: Model<Api>): ModelDto {
 		},
 		contextWindow: model.contextWindow,
 		maxTokens: model.maxTokens,
+		// A custom endpoint's price is unknown — the zero placeholders must
+		// never read as free (pricing.ts prices its calls as null too).
+		...(isCustomProviderId(model.provider) ? { unpriced: true as const } : {}),
 	};
 }
 

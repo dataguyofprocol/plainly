@@ -6,10 +6,14 @@ import { calculateCost, type Usage } from "@earendil-works/pi-ai";
 import { piModels } from "../agent/models.ts";
 import type { CallUsage, ChatRecord, JobRecord, TurnUsage } from "../core/contracts.ts";
 import { isSubscriptionModel, sessionCost as foldSessionCost, turnCost as foldTurnCost, jobCost as foldJobCost } from "../core/prices.ts";
+import { isCustomProviderId } from "../core/custom-providers.ts";
 
+/** Custom OpenAI-compatible endpoints carry placeholder zero rates — their
+ * real price is unknown, so they resolve to no catalog model: UNPRICED
+ * (null), never $0. */
 function catalogModel(id: string) {
 	const colon = id.indexOf(":");
-	if (colon < 0 || isSubscriptionModel(id)) return undefined;
+	if (colon < 0 || isSubscriptionModel(id) || isCustomProviderId(id.slice(0, colon))) return undefined;
 	return piModels().getModel(id.slice(0, colon), id.slice(colon + 1));
 }
 

@@ -24,6 +24,10 @@ export interface ModelCatalogEntry {
 	cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
 	contextWindow: number;
 	maxTokens: number;
+	/** True when the price is UNKNOWN (custom OpenAI-compatible endpoints,
+	 *  custom-endpoint wave 2026-10-26): `cost` is then all zeros as a
+	 *  placeholder and must render as unknown, never as $0. */
+	unpriced?: true;
 }
 
 /** The conversation agents' resolved default (BYOK, owner 2026-09-22): the
@@ -80,6 +84,12 @@ export interface CatalogProvider {
 	id: string;
 	/** The env var whose presence federates this provider in. */
 	envVar: string;
-	/** Whether that var is currently present (env or auth file). */
+	/** Whether that var is currently present (env or auth file). Custom
+	 *  providers are always usable: a stored key OR keyless by design. */
 	keyPresent: boolean;
+	/** Custom providers only (id "custom-…"): the user's display name. */
+	name?: string;
+	/** Custom providers only: true when no key is stored — the endpoint is
+	 *  called without one (local servers). */
+	keyless?: boolean;
 }

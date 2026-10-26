@@ -43,6 +43,9 @@ export * from "./compaction.ts";
 export { runPiTurn, piTurnResponse, type PiTurnHandle, type PiTurnSpec } from "./pi/ui-stream.ts";
 export * from "./observability.ts";
 export * from "./model-catalog.ts";
+// Custom OpenAI-compatible providers (custom-endpoint wave, 2026-10-26):
+// the CRUD + /models probe behind /api/providers/custom.
+export * from "./custom-providers.ts";
 export { sessionCost } from "./pricing.ts";
 // The v4 progress surfaces (redesign, 2026-10-26): the time ledger, period
 // stats, topics, the session list's progress fields, and the suggestions.
