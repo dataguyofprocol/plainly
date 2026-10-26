@@ -1,6 +1,6 @@
 import { chainsForSelection, formatChainLine } from "@/src/core";
 import { newGraphContextMessage, type GraphContextPick } from "@/src/core";
-import { compactionInFlight, createChat, isTurnRunning, listChats, readSettingsRecord, stores, titleFromPrompt } from "@/src/server";
+import { chatListItems, createChat, readSettingsRecord, stores, titleFromPrompt } from "@/src/server";
 import type { ChatListItem } from "@/src/core";
 
 /** The session picker's list: record-derived summaries (phase, pending
@@ -10,12 +10,12 @@ import type { ChatListItem } from "@/src/core";
  *  count — the sidebar's Background agents section is their channel now
  *  (a running spinner per row would double-signal them), so busy means
  *  exactly "a teach turn is in flight". */
+/** v4 redesign (2026-10-26): each item also carries state, the pending
+ *  question's text, plan position, active minutes, answer stats, and the
+ *  practice set — all record-derived or ledger-derived
+ *  (server/activity.ts chatListItems, contracts/chat.ts ChatListItem). */
 export async function GET() {
-	const chats: ChatListItem[] = listChats().map((c) => ({
-		...c,
-		busy: isTurnRunning(c.id),
-		compacting: compactionInFlight(c.id),
-	}));
+	const chats: ChatListItem[] = chatListItems();
 	return Response.json({ chats });
 }
 
