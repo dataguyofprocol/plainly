@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownIcon, ChevronRightIcon, PlayIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { finishDictation, isDictationActive, joinDictation, useDictationTarget } from "@/components/dictation";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { MessageResponse } from "@/components/ai-elements/message";
@@ -10,8 +9,8 @@ import { cn } from "@/lib/utils";
 import {
 	buildAnswer,
 	normalizeQuizType,
-	CONFIDENCE_STOPS,
-	DEFAULT_CONFIDENCE_INDEX,
+	CONFIDENCE_LEVELS,
+	kbdEventForAction,
 	emptyDockSelection,
 	normalizeOptions,
 	resolveCorrect,
@@ -321,11 +320,11 @@ function QuestionDockForm({
 	 * in time — submit reads these, kept current at every write site. */
 	const thinkingTextRef = useRef("");
 	const answerTextRef = useRef("");
-	// Confidence (owner, 2026-10-01): an index into CONFIDENCE_STOPS,
-	// resting at 50 — a real coin flip by definition, untouched or
-	// deliberate (the same number, the same meaning). The dock unmounts
-	// between questions, so each question starts fresh at 50.
-	const [confIdx, setConfIdx] = useState<number>(DEFAULT_CONFIDENCE_INDEX);
+	// Confidence (owner, 2026-10-01; v4 four levels 2026-10-26): an index
+	// into CONFIDENCE_LEVELS, resting at "Unsure" (50) — a real coin flip by
+	// definition, untouched or deliberate (the same number, the same
+	// meaning). The dock unmounts between questions, so each starts fresh.
+	const [confIdx, setConfIdx] = useState<number>(1);
 	const selectMode: SelectMode = qd.mode === "multi-select" ? "multi-select" : "single-select";
 
 	// The PRIMARY dictation input (owner, STT round 1): while a question
@@ -387,7 +386,7 @@ function QuestionDockForm({
 			thinking: qd.mode !== "text" ? thinkingTextRef.current.trim() || undefined : undefined,
 			// Always sent on quiz answers (owner: 50 must mean 50, never
 			// "untouched"); buildAnswer drops it on "I don't know".
-			confidence: kind === "quiz" ? CONFIDENCE_STOPS[confIdx] : undefined,
+			confidence: kind === "quiz" ? CONFIDENCE_LEVELS[confIdx]!.value : undefined,
 		};
 		onSubmit(buildAnswer(qd, req, toolName));
 	};
@@ -491,6 +490,17 @@ function QuestionDockForm({
 			// Keys from a typing surface keep their meaning (arrows move
 			// the caret, space types).
 			if (typing || modded) return;
+			// Lesson4's "1–4 pick": a digit acts on that row (the trailing
+			// "I don't know" / Other row is the number after the options).
+			if (/^[1-9]$/.test(e.key)) {
+				const idx = Number(e.key) - 1;
+				if (idx < rowCount) {
+					e.preventDefault();
+					setKbdIdx(idx);
+					kbdAct(idx);
+				}
+				return;
+			}
 			if (e.key === "ArrowDown") {
 				e.preventDefault();
 				const next = Math.min((kbdIdx ?? -1) + 1, rowCount - 1);
@@ -512,7 +522,7 @@ function QuestionDockForm({
 				e.preventDefault();
 				setConfIdx((i) =>
 					Math.min(
-						CONFIDENCE_STOPS.length - 1,
+						CONFIDENCE_LEVELS.length - 1,
 						Math.max(0, i + (e.key === "ArrowRight" ? 1 : -1)),
 					),
 				);
@@ -538,39 +548,47 @@ function QuestionDockForm({
 			?.scrollIntoView({ block: "nearest" });
 	}, [kbdIdx]);
 
+	// Lesson4's question: the eyebrow, the serif question, numbered option
+	// rows, how sure, the thinking field with its mic, the keys and submit.
+	const toggleDictation = () => window.dispatchEvent(new CustomEvent(kbdEventForAction("toggle-dictation")));
+	const keyBadge = (i: number) => (
+		<span className="k" aria-hidden="true">
+			{i + 1}
+		</span>
+	);
 	return (
-		<div ref={rootRef} data-testid="question-dock">
-			{/* Question area — scrolls internally if very tall; the bottom row stays put.
-			    Capped by the measured column (--dock-max-h; the old fixed 55dvh cut
-			    long questions short — owner round, 2026-10-05). */}
-			<div data-session-find-root="" className="max-h-[var(--dock-max-h,55dvh)] overflow-y-auto px-4 pt-3">
-				<div className="mb-1 text-xs font-medium text-muted-foreground">
-					{toolName === "probe"
+		<div ref={rootRef} data-testid="question-dock" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+			<div data-session-find-root="" style={{ maxHeight: "var(--dock-max-h, 55dvh)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+				<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+					<span style={{ fontSize: 11.5, fontWeight: 700, color: qd.questionType === "predict" ? "var(--warn)" : "var(--accent)" }}>
+						{toolName === "probe"
 						? "Probe"
 						: toolName === "recall"
 							? "Recall"
 							: kind === "quiz"
 								? qd.questionType === "predict"
-									? "Prediction"
+									? "Predict before you read on"
 									: "Check"
-									: kind === "explain"
-										? "Explain"
-											: "Question"}
-					{qd.mode === "multi-select" && " · select all that apply"}
-				</div>
-				<div className="mb-3 font-medium">
-					<MessageResponse>{qd.question}</MessageResponse>
+								: kind === "explain"
+									? "Explain"
+									: "Question"}
+						{qd.mode === "multi-select" && " · select all that apply"}
+					</span>
+					<div className="serif" style={{ fontSize: 17, lineHeight: "24px", fontWeight: 500 }}>
+						<MessageResponse>{qd.question}</MessageResponse>
+					</div>
 				</div>
 				{qd.context && (
-					<div className="mb-3 text-sm text-muted-foreground">
+					<div className="serif" style={{ fontSize: 14, lineHeight: "21px", color: "var(--muted)" }}>
 						<MessageResponse>{qd.context}</MessageResponse>
 					</div>
 				)}
 
 				{qd.mode !== "text" && (
-					<div className="flex flex-col gap-2 pb-2" role={qd.mode === "multi-select" ? "group" : "radiogroup"}>
+					<div style={{ display: "flex", flexDirection: "column", gap: 6 }} role={qd.mode === "multi-select" ? "group" : "radiogroup"}>
 						{qd.options.map((opt, i) => {
 							const isSel = sel.selected.has(i);
+							const dim = !isSel && (sel.selected.size > 0 || sel.dontKnow) && qd.mode !== "multi-select";
 							return (
 								<button
 									key={opt.value}
@@ -579,38 +597,17 @@ function QuestionDockForm({
 									aria-checked={isSel}
 									data-kbdrow={i}
 									onClick={() => toggle(i)}
-									className={cn(
-										"flex items-start gap-3 rounded-lg border px-3 py-2 text-left text-sm outline-none transition-colors",
-										isSel ? "border-brand bg-popover shadow-[inset_0_0_0_1px_var(--brand)]" : "bg-popover hover:border-input",
-										i === kbdIdx && !isSel && "ring-1 ring-border bg-accent/40",
-									)}
+									className={cn("opt", isSel && "sel", dim && "dim")}
+									style={i === kbdIdx && !isSel ? { borderColor: "var(--line2)", background: "#fff" } : undefined}
 								>
-									<span
-										className={cn(
-											"mt-0.5 flex size-4 shrink-0 items-center justify-center border",
-											qd.mode === "multi-select" ? "rounded-sm" : "rounded-full",
-											isSel ? "border-brand bg-brand text-white" : "border-muted-foreground/40",
-										)}
-									>
-										{isSel && (
-											<span className={cn(qd.mode === "multi-select" ? "text-base leading-none" : "size-1.5 rounded-full bg-current")}>
-												{qd.mode === "multi-select" ? "✓" : ""}
-											</span>
-										)}
-									</span>
-									<span>
+									{keyBadge(i)}
+									<span style={{ minWidth: 0 }}>
 										<MessageResponse>{opt.label}</MessageResponse>
 										{kind !== "quiz" && opt.description && (
-											// Option subtext renders in Source Sans 3 (owner's mockup);
-											// the "I don't know" copy stays JetBrains Mono. QUIZ options render
-											// NO description (owner ruling 2026-09-26): the model used them to
-											// telegraph correctness — the schema dropped the field and old
-											// records must not leak either. Same MessageResponse path as the
-											// label (owner, 2026-10-12): descriptions are full markdown —
-											// LaTeX included — not plain text.
-											<MessageResponse className="lh-prose block text-xs text-muted-foreground">
-												{opt.description}
-											</MessageResponse>
+											// QUIZ options render NO description (owner ruling
+											// 2026-09-26): the model used them to telegraph
+											// correctness. Descriptions are full markdown.
+											<MessageResponse className="lh-prose block text-xs text-muted-foreground">{opt.description}</MessageResponse>
 										)}
 									</span>
 								</button>
@@ -620,30 +617,13 @@ function QuestionDockForm({
 						{kind === "quiz" && (
 							<button
 								type="button"
-								onClick={() =>
-									setSel((prev) => ({ ...prev, selected: new Set(), otherSelected: false, dontKnow: !prev.dontKnow }))
-								}
+								onClick={() => setSel((prev) => ({ ...prev, selected: new Set(), otherSelected: false, dontKnow: !prev.dontKnow }))}
 								data-kbdrow={optionCount}
 								aria-pressed={sel.dontKnow}
-								className={cn(
-									// Option-row layout + radio circle (owner); the dashed
-									// outline stays — this is the deliberate non-answer.
-									"flex items-start gap-3 rounded-lg border border-dashed px-3 py-2 text-left text-sm outline-none transition-colors",
-									sel.dontKnow ? "border-brand text-foreground" : "text-muted-foreground",
-									kbdIdx === optionCount && !sel.dontKnow && "ring-1 ring-border bg-accent/40",
-								)}
+								className={cn("opt idk", sel.dontKnow && "sel")}
 							>
-								<span
-									className={cn(
-										"mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border",
-										sel.dontKnow
-											? "border-brand bg-brand text-white"
-											: "border-muted-foreground/40",
-									)}
-								>
-									{sel.dontKnow && <span className="size-1.5 rounded-full bg-current" />}
-								</span>
-								<span>I don't know</span>
+								{keyBadge(optionCount)}
+								<span>I don’t know yet</span>
 							</button>
 						)}
 
@@ -654,63 +634,35 @@ function QuestionDockForm({
 								data-testid="other-option"
 								data-kbdrow={optionCount}
 								onClick={selectOther}
-								className={cn(
-									"flex items-start gap-3 rounded-lg border px-3 py-2 text-left text-sm outline-none transition-colors",
-									sel.otherSelected ? "border-brand bg-popover shadow-[inset_0_0_0_1px_var(--brand)]" : "border-dashed hover:border-input",
-									kbdIdx === optionCount && !sel.otherSelected && "ring-1 ring-border bg-accent/40",
-								)}
+								className={cn("opt", sel.otherSelected ? "sel" : "idk")}
+								style={{ cursor: "text" }}
 							>
-								<span
-									className={cn(
-										"mt-0.5 flex size-4 shrink-0 items-center justify-center border",
-										qd.mode === "multi-select" ? "rounded-sm" : "rounded-full",
-										sel.otherSelected
-											? "border-brand bg-brand text-white"
-											: "border-muted-foreground/40",
-									)}
-								>
-									{sel.otherSelected && (
-										<span className={cn(qd.mode === "multi-select" ? "text-base leading-none" : "size-1.5 rounded-full bg-current")}>
-											{qd.mode === "multi-select" ? "✓" : ""}
-										</span>
-									)}
-								</span>
+								{keyBadge(optionCount)}
 								<input
 									ref={otherInputRef}
 									value={other}
 									onChange={(e) => {
 										setOther(e.target.value);
-										// Typing selects the row — displacing in
-										// single-select, alongside the siblings in multi.
+										// Typing selects the row — displacing in single-select.
 										setSel((prev) => (prev.otherSelected ? prev : toggleOther(selectMode, prev)));
 									}}
 									onKeyDown={(e) => {
-										// Esc escapes the typing (owner refinement round,
-										// 2026-09-24): focus leaves the input, the row STAYS
-										// selected — deselection is the next Space's job, acting
-										// on the row — and the arrow walk resumes from this
-										// row (kbdIdx pins it). stopPropagation keeps the
-										// window chain from reading this Esc as abort-turn.
+										// Esc leaves the typing (the row stays selected); the
+										// window chain must not read it as abort-turn.
 										if (e.key === "Escape") {
 											e.preventDefault();
 											e.stopPropagation();
 											e.currentTarget.blur();
 											setKbdIdx(optionCount);
 										}
-											// Enter submits directly (owner, keyboard round 2026-10-06):
-											// the custom answer is a single-line input — no newline
-											// to protect, and typing has already selected the row, so
-											// the payload is ready. Every Enter (shift or not — nothing
-											// else could ever happen in a one-line field) rides the
-											// same submit seam as the button, dictation finish-first
-											// included.
-											if (e.key === "Enter") {
-												e.preventDefault();
-												submit();
-											}
+										// Enter submits: a one-line field has no newline to protect.
+										if (e.key === "Enter") {
+											e.preventDefault();
+											submit();
+										}
 									}}
 									placeholder="Type your own answer…"
-									className="lh-input w-full min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+									style={{ flex: 1, minWidth: 0, border: 0, background: "transparent", outline: "none" }}
 									onClick={(e) => e.stopPropagation()}
 								/>
 							</div>
@@ -719,103 +671,82 @@ function QuestionDockForm({
 				)}
 			</div>
 
-			{/* Confidence (owner, 2026-10-01; v4 redesign 2026-10-26): the
-				learner's stated probability that the selected answer is correct,
-				as a segmented control over the SAME six stops the slider had —
-				the data contract and the teacher's reading of it are unchanged.
-				Keyboard: GLOBAL ←/→ (the ↑/↓ pattern, handled above). "I don't
-				know" GRAYS it out — the layout holds, no value is sent, the IDK
-				signal stands alone. */}
+			{/* How sure (owner, 2026-10-01; v4 four levels): the learner's stated
+			    probability that the selected answer is correct. Global ←/→ move
+			    it; "I don't know" grays it out and nothing is sent. */}
 			{kind === "quiz" && (
-				<div className="border-t border-border/60 px-4 py-2.5">
-					<div className="flex flex-col gap-1.5">
-						<span
-							id={`${toolCallId}-confidence`}
-							className={cn("text-xs font-semibold", sel.dontKnow ? "text-muted-foreground/50" : "text-muted-foreground")}
-						>
-							How sure are you?
-						</span>
-						<div
-							role="radiogroup"
-							aria-labelledby={`${toolCallId}-confidence`}
-							aria-disabled={sel.dontKnow}
-							title="The probability your selected answer is correct — 50% is a coin flip. Adjust with ←/→."
-							data-testid="confidence-control"
-							className={cn("flex rounded-lg bg-muted p-0.5", sel.dontKnow && "opacity-40")}
-						>
-							{CONFIDENCE_STOPS.map((stop, i) => (
-								<button
-									key={stop}
-									type="button"
-									role="radio"
-									aria-checked={!sel.dontKnow && i === confIdx}
-									disabled={sel.dontKnow}
-									onClick={() => setConfIdx(i)}
-									data-testid={`confidence-stop-${stop}`}
-									className={cn(
-										"h-7 flex-1 rounded-md font-mono text-xs tabular-nums transition-colors disabled:cursor-not-allowed",
-										!sel.dontKnow && i === confIdx
-											? "bg-popover font-semibold text-foreground shadow-[0_1px_2px_var(--shadow)]"
-											: "text-muted-foreground hover:text-foreground",
-									)}
-								>
-									{stop}%
-								</button>
-							))}
-						</div>
+				<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+					<span id={`${toolCallId}-confidence`} style={{ fontSize: 12, fontWeight: 600, opacity: sel.dontKnow ? 0.5 : 1 }}>
+						How sure?
+					</span>
+					<div
+						className="seg"
+						role="radiogroup"
+						aria-labelledby={`${toolCallId}-confidence`}
+						aria-disabled={sel.dontKnow}
+						title="How likely your answer is right. Adjust with ←/→."
+						data-testid="confidence-control"
+						style={sel.dontKnow ? { opacity: 0.4 } : undefined}
+					>
+						{CONFIDENCE_LEVELS.map((level, i) => (
+							<button
+								key={level.value}
+								type="button"
+								role="radio"
+								aria-checked={!sel.dontKnow && i === confIdx}
+								disabled={sel.dontKnow}
+								onClick={() => setConfIdx(i)}
+								data-testid={`confidence-stop-${level.value}`}
+								className={!sel.dontKnow && i === confIdx ? "on" : ""}
+							>
+								{level.label}
+							</button>
+						))}
 					</div>
 				</div>
 			)}
 
-			{/* The learner's half of the dock — a composer TWIN: a labeled, bordered
-			    field with Submit docked inside, exactly like the chat composer's
-			    send. Select modes get "Your thinking" (Enter makes a newline — it
-			    is for dumping, soon dictated; the button submits); text mode
-			    keeps "Your answer" with Enter-to-submit. */}
+			{/* The learner's own words: "Your thinking" beside the options
+			    (Enter submits, ⇧↵ newline), or "Your answer" in text mode. */}
 			<form
-				className="border-t border-border/60 p-1.5"
 				onSubmit={(e) => {
 					e.preventDefault();
 					submit();
 				}}
+				style={{ display: "flex", flexDirection: "column", gap: 8 }}
 			>
-				<div
-					data-testid={qd.mode === "text" ? "answer-field" : "thinking-field"}
-					className="rounded-[10px] border border-border/70 bg-background/60 transition-colors focus-within:border-primary/50"
-				>
-					<div className="px-2.5 pt-2 text-xs font-medium text-muted-foreground">
+				<div style={{ position: "relative" }} data-testid={qd.mode === "text" ? "answer-field" : "thinking-field"}>
+					<label className="sr" htmlFor={`${toolCallId}-field`}>
 						{qd.mode === "text" ? "Your answer" : "Your thinking"}
-					</div>
+					</label>
 					{qd.mode === "text" ? (
 						<textarea
+							id={`${toolCallId}-field`}
 							value={text}
 							onChange={(e) => {
 								answerTextRef.current = e.target.value;
 								setText(e.target.value);
 							}}
 							onKeyDown={(e) => {
-								// Esc ends dictation (the dictate decisions: click-again
-								// or Esc) — stopPropagation claims it (keyboard wave
-								// A) so the window chain doesn't also abort a turn.
 								if (e.key === "Escape" && onEscape) {
 									e.preventDefault();
 									e.stopPropagation();
 									onEscape();
 									return;
 								}
-								// Chat convention: Enter submits, Shift+Enter is a newline;
-								// ⌘/Ctrl+Enter also submits (universal across the app).
 								if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
 									e.preventDefault();
 									submit();
 								}
 							}}
-							placeholder="Type your answer…"
-							rows={1}
-							className="field-sizing-content lh-input max-h-48 min-h-10 w-full resize-none bg-transparent px-2.5 py-2 outline-none placeholder:text-muted-foreground"
+							placeholder="Your answer, in your own words…"
+							rows={4}
+							className="serif"
+							style={{ width: "100%", display: "block", padding: "9px 44px 9px 11px", borderRadius: 11, border: "1px solid var(--line)", background: "var(--input)", resize: "vertical", fontSize: 14, lineHeight: "21px", outline: "none" }}
 						/>
 					) : (
 						<textarea
+							id={`${toolCallId}-field`}
 							ref={thinkingRef}
 							value={thinking}
 							onChange={(e) => {
@@ -823,47 +754,57 @@ function QuestionDockForm({
 								setThinking(e.target.value);
 							}}
 							onKeyDown={(e) => {
-								// Esc ends dictation (the dictate decisions: click-again
-								// or Esc) — stopPropagation claims it (keyboard wave
-								// A) so the window chain doesn't also abort a turn.
 								if (e.key === "Escape" && onEscape) {
 									e.preventDefault();
 									e.stopPropagation();
 									onEscape();
 									return;
 								}
-								// THE STANDARD CHORD (owner round 5, 2026-10-05): Enter
-								// submits, Shift+Enter is a newline, ⌘/Ctrl+Enter works
-								// too — identical to the practice dock and the composer.
+								// THE STANDARD CHORD: Enter submits, Shift+Enter is a newline.
 								if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
 									e.preventDefault();
 									submit();
 								}
 							}}
 							placeholder="Why this answer? Whatever comes to mind."
-							rows={1}
-							className={cn(
-								"field-sizing-content lh-input max-h-48 w-full resize-none bg-transparent px-2.5 py-2 outline-none placeholder:text-muted-foreground/70",
-								// Phase-scaled prominence: teaching invites depth,
-								// probing stays quick.
-								phase === "teach" ? "min-h-[4.5rem]" : "min-h-10",
-							)}
+							rows={phase === "teach" ? 3 : 2}
+							className="serif"
+							style={{ width: "100%", display: "block", padding: "9px 44px 9px 11px", borderRadius: 11, border: "1px solid var(--line)", background: "var(--input)", resize: "vertical", fontSize: 14, lineHeight: "21px", outline: "none" }}
 						/>
 					)}
-					<div className="flex items-center justify-between gap-2 p-1">
-						<span aria-hidden className="pl-1.5 text-xs text-muted-foreground">
-								{compactionRunning ? "compacting session…" : "↵ submits · ⇧↵ newline"}
-						</span>
-						<Button
-							type="submit"
-							disabled={!canSubmit || compactionRunning}
-							className="ml-auto h-9 rounded-[6px] px-3.5 text-sm font-medium"
-						>
-							Submit answer
-						</Button>
-					</div>
+					<button
+						type="button"
+						className={cn("ib", isDictationActive() && "on")}
+						aria-label="Dictate"
+						onClick={toggleDictation}
+						style={{ position: "absolute", right: 6, bottom: 6 }}
+					>
+						<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+							<rect x="9" y="3" width="6" height="11" rx="3" />
+							<path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+						</svg>
+					</button>
+				</div>
+				<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+					<span style={{ fontSize: 11.5, color: "var(--faint)" }}>
+						{compactionRunning ? (
+							"compacting session…"
+						) : qd.mode === "text" ? (
+							<>
+								{"↵ submits · ⇧↵ newline"}
+							</>
+						) : (
+							<>
+								<span className="kbd">1</span>–<span className="kbd">{rowCount}</span> pick · {"↵ submits · ⇧↵ newline"}
+							</>
+						)}
+					</span>
+					<button type="submit" className="btn tall" style={{ marginLeft: "auto" }} disabled={!canSubmit || compactionRunning}>
+						Submit
+					</button>
 				</div>
 			</form>
 		</div>
 	);
+
 }

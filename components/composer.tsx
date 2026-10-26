@@ -1,16 +1,9 @@
 "use client";
 
-import { ArrowRightIcon, CornerDownLeftIcon, SquareIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Hint } from "@/components/ui/hint";
+import { ArrowRightIcon, SquareIcon } from "lucide-react";
 
 /**
- * The chat composer — content row ONLY (the persistent rounded shell lives in
- * the chat view's overlay, so the shell can later morph chat → question
- * without remounting).
- *
- * Corner-radius math (concentric with the shell): shell rounded-2xl (16px) −
- * row padding p-1.5 (6px) = button rounded-[10px] = 25% of the 40px button.
+ * The session composer — Lesson4's steer row (see the render below).
  */
 /** What one Enter press does, in precedence order: stop a busy stream,
  *  otherwise send the message, otherwise — practice sessions only — fire
@@ -49,6 +42,7 @@ export function Composer({
 	placeholder = "Ask, answer, or steer the lesson…",
 	nextProblem = false,
 	onNext,
+	trailing,
 }: {
 	busy: boolean;
 	value: string;
@@ -74,6 +68,8 @@ export function Composer({
 	/** The signal's dispatcher (send({type:"next"})) — the chip and the
 	 *  empty-Enter share it. */
 	onNext?: () => void;
+	/** A control at the row's end, before the button (the session's mic). */
+	trailing?: React.ReactNode;
 }) {
 	const act = () => {
 		const action = enterAction({ busy, canSend, nextProblem });
@@ -81,10 +77,17 @@ export function Composer({
 		else if (action === "send") onSend();
 		else if (action === "next") onNext?.();
 	};
+	// Lesson4's steer row (v4 rebuild, 2026-10-26): one glass row — the
+	// field, a quiet line saying what Enter will do, and a text button. The
+	// behaviour is unchanged: send, steer mid-turn ("Queue" — answered after
+	// this step), stop on an empty field mid-turn, next problem in the pause.
+	const action = enterAction({ busy, canSend, nextProblem });
+	const hint = busy && canSend ? "answered after this step" : busy ? "↵ stops the reply" : null;
 	return (
 		<form
 			data-testid="composer"
-			className="flex items-end gap-1.5 p-1.5"
+			className="glass"
+			style={{ display: "flex", alignItems: "flex-end", gap: 6, padding: "4px 4px 4px 14px", borderRadius: 12 }}
 			onSubmit={(e) => {
 				e.preventDefault();
 				act();
@@ -96,18 +99,15 @@ export function Composer({
 				onChange={(e) => onChange(e.target.value)}
 				onKeyDown={(e) => {
 					// Esc ends dictation before anything else Esc might someday mean
-					// here (the dictate decisions: click-again or Esc to stop).
-					// stopPropagation claims the Esc (keyboard wave A): the
-					// window-level chain must not also abort a turn under us.
+					// here; stopPropagation claims it (keyboard wave A) so the
+					// window-level chain doesn't also abort a turn.
 					if (e.key === "Escape" && onEscape) {
 						e.preventDefault();
 						e.stopPropagation();
 						onEscape();
 						return;
 					}
-					// Chat convention: Enter sends, Shift+Enter is a newline.
-					// ⌘/Ctrl+Enter also sends — the universal submit shortcut
-					// across every input in the app (thinking field, answers).
+					// Enter sends, Shift+Enter is a newline; ⌘/Ctrl+Enter also sends.
 					if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
 						e.preventDefault();
 						act();
@@ -116,47 +116,29 @@ export function Composer({
 				placeholder={placeholder}
 				autoFocus={autoFocus}
 				rows={1}
-				className="field-sizing-content lh-input max-h-48 min-h-10 flex-1 resize-none bg-transparent px-2.5 py-2 outline-none placeholder:text-muted-foreground"
+				aria-label="Ask about this step, or steer the lesson"
+				className="field-sizing-content"
+				style={{ flex: 1, minWidth: 0, minHeight: 36, maxHeight: 192, padding: "8px 0", border: 0, background: "transparent", outline: "none", resize: "none", fontSize: 13.5, lineHeight: "20px" }}
 			/>
-			{/* The button follows the text (owner report 2026-10-03): while
-				 a turn runs WITH text typed it stays the SEND affordance
-				 (click = steer — steering must be clickable, not Enter-only);
-				 only an empty composer morphs it to Stop. ESC keeps its
-				 confirm-popup abort in every state, so stop is never
-				 unreachable. No tooltip — the ↵ glyph is the affordance
-				 (owner, subtlety round 2026-09-25).
-
-				 THE NEXT MORPH (owner round 16 refinement, 2026-10-06): an
-				 empty composer in the practice pause morphs the button into
-				 a wide green NEXT PROBLEM — the affordance IS the button
-				 (click and Enter share one lane), and typing anything
-				 returns the regular send. The green is the app's correct-
-				 answer register (the --good token, as answered-card). */}
-				{nextProblem && !busy && !canSend ? (
-					<button
-						type="submit"
-						data-testid="next-problem-button"
-						aria-label="Next problem"
-						className="flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-[10px] bg-good px-4 font-ui text-xs font-medium text-white transition-colors hover:bg-good/90"
-					>
-						Next problem
-						<ArrowRightIcon className="size-4" />
-					</button>
-				) : (
-					<button
-						type="submit"
-						aria-label={busy && !canSend ? "Stop" : "Send"}
-						disabled={!busy && !canSend}
-						className={cn(
-							"flex size-10 shrink-0 items-center justify-center rounded-[10px] transition-colors",
-							busy && !canSend
-								? "bg-secondary text-foreground hover:bg-accent"
-								: "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40",
-						)}
-					>
-						{busy && !canSend ? <SquareIcon className="size-4" /> : <CornerDownLeftIcon className="size-5" />}
-					</button>
-				)}
+			{hint && (
+				<span className="hide-sm" style={{ alignSelf: "center", fontSize: 11.5, color: "var(--faint)", whiteSpace: "nowrap" }}>
+					{hint}
+				</span>
+			)}
+			{trailing}
+			{nextProblem && !busy && !canSend ? (
+				<button type="submit" data-testid="next-problem-button" aria-label="Next problem" className="btn" style={{ height: 30, padding: "0 12px", background: "var(--good)" }}>
+					Next problem <ArrowRightIcon className="size-3.5" />
+				</button>
+			) : action === "stop" ? (
+				<button type="submit" aria-label="Stop" className="ghost" style={{ height: 30 }}>
+					<SquareIcon className="size-3" /> Stop
+				</button>
+			) : (
+				<button type="submit" aria-label="Send" disabled={!busy && !canSend} className="btn" style={{ height: 30, padding: "0 12px" }}>
+					{busy ? "Queue" : "Send"}
+				</button>
+			)}
 		</form>
 	);
 }

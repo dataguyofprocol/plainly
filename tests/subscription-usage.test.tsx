@@ -7,7 +7,7 @@ import { subscriptionLabel, subscriptionLabels, isSubscriptionModel, type TurnUs
 import { sessionCost, callCost } from "../src/server/pricing.ts";
 import { graphCostSummary } from "../src/core/cost-summary.ts";
 import { planCostLabel } from "../components/usage-format.ts";
-import { StatsBar } from "../components/stats-bar.tsx";
+import { lessonCostLabel } from "../components/lesson-panel.tsx";
 import { ModelMenuList } from "../components/settings/model-menu.tsx";
 import { toModelDto } from "../src/server/model-catalog.ts";
 import { piModels } from "../src/agent/models.ts";
@@ -28,7 +28,7 @@ test("mixed session pricing sums only API dollars and retains all subscription p
 	const turns = [turn("github-copilot-subscription:gpt-5", "copilot"), turn("xai-subscription:grok", "grok"), turn("chatgpt:gpt-5", "chatgpt"), turn("openai:gpt-5", "api")];
 	const pricing = sessionCost({ turns }); assert.equal(pricing.subscription, 3); assert.equal(pricing.unpriced, 0); assert.equal(pricing.cost, callCost(step, "openai:gpt-5"));
 	assert.deepEqual(pricing.subscriptionProviders, ["GitHub Copilot", "Grok", "ChatGPT"]);
-	const html = renderToStaticMarkup(<StatsBar turns={turns} pricing={pricing} />);
+	const html = lessonCostLabel(turns, pricing);
 	assert.match(html, /\$[\d.]+ \+ GitHub Copilot \+ Grok \+ ChatGPT/); assert(!html.includes(" API +")); assert(!html.includes("ChatGPT plan"));
 });
 test("graph stage/recent aggregates retain distinct subscription providers without inventing dollars", () => {

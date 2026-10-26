@@ -17,7 +17,7 @@ import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it } from "node:test";
 
-import { PracticeDock } from "../components/practice-dock.tsx";
+import { PracticePanel } from "../components/lesson-panel.tsx";
 import { ConcludeCard, ProblemCard, ThinkingCard } from "../components/practice-cards.tsx";
 import { GraphContextCard } from "../components/graph-context-card.tsx";
 import { newGraphContextMessage } from "../src/core/native-messages.ts";
@@ -36,49 +36,39 @@ const part = (over: Partial<ArtifactPartProps["part"]>): ArtifactPartProps["part
 	...over,
 });
 
-// ── the dock ─────────────────────────────────────────────────────────────────
+// ── the dock (Practice4) ─────────────────────────────────────────────────────
 
-describe("PracticeDock", () => {
-	it("expanded: statement renders, the two lanes sit in the thinking field", () => {
+describe("PracticePanel", () => {
+	const problem = { toolCallId: "call_p1", input: { statement: "Show that the sum is even." } };
+
+	it("an open problem: your working, how sure, the hint ladder, submit, the set", () => {
 		const html = renderToStaticMarkup(
-			<PracticeDock
-				problemCallId="call_p1"
-				input={{ statement: "Show that the sum is even." }}
-				expanded={true}
-				onExpand={() => {}}
-				onSubmit={() => {}}
-			/>,
+			<PracticePanel messages={[]} practice={problem} onSubmitThinking={() => {}} compactionRunning={false} turns={[]} hintsUsed={1} />,
 		);
-		assert.match(html, /Show that the sum is even\./);
-		// The 'Problem' eyebrow (owner round, 2026-10-05): the quiz cards'
-		// label row, mirrored — dock and transcript card read identically.
-		assert.match(html, /Problem/);
-		// The measured column cap (the old fixed 40vh is only the fallback).
-		assert.match(html, /--dock-max-h/);
-		assert.match(html, /Your thinking/);
+		assert.match(html, /Your working/);
+		assert.match(html, /How sure\?/);
+		for (const level of ["Guessing", "Unsure", "Fairly sure", "Certain"]) assert.match(html, new RegExp(level));
+		assert.match(html, /1 of 3 used/, "the ladder counts the rungs asked for");
+		assert.match(html, /Ask for a bigger hint/, "the next rung names itself");
 		assert.match(html, /data-testid="practice-send"/);
-		assert.ok(!html.includes("practice-nudge") && !html.includes("practice-commit"), "the two-lane buttons are gone");
-		// The buttons carry their lane in the disabled gate; both start
-		// disabled (empty field).
-		assert.match(html, /disabled/);
+		assert.match(html, /This set/);
+		assert.equal((html.match(/class="prob"/g) ?? []).length, 5, "a set of five");
+		// The statement lives on the problem card, not in the dock.
+		assert.ok(!html.includes("Show that the sum is even."));
 	});
 
-	it("collapsed: the slim bar carries the statement excerpt", () => {
+	it("the ladder runs out after the third rung", () => {
 		const html = renderToStaticMarkup(
-			<PracticeDock
-				problemCallId="call_p1"
-				input={{ statement: "Show that the sum is even." }}
-				expanded={false}
-				onExpand={() => {}}
-				onSubmit={() => {}}
-			/>,
+			<PracticePanel messages={[]} practice={problem} onSubmitThinking={() => {}} compactionRunning={false} turns={[]} hintsUsed={3} />,
 		);
-		assert.match(html, /data-testid="practice-dock-bar"/);
-		assert.match(html, /Show that the sum is even\./);
+		assert.match(html, /No more hints/);
+	});
+
+	it("between problems: the set and a pointer to the next one", () => {
+		const html = renderToStaticMarkup(<PracticePanel messages={[]} practice={null} onSubmitThinking={() => {}} compactionRunning={false} turns={[]} hintsUsed={0} />);
+		assert.match(html, /first problem arrives/);
 	});
 });
-
-// ── the transcript cards ─────────────────────────────────────────────────────
 
 describe("the practice transcript cards", () => {
 	it("ProblemCard: ALWAYS OPEN, the 'Problem' eyebrow + the statement — the commitment NEVER renders", () => {

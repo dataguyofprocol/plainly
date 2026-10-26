@@ -142,14 +142,14 @@ describe("render smoke tests", () => {
 		const html = renderDock({ toolName: "quiz", toolCallId: "q1", input: quizInput as never });
 		assert.match(html, /Which planet is closest to the sun\?/);
 		assert.match(html, /Mercury/);
-		assert.match(html, /I don&#x27;t know|I don't know/);
+		assert.match(html, /I don’t know yet/, "v4's non-answer row");
 		// The learner's voice: a labeled "Your thinking" composer-twin lives
 		// INSIDE the dock — never called optional, inviting the dump.
 		assert.ok(html.includes('data-testid="thinking-field"'), "thinking field present");
 		assert.match(html, /Your thinking/, "labeled as the learner's voice (v4: sentence case)");
 		assert.match(html, /Why this answer\? Whatever comes to mind/, "placeholder invites, not apologizes (owner, placeholder round 2026-10-07)");
 		assert.ok(!html.includes("optional"), "the field is never called optional");
-		assert.match(html, /Submit answer/, "send becomes Submit answer");
+		assert.match(html, />Submit</, "send becomes Submit (v4)");
 		assert.match(html, /↵ submits · ⇧↵ newline/, "the standard chord is discoverable (owner round 5)");
 		// The v1 desync bug: options are buttons with ARIA roles, not native inputs.
 		assert.ok(!html.includes('type="radio"'), "no native radio inputs");
@@ -223,10 +223,9 @@ describe("render smoke tests", () => {
 				onSubmit={() => {}}
 			/>,
 		);
-		assert.ok(teach.includes("min-h-[4.5rem]"), "teach: a generous dump area");
+		assert.ok(teach.includes('rows="3"'), "teach: a generous dump area");
 		const probe = renderDock({ toolName: "quiz", toolCallId: "q1", input: quizInput as never });
-		assert.ok(!probe.includes("min-h-[4.5rem]"), "probe (default): stays compact");
-		assert.ok(probe.includes("min-h-10"), "probe: one quiet row");
+		assert.ok(probe.includes('rows="2"'), "probe (default): stays compact");
 	});
 
 	it("text-mode asks keep Enter-to-submit and the answer label", () => {
@@ -441,7 +440,7 @@ describe("teach-check reveal (W5 phase separation)", () => {
 		// path renders the identical form; this is also the regression pin for it.
 		const html = renderDock({ toolName: "quiz", toolCallId: "t1", input: quizInput as never });
 		assert.ok(html.includes('data-testid="question-dock"'), "the form is the dock's content once expanded");
-		assert.match(html, /Submit answer/);
+		assert.match(html, />Submit</);
 	});
 });
 
@@ -624,7 +623,7 @@ describe("predict vs check rendering", () => {
 				onSubmit={() => {}}
 			/>,
 		);
-		assert.ok(html.includes("Prediction"), `eyebrow missing: ${html.slice(0, 200)}`);
+		assert.ok(html.includes("Predict before you read on"), `eyebrow missing: ${html.slice(0, 200)}`);
 	});
 
 	it("a check quiz reads the 'Check' eyebrow — the type name IS the label (owner, 2026-10-09)", () => {

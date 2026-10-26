@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { LESSON_PANEL_MIN, planProgress, practiceSet } from "../components/lesson-panel.tsx";
+import { planProgress, practiceSet, stepFold } from "../components/lesson-panel.tsx";
 import type { PlanTree } from "../src/core/index.ts";
 
 const tree: PlanTree = {
@@ -47,9 +47,6 @@ describe("planProgress", () => {
 		assert.equal(p.currentIndex, null);
 	});
 
-	it("the panel threshold leaves a reading column beside a 380px panel", () => {
-		assert.ok(LESSON_PANEL_MIN - 380 >= 600);
-	});
 });
 
 describe("practiceSet", () => {
@@ -81,5 +78,30 @@ describe("practiceSet", () => {
 			part("tool-conclude", "output-available", { input: {} }),
 		]);
 		assert.equal(set[0]!.outcome, "movedOn");
+	});
+});
+
+describe("stepFold — Lesson4's reading mode", () => {
+	const answer = (correct: boolean) => ({ parts: [{ type: "tool-quiz", state: "output-available", input: {}, output: { correct } }] });
+	const text = { parts: [{ type: "text" }] };
+
+	it("no plan position yet: nothing folds (the check-in reads in full)", () => {
+		assert.equal(stepFold([quiz("a")], planProgress(tree, [])), null);
+	});
+
+	it("the current step starts after the last check about another node", () => {
+		const messages = [quiz("a"), answer(true), quiz("b"), answer(false), text, quiz("c")];
+		const fold = stepFold(messages, planProgress(tree, messages))!;
+		assert.equal(fold.startIndex, 3, "after the message holding the check on b");
+		assert.deepEqual(fold.heading, { number: 3, title: "C" });
+		assert.equal(fold.steps, 2);
+		assert.deepEqual(fold.answers, { total: 1, firstTry: 1 }, "graded answers before the step");
+	});
+
+	it("still on the first node: nothing above to fold", () => {
+		const messages = [text, quiz("a")];
+		const fold = stepFold(messages, planProgress(tree, messages))!;
+		assert.equal(fold.startIndex, 0);
+		assert.equal(fold.steps, 0);
 	});
 });

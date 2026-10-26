@@ -175,10 +175,20 @@ export const PENDING_TEXT_MAX = 140;
 export function plainText(raw: unknown, max = PENDING_TEXT_MAX): string | null {
 	if (typeof raw !== "string") return null;
 	let text = raw
+		// Math reads as its content (the question bar's teaser rules):
+		// delimiters drop, \frac{a}{b} → a/b, other commands lose their
+		// backslash, braces go.
+		.replace(/\\\(([\s\S]*?)\\\)/g, "$1")
+		.replace(/\\\[([\s\S]*?)\\\]/g, "$1")
+		.replace(/\$\$?([^$]*)\$\$?/g, "$1")
+		.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, "$1/$2")
+		.replace(/\\([a-zA-Z]+)/g, "$1")
+		.replace(/[{}]/g, "")
 		.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
 		.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
 		.replace(/```[\s\S]*?```/g, " ")
-		.replace(/[*_`~]+/g, "")
+		.replace(/[*`~]+/g, "")
+		.replace(/(^|\s)_+|_+(?=\s|$)/g, "$1")
 		.replace(/^\s{0,3}(#{1,6}|>|[-+]|\d+\.)\s+/gm, "")
 		.replace(/\s+/g, " ")
 		.trim();
@@ -438,11 +448,18 @@ export interface TopicsInput {
 
 /** One topic per snapshot cluster, newest-learned first (null last).
  *  Name: a notes cluster reads its file's basename without extension;
- *  a chat cluster its label, else its birth session's title; else
- *  "Untitled topic" (a deleted birth chat keeps its members unlabeled). */
+ *  a chat cluster its label, else its birth session's title; else its
+ *  first idea's name (a deleted birth chat keeps its members unlabeled);
+ *  else "Untitled topic". */
 export function topicsOf(input: TopicsInput): Topic[] {
 	const createdAt = new Map<string, string>();
 	for (const node of input.propositions) if (!createdAt.has(node.id)) createdAt.set(node.id, node.createdAt);
+	const nameOf = new Map(input.propositions.map((n) => [n.id, n.name]));
+	// A cluster whose birth chat is gone names itself by its first idea.
+	const firstIdeaName = (ids: readonly string[]): string | null => {
+		const first = [...ids].sort((a, b) => (createdAt.get(a) ?? "").localeCompare(createdAt.get(b) ?? ""))[0];
+		return first ? (nameOf.get(first) ?? null) : null;
+	};
 	const topics = input.clusters.map((cluster): Topic => {
 		const ideaIds = cluster.members.filter((id) => createdAt.has(id));
 		let lastLearnedAt: string | null = null;
@@ -461,7 +478,7 @@ export function topicsOf(input: TopicsInput): Topic[] {
 			? fileTopicName(file)
 			: cluster.id.startsWith("src_") && cluster.label
 				? fileTopicName(cluster.label)
-				: (cluster.label ?? input.sessions[cluster.id] ?? "Untitled topic");
+				: (cluster.label ?? input.sessions[cluster.id] ?? firstIdeaName(ideaIds) ?? "Untitled topic");
 		return { id: cluster.id, name: name.trim() || "Untitled topic", ideaIds, lastLearnedAt, lastPracticedAt };
 	});
 	return topics.sort((a, b) => {

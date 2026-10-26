@@ -8,7 +8,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { validateToolArguments } from "@earendil-works/pi-ai";
 import { problemInputObject } from "../src/agent/tools/practice.ts";
-import { PracticeDock } from "../components/practice-dock.tsx";
 import { QuestionDock } from "../components/question-dock.tsx";
 import { LatexGlyph } from "../components/latex-glyph.tsx";
 import { ProblemCard, ConcludeCard } from "../components/practice-cards.tsx";
@@ -30,9 +29,9 @@ const repairedMatrix = String.raw`\begin{pmatrix}1 & 2 \\ 3 & 4\end{pmatrix}`;
 const part = (input: unknown, over: Partial<ArtifactPartProps["part"]> = {}): ArtifactPartProps["part"] => ({
 	type: "tool-problem", state: "input-available", toolCallId: "call_math", input, ...over,
 });
-const dock = (input: { statement: string }, expanded = true) => (
-	<PracticeDock problemCallId="call_math" input={input} expanded={expanded} onExpand={() => {}} onSubmit={() => {}} />
-);
+// The problem statement renders in ONE place since the v4 rebuild (the
+// problem card; the practice dock is the learner's working only).
+const dock = (input: { statement: string }) => <ProblemCard part={part(input)} />;
 
 function math(html: string) {
 	const { document } = parseHTML(html);
@@ -167,7 +166,7 @@ describe("practice display surfaces", () => {
 		const active = activeProblemOf(messages);
 		assert.ok(active);
 		assert.equal((active.input as { statement: unknown }).statement, 17);
-		// Mirror the existing runtime cast at the Chat -> PracticeDock seam.
+		// Mirror the runtime cast at the Chat -> problem card seam.
 		const input = active.input as { statement: string };
 		let expanded = "";
 		assert.doesNotThrow(() => { expanded = renderToStaticMarkup(dock(input)); });
@@ -175,10 +174,6 @@ describe("practice display surfaces", () => {
 		assert.equal(document.querySelector(".lh-prose")!.innerHTML,
 			parseHTML(renderToStaticMarkup(<MessageResponse>{input.statement}</MessageResponse>)).document.firstElementChild!.outerHTML,
 			"non-string values pass through exactly as before, without string coercion or a new fallback");
-		const collapsed = renderToStaticMarkup(dock(input, false));
-		assert.match(collapsed, /data-testid="practice-dock-bar"/);
-		assert.equal(parseHTML(collapsed).document.querySelector("span.truncate")!.textContent, "17");
-		assert.deepEqual(math(collapsed).annotations, []);
 		assert.deepEqual(messages, before);
 		assert.equal(raw.statement, 17);
 	});
@@ -194,10 +189,7 @@ describe("practice display surfaces", () => {
 		}
 	});
 
-	it("does not change the collapsed preview, dismissal or global prose renderer", () => {
-		const preview = renderToStaticMarkup(dock({ statement: doubled }, false));
-		assert.ok(preview.includes(doubled));
-		assert.deepEqual(math(preview).annotations, []);
+	it("does not change the dismissal or global prose renderer", () => {
 		const dismissed = renderToStaticMarkup(<ConcludeCard part={part({ outcome: "dismissed", verdict: doubled }, { reveal: doubled })} />);
 		assert.ok(dismissed.includes("Problem dismissed."));
 		assert.deepEqual(math(dismissed).annotations, []);

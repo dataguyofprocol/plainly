@@ -320,3 +320,11 @@
 .v4 .rail-lights { display: none; }
 .lh-electron[data-lh-platform="darwin"] .v4 .brand { padding-left: calc(60px / var(--lh-zoom)) !important; min-height: 28px; }
 .lh-electron[data-lh-platform="darwin"] .v4 .rail-lights { display: block; width: 100%; height: calc(34px / var(--lh-zoom)); flex: none; }
+
+/* The reading column holds its measure inside the scroller's flex column
+   (Lesson4: 680px), whatever the current step's content width. */
+.v4 .scroll > .col { width: 100%; }
+/* Option rows set their (markdown-rendered) text in the UI sans, as drawn;
+   the question above them stays in the reading serif. */
+.v4 .opt .lh-prose,
+.v4 .opt [data-streamdown] { font-family: inherit; font-size: 13.5px; line-height: 20px; }

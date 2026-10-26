@@ -124,7 +124,7 @@ describe("GET /api/chats — v4 progress fields", () => {
 		const practice = chats.find((c) => c.id === practiceId)!;
 		assert.equal(practice.state, "waiting");
 		assert.equal(practice.pendingProblem, true);
-		assert.equal(practice.pendingQuestionText, "Show that $x>0$.");
+		assert.equal(practice.pendingQuestionText, "Show that x>0.", "math reads as its content");
 		assert.deepEqual(practice.practiceSet, { size: 5, done: 0 });
 		assert.equal(practice.plan, null);
 		assert.equal(practice.answers, null);

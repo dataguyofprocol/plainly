@@ -342,7 +342,19 @@ describe("topics", () => {
 		assert.deepEqual(topics, [
 			{ id: "src_b", name: "Physics", ideaIds: ["n3"], lastLearnedAt: "2026-10-20T00:00:00.000Z", lastPracticedAt: null },
 			{ id: "chat_a", name: "Calculus", ideaIds: ["n1", "n2"], lastLearnedAt: "2026-10-05T00:00:00.000Z", lastPracticedAt: "2026-10-12T00:00:00.000Z" },
-			{ id: "chat_gone", name: "Untitled topic", ideaIds: ["n4"], lastLearnedAt: "2026-09-01T00:00:00.000Z", lastPracticedAt: null },
+			{ id: "chat_gone", name: "n4", ideaIds: ["n4"], lastLearnedAt: "2026-09-01T00:00:00.000Z", lastPracticedAt: null },
 		]);
+	});
+});
+
+describe("plainText — math reads as its content", () => {
+	it("drops TeX delimiters and commands, keeps subscripts", () => {
+		assert.equal(
+			plainText("After the step the belief stands at \\(p^- = 0.44\\), with \\frac{1}{2} and $p_1 = 0.70$"),
+			"After the step the belief stands at p^- = 0.44, with 1/2 and p_1 = 0.70",
+		);
+	});
+	it("still strips Markdown emphasis", () => {
+		assert.equal(plainText("**Bold** and _em_ and `code`"), "Bold and em and code");
 	});
 });

@@ -1,12 +1,12 @@
 "use client";
 
-import { createContext, Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createContext, Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChatSession } from "@/components/session";
 import { visibleQueuedSteers } from "@/components/session-core";
 import { SetupDialog } from "@/components/setup-dialog";
 import { Hint } from "@/components/ui/hint";
 import { useZeroKeys, ZeroKeysPill } from "@/components/setup-cta";
-import { useStickToBottomContext, type StickToBottomContext } from "use-stick-to-bottom";
+import type { StickToBottomContext } from "use-stick-to-bottom";
 import {
 	Conversation,
 	ConversationContent,
@@ -24,13 +24,10 @@ import { artifactRenderers } from "@/components/artifacts";
 import { SubagentSteerCard } from "@/components/artifacts/steer-card";
 import { Composer } from "@/components/composer";
 import { useEnterSubmits } from "@/components/enter-submits";
-import { blurAfterPointerClick } from "@/components/focus-hygiene";
-import { dockStateKey } from "@/components/dock-state-key";
-import { QueuedSteersBody, type QueuedSteerLine } from "@/components/queued-steers";
-import { DictationBar, finishDictation, joinDictation, useDictation } from "@/components/dictation";
+import { QueuedSteersBody } from "@/components/queued-steers";
+import { joinDictation, useDictation } from "@/components/dictation";
 import { useFieldCycle } from "@/components/field-cycle";
 import { JobsContext } from "@/components/jobs-context";
-import { StatsBar } from "@/components/stats-bar";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import {
 	isProviderKeyRefusal,
@@ -45,27 +42,22 @@ import {
 	type ModelSlotName,
 } from "@/src/core";
 import { PlanBlock, PlanPopup, latestTree } from "@/components/plan-block";
-import { PlanMarginalia, planExists } from "@/components/plan-window";
 import { MermaidOverlay, SessionMermaidContext } from "@/components/session-overlay";
 import { AbortTurnDialog, type AbortMode } from "@/components/abort-turn-dialog";
-import { ArrowRightIcon, DumbbellIcon, WaypointsIcon } from "lucide-react";
+import { ArrowRightIcon } from "lucide-react";
 import type { PlanBlockData } from "@/src/core";
-import { QuestionDock } from "@/components/question-dock";
 import { SessionFind } from "@/components/session-find";
 import { SessionMessageNavigation } from "@/components/session-navigation";
-import { PracticeDock } from "@/components/practice-dock";
 import { ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
 import { GraphContextCard, type GraphContextData } from "@/components/graph-context-card";
-import { TopBar } from "@/components/top-bar";
-import type { ArtifactPartProps, JobRecord, Phase3, QuestionAnswerData, TurnUsage, SessionPricing } from "@/src/core";
+import type { ArtifactPartProps, JobRecord, QuestionAnswerData, TurnUsage, SessionPricing } from "@/src/core";
 import type { LhViewMessage } from "@/src/core";
-import { PhaseChip, PhaseDivider } from "@/components/phase-divider";
+import { PhaseDivider } from "@/components/phase-divider";
 import {
 	CompactionCutDivider,
 	CompactionMomentDivider,
 	type CompactionDividerData,
 } from "@/components/compaction-divider";
-import { CoverageRing } from "@/components/extraction-coverage";
 import {
 	activeProblemOf,
 	dismissedAnswer,
@@ -76,42 +68,13 @@ import {
 	toolQuestionKind,
 	questionNeedsReveal,
 } from "@/src/core";
-import { ReadingThinkingField } from "@/components/reading-thinking";
-import { LESSON_PANEL_MIN, LessonPanel, PracticePanel, planProgress, practiceSet } from "@/components/lesson-panel";
-import { cn } from "@/lib/utils";
+import { LessonPanel, PracticePanel, planProgress, practiceSet, stepFold } from "@/components/lesson-panel";
+import { ModelControl } from "@/components/model-picker";
+import { CheckIcon, MicIcon, PlanMapIcon } from "@/components/v4/icons";
+import { Field, Rail } from "@/components/v4/shell";
 import { currentUserThinkingOpen, setAllUserThinkingOpen } from "@/components/thinking-block";
-import { slotsConfigured, type ModelsSettings } from "@/src/core";
+import { PRACTICE_SET_SIZE, practiceHintsUsed, slotsConfigured, type HintRung, type ModelsSettings } from "@/src/core";
 import { useSettingsSaved } from "@/components/settings-signal";
-
-/** One width for everything: transcript, cards, and the bottom blob share this column. */
-/**
- * Width tokens (wave-5 reskin, owner decision): the teaching PROSE spans the
- * full session width with a thin px-6 margin; the composer/question DOCK is
- * deliberately narrower (~46rem centered) per the reference. Same ELEMENT,
- * same place — width polish only.
- */
-const COLUMN = "mx-auto w-full max-w-none px-6";
-const DOCK = "mx-auto w-full max-w-[46rem] px-4";
-// The DOCK container's fixed width (46rem) and the plan marginalia's
-// geometry (owner, plan-placement round): the bare diagram sits in the
-// dock band's RIGHT flank — MARGIN_GAP from the DOCK container's edge and
-// the same from the column's right edge. The box width is pure CSS, so
-// the diagram shrinks CONTINUOUSLY with the flank; MARGIN_MIN_W is only
-// the fade floor (owner, resize round) — below it the marginalia fades
-// out over the normal transition instead of popping away, and it stays
-// mounted while the question owns the band so widening fades it back.
-const DOCK_W = 46 * 16;
-const MARGIN_GAP = 16;
-const MARGIN_MIN_W = 220;
-// The dock overlay's gradient band (h-24) — part of the reserved tail.
-const GRADIENT_H = 96;
-// Fold thresholds (owner, scroll round 1, tuned round 3): pixel distance
-// from the bottom — position, not velocity. Leave the bottom → the box
-// folds (visual only); reach it again → it re-opens. 96 (was 64, owner
-// round 3) tolerates a small peek upward without folding; the dead band
-// vs EXPAND_DIST absorbs trackpad drift.
-const COLLAPSE_DIST = 96;
-const EXPAND_DIST = 16;
 
 /**
  * Server-sync channel for artifact renderers: the CENTRAL jobs poll in Chat
@@ -163,9 +126,6 @@ export function parseProviderKeyRefusal(message: string | undefined): boolean {
 		return false;
 	}
 }
-
-/** useLayoutEffect that is silent during SSR (client components still render on the server in Next). */
-const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /** A wake-pipeline steer message: user-role delivery whose metadata marks it
  * as a sub-agent result — rendered as an artifact card, never a bubble. */
@@ -490,10 +450,11 @@ export function Chat({
 	// the dock stays mounted (the problem is still active until the agent
 	// concludes).
 	const submitThinking = useCallback(
-		(text: string) => {
+		(text: string, hint?: HintRung) => {
 			const problem = activeProblemRef.current;
 			if (!problem) return;
-			void send({ type: "thinking", problemCallId: problem.toolCallId, text });
+			// A hint request (v4 ladder) rides the same lane with its rung.
+			void send(hint ? { type: "thinking", problemCallId: problem.toolCallId, text, hint } : { type: "thinking", problemCallId: problem.toolCallId, text });
 		},
 		[send],
 	);
@@ -509,24 +470,12 @@ export function Chat({
 	// question's phase.
 	const requiresReveal = pending !== null && questionNeedsReveal(pending.tool, pending.input, phaseAt3(messages));
 
-	// THE LESSON PANEL (v4 redesign, 2026-10-26): with room for a reading
-	// column AND the panel, the question moves beside the text; narrower,
-	// the bottom dock keeps it. Measured on the session surface (the
-	// sidebar's width already excluded). Practice gets its own panel.
-	const surfaceRef = useRef<HTMLDivElement>(null);
-	const [wide, setWide] = useState(false);
-	useEffect(() => {
-		const el = surfaceRef.current;
-		if (!el) return;
-		const measure = () => setWide(el.offsetWidth >= LESSON_PANEL_MIN);
-		measure();
-		const ro = new ResizeObserver(measure);
-		ro.observe(el);
-		return () => ro.disconnect();
-	}, []);
-	const panelOn = wide;
 	const lessonProgress = useMemo(() => (kind === "practice" ? null : planProgress(latestTree(messages), messages)), [kind, messages]);
 	const setProgress = useMemo(() => (kind === "practice" ? practiceSet(messages) : null), [kind, messages]);
+	// Lesson4's reading fold: earlier steps behind the "Steps 1–n" bar.
+	const fold = useMemo(() => (kind === "practice" ? null : stepFold(messages, lessonProgress)), [kind, messages, lessonProgress]);
+	const [reviewOpen, setReviewOpen] = useState(false);
+	const hintsUsed = activeProblem ? practiceHintsUsed(nativeMessages, activeProblem.toolCallId).length : 0;
 
 	/* The READING-THINKING channel (owner 2026-10-03): a draft field for
 	 * thinking while reading the teaching prose, mounted while a check waits
@@ -830,14 +779,6 @@ export function Chat({
 	// The live plan popup (wave 4): opened by any transcript plan block, the
 	// top-bar plan chip, and the dock band's marginalia.
 	const [planOpen, setPlanOpen] = useState(false);
-	// Real plan presence — gates the marginalia's clickable flank. A JSX
-	// element is always truthy; gating on the node alone mounted a phantom
-	// (invisible, clickable) button in the bottom-right whenever a question
-	// was pending with no plan yet (owner report, UI round 2026-10-01).
-	const hasPlan = useMemo(() => planExists(messages), [messages]);
-	// The coverage ring's refresh chain (extraction-UX redesign): bumped at
-	// turn settle — the moment this session's uncovered mass changes.
-	const [coverageTick, setCoverageTick] = useState(0);
 	// The mermaid focus (chrome-melt wave, 2026-09-19): md-blocks' expand
 	// button registers the chart source here; the overlay (and the plan
 	// popup) mount INSIDE the session-area div — both are session-scoped, so
@@ -876,13 +817,6 @@ export function Chat({
 	const [pricing, setPricing] = useState<SessionPricing | undefined>();
 	// The per-chat model control state (model-picker writes via PUT; the
 	// record is the source of truth, lifted here so the stats bar re-renders).
-	// The dock's reserved tail height (DockOverlay reports it; the spacer at
-	// the end of the transcript renders it). Lives here because the spacer is
-	// inside the scroller while the dock overlays OUTSIDE it — two parents.
-	// 208 ≈ gradient(96) + composer block(~112): the SSR/pre-hydration
-	// guess so the static paint has a sane tail. The first layout effect
-	// replaces it with the measured truth before paint.
-	const [dockReserve, setDockReserve] = useState(208);
 	const syncTurns = useCallback(async () => {
 		try {
 			const res = await fetch(`/api/chats/${chatId}`);
@@ -918,9 +852,6 @@ export function Chat({
 		// immediate: turns-only refetch — the stats bar updates even while
 		// the server's persist/endTurn lags the client by milliseconds
 		void syncTurns();
-		// The coverage ring re-reads at turn settle too (extraction-UX
-		// redesign, 2026-09-24); the ring's own running-poll handles runs.
-		setCoverageTick((t) => t + 1);
 		// CANONIZATION (fix B, the duplicate-previous-message bug, 2026-10-02):
 		// turn-settled for OUR OWN turn arrives while the stream is still open
 		// (endTurn emits from onFinish before the response terminates, so the
@@ -1190,224 +1121,9 @@ export function Chat({
 		doSend();
 	};
 
-	// THE ANSWER IS THE QUESTION CALL'S TOOL RESULT (fork 1, owner
-	// 2026-09-26): one input event, one turn — the hook appends the
-	// optimistic graded result (the AnsweredCard shows at once) and the
-	// server's write-ahead persists it before the turn; the teacher's
-	// reaction streams below it. Dismissals ride the same callback
-	// (QuestionAnswerData.dismissed). The reading-thinking draft rides along
-	// (owner 2026-10-03) — the check answer is its only carrier. Shared by
-	// the bottom dock and the lesson panel.
-	const submitPendingAnswer = (output: QuestionAnswerData) => {
-		if (!pending) return;
-		const reading = readingThinkingRef.current.trim() || undefined;
-		clearReadingThinking();
-		submitAnswer(pending.tool, pending.toolCallId, reading ? { ...output, readingThinking: reading } : output);
-	};
-
-	return (
-		<ChatActionsContext.Provider
-			value={{
-				chatId,
-				syncFromServer,
-				sendText: (t: string) => {
-					void send({ type: "text", text: t });
-				},
-				openSetup: () => setSetupOpen(true),
-			}}
-		>
-		<SessionMermaidContext.Provider
-			value={{
-				openMermaid: setMermaidFocus,
-				openFigure: (svg, inverted) => setFigureFocus({ svg, inverted }),
-			}}
-		>
-		<JobsContext.Provider value={jobs}>
-		{/* The session surface: the transcript column (header + scroller) and
-		    the plan-tree panel as full-height SIBLINGS — the panel spans top to
-		    bottom exactly like the left sidebar, and the header (name + phase
-		    chip) spans from the left sidebar's edge to the panel's edge. The
-		    dock overlays the column bottom (outside the scroller); a spacer in
-		    the transcript reserves its height. */}
-		<div ref={surfaceRef} className="flex h-dvh">
-			<div className="flex min-w-0 flex-1 flex-col">
-				{/* The top bar is its own block (owner, top-fade round 4): in flow
-				    above the scroller on the plain page background — no gradient. Its
-				    bottom outline (border-b border-border) matches the one that
-				    separates the left sidebar — same width, same color (owner, r5).
-				    h-15 (60px), not py-2: the toggle (a size-9 icon button) renders
-				    only while the sidebar is CLOSED — an auto-height row would
-				    collapse when it disappears and slide the title + chip up.
-				    60px is an ALIGNMENT, not just a size: it equals the sidebar's
-				    LH wordmark band, so the header's border-b continues that
-				    band's bottom edge as one line across the app (owner, round 6). */}
-				<TopBar
-					// While renaming the bar is NOT a drag surface: app-region:drag
-					// would eat the mousedown, so click-to-escape (below) could
-					// never fire. Rename mode is interactive mode (owner ask) —
-					// TopBar's one escape hatch.
-					drag={!renaming}
-					onMouseDown={(e) => {
-						// Escape hitbox: any mousedown outside the input itself blurs
-						// it, running the existing onBlur commit path. The input is
-						// shrink-to-fit (field-sizing), so the rest of the bar is
-						// this spacer + inert chips — all click-to-exit (owner ask).
-						if (renaming && e.target !== titleInputRef.current) titleInputRef.current?.blur();
-					}}
-				>
-					{renaming ? (
-						<>
-							<input
-								ref={titleInputRef}
-								value={titleDraft}
-								onChange={(e) => setTitleDraft(e.target.value)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter") void commitRename(titleDraft);
-									// stopPropagation claims the Esc (keyboard wave A):
-									// closing rename must not also abort a turn.
-									else if (e.key === "Escape") {
-										e.stopPropagation();
-										setRenaming(false);
-									}
-								}}
-								onBlur={() => void commitRename(titleDraft)}
-								spellCheck={false}
-								aria-label="Session title"
-								title="Rename this session"
-								className="lh-no-drag min-w-[8ch] max-w-[70%] shrink-0 bg-transparent font-title text-xl caret-current outline-none [field-sizing:content]"
-							/>
-							{/* flex-1 spacer during rename too, so the chips stay at
-							    the right edge; clicks here commit via the header
-							    mousedown handler. */}
-							<div className="min-w-4 flex-1" aria-hidden="true" />
-						</>
-					) : (
-					<>
-						<Hint
-							// F2 renames (registry) — surfaced on the hover.
-							label="Rename session"
-							action="rename-session"
-							side="bottom"
-						>
-<button
-							type="button"
-														onClick={() => {
-								setTitleDraft(titleText);
-								setRenaming(true);
-							}}
-							className="lh-no-drag -mx-1.5 min-w-4 shrink cursor-text truncate rounded-md px-1.5 text-left font-title text-xl transition-colors hover:bg-accent"
-						>
-							{titleText}
-							</button>
-						</Hint>
-						{/* Where the lesson is (v4): POSITION in the plan, never
-						    mastery — statuses derive from which node the latest check
-						    was about (lesson-panel.tsx planProgress). */}
-						{setProgress && setProgress.length > 0 && (
-							<span className="hidden shrink-0 items-center gap-2.5 md:flex" data-testid="practice-progress">
-								<span className="text-sm text-muted-foreground">Problem {setProgress.length}</span>
-								<span className="hidden gap-1 lg:flex" role="img" aria-label={`${setProgress.filter((p) => p.outcome).length} of ${setProgress.length} problems done`}>
-									{setProgress.map((p) => (
-										<i
-											key={p.id}
-											className={cn(
-												"h-1.5 w-6 rounded-full",
-												p.outcome === null
-													? "bg-foreground"
-													: p.outcome === "solved"
-														? "bg-good"
-														: p.outcome === "solvedWithHints"
-															? "bg-warn"
-															: p.outcome === "surrendered"
-																? "bg-danger"
-																: "bg-input",
-											)}
-										/>
-									))}
-								</span>
-							</span>
-						)}
-						{lessonProgress && lessonProgress.currentIndex !== null && (
-							<span className="hidden shrink-0 items-center gap-2.5 md:flex" data-testid="lesson-progress">
-								<span className="text-sm text-muted-foreground">
-									Step {lessonProgress.currentIndex} of {lessonProgress.total}
-								</span>
-								<span className="hidden gap-[3px] lg:flex" role="img" aria-label={`${lessonProgress.visited} of ${lessonProgress.total} steps visited`}>
-									{lessonProgress.steps.map((st) => (
-										<i
-											key={st.id}
-											className={cn(
-												"h-1 rounded-full",
-												st.status === "current" ? "w-5 bg-brand" : st.status === "visited" ? "w-3 bg-faint" : "w-3 bg-input",
-											)}
-										/>
-									))}
-								</span>
-							</span>
-						)}
-							{/* flex-1 spacer: keeps the chips at the right edge AND stays a
-							    drag surface (no carve-out) — the freed bar is grippable. */}
-							<div className="min-w-4 flex-1" aria-hidden="true" />
-					</>
-					)}
-					{/* The plan chip (owner, plan-placement round): session-level
-					    structure beside the phase chip — access to the full-DAG popup
-					    at every width; the marginalia is the wide-screen glance view. */}
-					{planTree && (
-						<Hint label="Open the full plan" side="bottom">
-<button
-							type="button"
-							data-testid="plan-chip"
-							onClick={(e) => {
-								blurAfterPointerClick(e);
-								setPlanOpen(true);
-							}}
-							className="lh-no-drag flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-border/80 px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:border-border hover:text-foreground"
-						>
-							<WaypointsIcon className="size-3.5 text-primary" aria-hidden />
-							Plan
-						</button>
-</Hint>
-					)}
-					{/* The extraction ring (owner-locked redesign, 2026-09-24): fills
-					    with uncovered vs the chunk threshold, pulses while a run is in
-					    flight, vanishes when the graph is off. Click → the exact
-					    numbers. Before the phase label — the chips cluster right. */}
-					{/* Practice (owner, 2026-10-04): the coverage ring hides —
-				    practice never extracts, so an ever-filling ring with no
-				    run behind it would lie. */}
-					{kind !== "practice" && <CoverageRing chatId={chatId} refreshKey={coverageTick} />}
-					{/* Practice sessions: no phase arc — a quiet Practice tag
-					    instead of the phase chip. */}
-					{kind === "practice" ? (
-						<span
-							data-testid="phase-chip"
-							data-phase="practice"
-							aria-hidden="true"
-							className="pointer-events-none flex shrink-0 select-none items-center gap-1 text-xs font-medium text-muted-foreground"
-						>
-							<DumbbellIcon className="size-3" />
-							Practice
-						</span>
-					) : (
-						<PhaseChip phase={phases.at(-1) ?? "probe"} />
-					)}
-				</TopBar>
-
-				<SessionFind scopeRef={sessionFindScopeRef} scrollContextRef={scrollContextRef} />
-				<div ref={sessionFindScopeRef} className="relative flex min-h-0 flex-1">
-				<Conversation className="h-full min-w-0 flex-1" initial="instant" contextRef={scrollContextRef}>
-					<SessionMessageNavigation />
-					<ConversationContent className="min-h-full gap-0 p-0">
-						<div data-session-find-root="" className={`${COLUMN} flex flex-1 flex-col gap-4 pt-4`}>
-							{messages.length === 0 && !busy && (
-								<ConversationEmptyState
-									title="New session"
-									description="The teacher will open by probing what you already know."
-								/>
-							)}
-
-							{messages.map((m, mi) =>
+	// One transcript message → its rendering (the reading column's unit;
+	// called for the folded earlier steps and for the current step alike).
+	const renderMessage = (m: (typeof messages)[number], mi: number) =>
 								m.role === "user" && isSubagentSteer(m) ? (
 									// Sub-agent delivery (wake-pipeline steer): NO message bubble — the
 									// artifact card sits in the transcript column directly, full width
@@ -1619,7 +1335,175 @@ export function Chat({
 									</Message>
 									)}
 								</Fragment>
+							);
+
+	// THE ANSWER IS THE QUESTION CALL'S TOOL RESULT (fork 1, owner
+	// 2026-09-26): one input event, one turn — the hook appends the
+	// optimistic graded result (the AnsweredCard shows at once) and the
+	// server's write-ahead persists it before the turn; the teacher's
+	// reaction streams below it. Dismissals ride the same callback
+	// (QuestionAnswerData.dismissed). The reading-thinking draft rides along
+	// (owner 2026-10-03) — the check answer is its only carrier. Shared by
+	// the bottom dock and the lesson panel.
+	const submitPendingAnswer = (output: QuestionAnswerData) => {
+		if (!pending) return;
+		const reading = readingThinkingRef.current.trim() || undefined;
+		clearReadingThinking();
+		submitAnswer(pending.tool, pending.toolCallId, reading ? { ...output, readingThinking: reading } : output);
+	};
+
+	return (
+		<ChatActionsContext.Provider
+			value={{
+				chatId,
+				syncFromServer,
+				sendText: (t: string) => {
+					void send({ type: "text", text: t });
+				},
+				openSetup: () => setSetupOpen(true),
+			}}
+		>
+		<SessionMermaidContext.Provider
+			value={{
+				openMermaid: setMermaidFocus,
+				openFigure: (svg, inverted) => setFigureFocus({ svg, inverted }),
+			}}
+		>
+		<JobsContext.Provider value={jobs}>
+		{/* The session surface: the transcript column (header + scroller) and
+		    the plan-tree panel as full-height SIBLINGS — the panel spans top to
+		    bottom exactly like the left sidebar, and the header (name + phase
+		    chip) spans from the left sidebar's edge to the panel's edge. The
+		    dock overlays the column bottom (outside the scroller); a spacer in
+		    the transcript reserves its height. */}
+		<div className={`v4 ${kind === "practice" ? "warm" : ""}`} style={{ height: "100vh", overflow: "hidden" }}>
+		<Field variant={kind === "practice" ? "warm" : "home"} />
+		<div className="lshell">
+			<Rail active={kind === "practice" ? "practice" : undefined} />
+			<div className="center">
+				{/* Lesson4 / Practice4's header: the title (click or F2 to
+				    rename), where the session stands, then the plan map and the
+				    model chip. The band is the window's drag surface. */}
+				<header
+					className={`top ${renaming ? "" : "lh-drag"}`}
+					onMouseDown={(e) => {
+						// Click-to-commit: any mousedown outside the rename input
+						// blurs it, running the onBlur commit path.
+						if (renaming && e.target !== titleInputRef.current) titleInputRef.current?.blur();
+					}}
+				>
+					{renaming ? (
+						<input
+							ref={titleInputRef}
+							value={titleDraft}
+							onChange={(e) => setTitleDraft(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter") void commitRename(titleDraft);
+								// stopPropagation claims the Esc: closing rename must not
+								// also abort a turn.
+								else if (e.key === "Escape") {
+									e.stopPropagation();
+									setRenaming(false);
+								}
+							}}
+							onBlur={() => void commitRename(titleDraft)}
+							spellCheck={false}
+							aria-label="Session title"
+							style={{ minWidth: "8ch", maxWidth: "50%", border: 0, borderBottom: "1px solid var(--line2)", background: "transparent", outline: "none", fontSize: 14, fontWeight: 700, fieldSizing: "content" } as React.CSSProperties}
+						/>
+					) : (
+						<Hint label="Rename session" action="rename-session" side="bottom">
+							<button
+								type="button"
+								onClick={() => {
+									setTitleDraft(titleText);
+									setRenaming(true);
+								}}
+								style={{ minWidth: 0, border: 0, background: "transparent", padding: 0, cursor: "text" }}
+							>
+								<h1 style={{ margin: 0, fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{titleText}</h1>
+							</button>
+						</Hint>
+					)}
+					<span className="hide-sm" style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }} data-testid="session-position">
+						{kind === "practice"
+							? setProgress && setProgress.length > 0
+								? `Practice · problem ${Math.min(setProgress.length, PRACTICE_SET_SIZE)} of ${PRACTICE_SET_SIZE}`
+								: "Practice"
+							: lessonProgress && lessonProgress.currentIndex !== null
+								? `Lesson · step ${lessonProgress.currentIndex}/${lessonProgress.total}`
+								: (phases.at(-1) ?? "probe") === "probe"
+									? "Lesson · check-in"
+									: "Lesson"}
+					</span>
+					{kind === "practice" && setProgress && setProgress.length > 0 && (
+						<span className="set" role="img" aria-label={`${setProgress.filter((p) => p.outcome).length} of ${PRACTICE_SET_SIZE} problems done`}>
+							{Array.from({ length: Math.max(PRACTICE_SET_SIZE, setProgress.length) }, (_, i) => {
+								const p = setProgress[i];
+								const cls = !p ? "" : p.outcome === null ? "now" : p.outcome === "solved" ? "solid" : p.outcome === "solvedWithHints" ? "help" : "";
+								return <i key={i} className={cls} />;
+							})}
+						</span>
+					)}
+					{kind !== "practice" && lessonProgress && (
+						<span className="ticks lg hide-md" role="img" aria-label={`${lessonProgress.visited} of ${lessonProgress.total} steps visited`}>
+							{lessonProgress.steps.map((st) => (
+								<i key={st.id} className={st.status === "current" ? "c" : st.status === "visited" ? "d" : ""} />
 							))}
+						</span>
+					)}
+					<span style={{ marginLeft: "auto" }} />
+					{kind === "practice" && activeProblem && <ProblemClock key={activeProblem.toolCallId} problemId={activeProblem.toolCallId} />}
+					{kind !== "practice" && planTree && (
+						<button type="button" className="ib tipb" aria-label="Plan map" data-tip="Plan map" data-testid="plan-chip" onClick={() => setPlanOpen(true)}>
+							<PlanMapIcon />
+						</button>
+					)}
+					{kind !== "practice" && <ModelControl variant="chip" className="mchip" chatId={chatId} />}
+				</header>
+
+				<SessionFind scopeRef={sessionFindScopeRef} scrollContextRef={scrollContextRef} />
+				<div ref={sessionFindScopeRef} style={{ position: "relative", display: "flex", flex: 1, minHeight: 0 }}>
+				<Conversation className="min-w-0" style={{ flex: 1 }} initial="instant" contextRef={scrollContextRef}>
+					<SessionMessageNavigation />
+					<ConversationContent className="scroll" style={{ gap: 0, minHeight: "100%" }}>
+						<div data-session-find-root="" className="col" style={{ paddingTop: 4, paddingBottom: 24 }}>
+							{messages.length === 0 && !busy && (
+								<ConversationEmptyState
+									title="New session"
+									description="The teacher will open by probing what you already know."
+								/>
+							)}
+
+							{/* Lesson4's reading mode: only the current step is on the
+							    page — earlier steps fold into the "Steps 1–k" bar above,
+							    and Review unfolds them in place. */}
+							{fold && (
+								<div className="past rise" data-testid="past-steps">
+									<CheckIcon className="" />
+									<span>
+										Steps 1–{fold.steps}
+										{fold.answers.total > 0 && ` · ${fold.answers.firstTry} of ${fold.answers.total} answers right first time`}
+									</span>
+									<button
+										type="button"
+										onClick={() => setReviewOpen((v) => !v)}
+										style={{ marginLeft: "auto", border: 0, background: "transparent", fontWeight: 600, color: "var(--muted)" }}
+									>
+										{reviewOpen ? "Hide" : "Review"}
+									</button>
+								</div>
+							)}
+							{(!fold || reviewOpen) && messages.slice(0, fold?.startIndex ?? 0).map((m, i) => renderMessage(m, i))}
+							{fold?.heading && (
+								<div className="rise" style={{ display: "flex", flexDirection: "column", gap: 2, animationDelay: "40ms" }} data-testid="step-heading">
+									<span style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)" }}>Step {fold.heading.number}</span>
+									<h2 className="serif" style={{ margin: 0, fontSize: 28, lineHeight: "34px", fontWeight: 500, letterSpacing: "-0.01em" }}>
+										{fold.heading.title}
+									</h2>
+								</div>
+							)}
+							{messages.slice(fold?.startIndex ?? 0).map((m, i) => renderMessage(m, i + (fold?.startIndex ?? 0)))}
 
 							{/* THE placeholder, ACTION-gated (owner, optimistic round
 							    3, 2026-10-02): spinner + shimmered Thinking… from the
@@ -1662,96 +1546,13 @@ export function Chat({
 							)}
 						</div>
 
-						{/* The dock's reserved tail (DockOverlay reports its height):
-						    keeps at-rest transcript content scrolling fully clear of
-						    the overlay — the flow-space replacement for the old
-						    sticky dock. Zero only pre-measurement (the first layout
-						    effect reports before paint). */}
-						<div aria-hidden data-testid="dock-spacer" style={{ height: dockReserve }} />
 				</ConversationContent>
-				{/* The dock: an overlay sibling of the scroller (the
-				    use-stick-to-bottom pattern). The scroll-down button lives
-				    INSIDE the overlay now (owner refinement round, 2026-09-24):
-				    anchored to the dock block's top edge, so it rides every
-				    height morph (typing, a question growing the band, the
-				    fold) and NEVER overlaps the composer. */}
-				<DockOverlay
-					// Wide lessons: the question lives in the lesson panel, so
-					// the dock is composer-only (no fold, no reserve to defend).
-					pending={panelOn ? null : pending}
-					practice={panelOn ? null : activeProblem}
-					compactionRunning={compacting}
-					onSubmitThinking={submitThinking}
-					chatId={chatId}
-					plan={hasPlan ? <PlanMarginalia messages={messages} /> : undefined}
-					onOpenPlan={() => setPlanOpen(true)}
-					requiresReveal={requiresReveal}
-					readingThinking={readingThinking}
-					onReadingThinking={applyReadingThinking}
-					phase={phases.at(-1) ?? "probe"}
-					turns={turns}
-					contextTokens={contextTokens}
-					pricing={pricing}
-					onReserve={setDockReserve}
-					dictationSlot={<DictationBar dictation={dictation} />}
-					dictationCancel={dictation.cancel}
-					queuedSteers={visibleQueuedSteers(steerQueue, nativeMessages)}
-					setupCta={
-						zeroKeys ? (
-							<ZeroKeysPill onOpen={() => setSetupOpen(true)} />
-						) : (
-							!configured && (
-								<div className="pointer-events-auto mb-2 flex justify-center">
-									<button
-										type="button"
-										data-testid="setup-cta"
-										onClick={() => setSetupOpen(true)}
-										className="rounded-sm border border-border bg-card px-3 py-1.5 font-ui text-xs text-foreground transition-colors hover:border-muted-foreground/50 hover:bg-accent cursor-pointer"
-									>
-										Set up your models
-									</button>
-								</div>
-							)
-						)
-					}
-					composer={
-						<Composer
-							// Stop aborts ANY in-flight turn (stream-reattach wave): the
-							// square renders while a reattached/wake turn runs too — the
-							// abort channel kills it server-side; stop() alone would
-							// only detach our view.
-							busy={busy}
-							value={text}
-							onChange={applyText}
-							inputRef={composerInputRef}
-							onSend={onSend}
-							onStop={abortInFlightTurn}
-							canSend={canSend}
-							onEscape={dictation.active ? dictation.cancel : undefined}
-							// The pause affordance (owner round 16): the placeholder
-							// IS the hint — empty state, exactly where Enter-on-empty
-							// applies.
-							nextProblem={nextReady}
-							onNext={sendNext}
-							placeholder={
-								nextReady
-									? "Ask anything, or press Enter for the next one."
-									: panelOn && pending
-										? "Answer the question on the right to continue…"
-										: panelOn && activeProblem
-											? "Work the problem on the right — or ask about it once it's done…"
-											: undefined
-							}
-						/>
-					}
-					onSubmitAnswer={submitPendingAnswer}
-				/>
+				<ConversationScrollButton />
 				</Conversation>
 
-				{/* The session-scoped focuses (chrome-melt wave, 2026-09-19): mounted
-				    INSIDE the session area — absolute inset-0 siblings of the scroller,
-				    so they own the area below the drag bar, right of the sidebar, and
-				    the top bar stays sharp + draggable while a focus is open. */}
+				{/* The session-scoped focuses (chrome-melt wave): absolute inset-0
+				    siblings of the scroller, so the header stays sharp and
+				    draggable while a focus is open. */}
 				{mermaidFocus !== null && (
 					<MermaidOverlay chart={mermaidFocus} onClose={() => setMermaidFocus(null)} />
 				)}
@@ -1765,17 +1566,80 @@ export function Chat({
 				{planOpen && <PlanPopup messages={messages} onClose={() => setPlanOpen(false)} />}
 				<AbortTurnDialog mode={abortAsk} onClose={() => setAbortAsk(null)} onConfirm={confirmAbort} busy={busy} />
 				</div>
+
+				{/* Lesson4's steer composer: questions and redirections queue
+				    and are answered after the current step. */}
+				<div className="composer">
+					<div style={{ maxWidth: 680, margin: "0 auto", display: "flex", flexDirection: "column", gap: 6 }}>
+						{zeroKeys ? (
+							<ZeroKeysPill onOpen={() => setSetupOpen(true)} />
+						) : (
+							!configured && (
+								<div style={{ display: "flex", justifyContent: "center" }}>
+									<button type="button" className="ghost" data-testid="setup-cta" onClick={() => setSetupOpen(true)}>
+										Set up your models
+									</button>
+								</div>
+							)
+						)}
+						<QueuedSteersBody steers={visibleQueuedSteers(steerQueue, nativeMessages)} />
+						<Composer
+							// Stop aborts ANY in-flight turn (stream-reattach wave).
+							busy={busy}
+							value={text}
+							onChange={applyText}
+							inputRef={composerInputRef}
+							onSend={onSend}
+							onStop={abortInFlightTurn}
+							canSend={canSend}
+							onEscape={dictation.active ? dictation.cancel : undefined}
+							nextProblem={nextReady}
+							onNext={sendNext}
+							trailing={
+								<button
+									type="button"
+									className={`ib ${dictation.active ? "on" : ""}`}
+									aria-label={dictation.active ? "Stop dictation" : "Dictate"}
+									aria-pressed={dictation.active}
+									onClick={() => (dictation.active ? void dictation.finish() : dictation.toggle())}
+									style={{ width: 30, height: 30 }}
+								>
+									{dictation.active ? (
+										<span className="wave" aria-hidden="true">
+											<i />
+											<i />
+											<i />
+											<i />
+										</span>
+									) : (
+										<MicIcon />
+									)}
+								</button>
+							}
+							placeholder={
+								nextReady
+									? "Ask anything, or press Enter for the next one."
+									: pending
+										? "Ask about this step, or steer the lesson… (answer the check on the right)"
+										: kind === "practice"
+											? "Ask about the problem, or steer the set…"
+											: "Ask about this step, or steer the lesson…"
+							}
+						/>
+					</div>
+				</div>
 			</div>
-			{panelOn && kind === "practice" && (
+			{kind === "practice" ? (
 				<PracticePanel
 					messages={messages}
 					practice={activeProblem}
 					onSubmitThinking={submitThinking}
 					compactionRunning={compacting}
 					dictationCancel={dictation.cancel}
+					turns={turns}
+					hintsUsed={hintsUsed}
 				/>
-			)}
-			{panelOn && kind !== "practice" && (
+			) : (
 				<LessonPanel
 					messages={messages}
 					pending={pending}
@@ -1787,8 +1651,14 @@ export function Chat({
 					onSubmitAnswer={submitPendingAnswer}
 					dictationCancel={dictation.cancel}
 					onOpenPlan={() => setPlanOpen(true)}
+					busy={busy}
+					turns={turns}
+					contextTokens={contextTokens}
+					pricing={pricing}
+					chatId={chatId}
 				/>
 			)}
+		</div>
 		</div>
 		</JobsContext.Provider>
 		</SessionMermaidContext.Provider>
@@ -1812,37 +1682,6 @@ export function Chat({
 	);
 }
 
-/**
- * The floating blob: ONE persistent shell, OVERLAID at the bottom of the
- * column (absolute — a sibling of the scroller, the use-stick-to-bottom
- * pattern; it replaced the old in-flow sticky dock, which died of the
- * fold-latency problem below). Contents swap between the chat composer and
- * the question dock; shell height morphs between variants (WAAPI, quick). A
- * spacer at the end of the transcript (rendered by ChatView from onReserve
- * reports) holds the dock's flow-space, so at-rest content scrolls fully
- * clear of the overlay.
- *
- * Why an overlay (owner, scroll round 1): an in-flow dock IS scroll geometry
- * — folding it shrinks the scroll content, so the fold had to wait until the
- * learner was a full dock-height past the bottom (any closer and the browser
- * clamp pinned them back, re-expanding the box: the oscillation). Decoupled
- * from the flow, the fold is VISUAL ONLY: it fires as soon as the learner
- * leaves the bottom, and the reserved tail only ever GROWS while a question
- * is open (a shrinking tail would reintroduce the clamp).
- *
- * Collapse: scroll up past COLLAPSE_DIST and the dock folds into a slim bar;
- * click it (or scroll back to the bottom) to re-expand. The question form
- * stays MOUNTED while collapsed (hidden, not unmounted) so a half-made
- * selection survives.
- */
-/**
- * How a teach-phase question arrives (owner ruling, 2026-09-25): collapsed
- * behind the reveal button when it follows the composer — the learner
- * reads the teaching first — but OPEN when it follows another question
- * (a queued parallel check): the reading already happened, so there is
- * nothing left to wait for and the scroll height it already had is the
- * honest height.
- */
 /** The layered-Esc ruling (owner, 2026-10-04): an open overlay claims Esc —
  *  closing itself — before the abort chain may open its confirm. A mermaid
  *  focus, the plan popup, or the setup dialog over a pending question must
@@ -1889,600 +1728,21 @@ export function escAbortTarget(s: {
 	return null;
 }
 
-export function revealArrival(wasQuestion: boolean): { expanded: boolean; revealed: boolean } {
-	return wasQuestion ? { expanded: true, revealed: true } : { expanded: false, revealed: false };
-}
-
 /**
- * A PROBE question's arrival state (flicker round, 2026-09-26): open iff
- * the learner is at the bottom following along; scrolled up in history →
- * arrive as the collapsed bar (owner ruling: "it should just remain
- * closed"). Decided DURING RENDER like the teach seam above — the old
- * after-paint effect painted one stale-open frame first (the box "opened
- * and immediately closed" when scrolled up). Pure for tests.
+ * Practice4's clock — time on the open problem, counted from when it was
+ * posed in this view (a reload restarts it).
  */
-export function probeArrivalExpanded(isAtBottom: boolean): boolean {
-	return isAtBottom;
-}
-
-/**
- * The geometry-mute's growth rule (flicker round, 2026-09-26): a reserve
- * GROWTH while a question is pending is the dock stretching (the dictation
- * flush landing many lines at once) — the spacer lands in that commit, the
- * smooth catch-up lags by exactly the growth, and that lag is our own
- * motion, not the learner leaving, so the fold machine ignores scroll
- * events for the mute window after (reproduced d≈152 > COLLAPSE_DIST).
- * Shrinks never stamp — that path self-muted the at-bottom re-expand and
- * left the box stuck collapsed (resize round, verified live). Pure for
- * tests.
- */
-export function shouldStampGeometryMute(nextH: number, prevH: number, pending: boolean): boolean {
-	return pending && nextH > prevH + 1;
-}
-
-function DockOverlay({
-	pending,
-	practice,
-	compactionRunning,
-	onSubmitThinking,
-	requiresReveal,
-	readingThinking,
-	onReadingThinking,
-	phase,
-	turns,
-	contextTokens,
-	pricing,
-	composer,
-	onSubmitAnswer,
-	chatId,
-	onReserve,
-	plan,
-	onOpenPlan,
-	dictationSlot,
-	dictationCancel,
-	setupCta,
-	queuedSteers,
-}: {
-	pending: ReturnType<typeof findPendingToolCall>;
-	/** Compaction running for this chat (round 14) — the docks' submit
-	 *  affordance gate (the server's registry is the real one). */
-	compactionRunning: boolean;
-	/** The ACTIVE practice problem (practice sessions, 2026-10-04):
-	 *  {toolCallId, input} — dock ownership exactly like a pending
-	 *  question (the composer is replaced); null in teaching sessions. */
-	practice: { toolCallId: string; input: unknown } | null;
-	/** (commit, text) — the practice dock's two submit lanes. */
-	onSubmitThinking: (text: string) => void;
-	/** Teach-phase pending question: arrives collapsed behind the reveal button (W5). */
-	requiresReveal: boolean;
-	/** The reading-thinking draft (owner 2026-10-03) — owned by ChatView so
-	 *  the submit + dismissal seams (outside this overlay) can merge it. */
-	readingThinking: string;
-	onReadingThinking: (v: string) => void;
-	/** Session phase at the pending question — scales the thinking field. */
-	phase: Phase3;
-	/** The session's usage log — the stats bar beneath the composer folds it. */
-	turns: TurnUsage[];
-	contextTokens: number | null;
-	pricing?: SessionPricing;
-	composer: React.ReactNode;
-	onSubmitAnswer: (output: QuestionAnswerData) => void;
-	/** The model control's pass-through (the stats bar hosts it). */
-	chatId: string;
-	/** Reports the dock's settled height (block + gradient) — ChatView's
-	 *  dockReserve state feeds the transcript's spacer from it. */
-	onReserve: (h: number) => void;
-	/** The plan marginalia's content (the bare diagram) — rendered only
-	 *  while a question owns the band. Null until a plan exists. */
-	plan?: React.ReactNode;
-	/** Opens the full-DAG popup (the marginalia + chip share it). */
-	onOpenPlan: () => void;
-	/** The dictation strip (STT wave): rendered in the stats bar's middle
-	 *  slot — the mic button + live meter (components/dictation.tsx). */
-	dictationSlot?: React.ReactNode;
-	/** Esc in a pending question's field stops dictation (the strip is the
-	 *  stats bar's; the stop belongs to the page-owned hook, threaded down). */
-	dictationCancel?: () => void;
-	/** The queued-steer indicator's lines (composer steering, 2026-10-03):
-	 *  already filtered by visibleQueuedSteers — only undrained steers. */
-	queuedSteers: QueuedSteerLine[];
-	/** The persistent setup CTA (BYOK, owner 2026-09-22): the same pill
-	 *  home and /chat/new carry, above the composer while slots are unset. */
-	setupCta?: React.ReactNode;
-}) {
-	const { isAtBottom, scrollToBottom, scrollRef } = useStickToBottomContext();
-	// Render-fresh bottom state (flicker round): the arrival block below reads
-	// it DURING RENDER — the same value the after-paint effect used to read a
-	// frame too late. Assigned per render like the other refs below.
-	const atBottomRef = useRef(isAtBottom);
-	atBottomRef.current = isAtBottom;
-	// Teach-phase mount (session reload with a pending check): the dock starts
-	// as the collapsed invitation too — the check must not pop open on reload.
-	const [expanded, setExpanded] = useState(!requiresReveal);
-	// Reveal state (W5): false until the learner clicks the invitation. While
-	// false, the scroll machine must NOT auto-expand at the bottom — the
-	// learner reads the teaching first and opens the check when ready. Once
-	// revealed, the normal collapse machine rules apply untouched.
-	const [revealed, setRevealed] = useState(false);
-	const revealPending = requiresReveal && !revealed;
-
-	const pendingId = pending?.toolCallId ?? null;
-	const initialPendingRef = useRef(pendingId);
-
-	// Teach-question ARRIVAL state, applied during render — BEFORE the
-	// first paint (owner, scroll-honesty round 2026-09-25). Until now the
-	// stale expanded=true left by the previous question painted one frame
-	// of the OPEN question: the dock measured itself tall, permanently
-	// reserved that height, and the collapse after the paint could never
-	// give it back (fold immunity) — so a collapsed teach question scrolled
-	// the transcript as if it had opened. Resetting here means the paint
-	// measures the bar, the reserve keeps the composer's height, and the
-	// only motion is the teaching text itself.
-	const prevPendingIdRef = useRef(pendingId);
-	if (pendingId !== prevPendingIdRef.current) {
-		const wasQuestion = prevPendingIdRef.current !== null;
-		prevPendingIdRef.current = pendingId;
-		if (pendingId && requiresReveal) {
-			const arrival = revealArrival(wasQuestion);
-			setExpanded(arrival.expanded);
-			setRevealed(arrival.revealed);
-		} else if (pendingId) {
-			// Probe arrival (flicker round): open iff following at the bottom.
-			// Painted in THIS render — no stale-open frame, no after-paint flip.
-			setExpanded(probeArrivalExpanded(atBottomRef.current));
-		}
-	}
-
-	// New question MID-SESSION (flicker round): the open/closed state itself
-	// is decided DURING RENDER above; this effect only owns the reveal
-	// scroll for the at-bottom arrival — and now under the SAME fold
-	// suppression the teach reveal uses (the arrival's growth used to
-	// out-run the scroll catch-up, the position machine read the lag as the
-	// learner leaving, and the dock flashed open → bar → open; reproduced
-	// frame-by-frame 2026-09-26, d peaked ~405px). On session mount the dock
-	// starts in its initial state — no scroll, no morph.
+function ProblemClock({ problemId }: { problemId: string }) {
+	const [start] = useState(() => Date.now());
+	const [now, setNow] = useState(start);
 	useEffect(() => {
-		if (!pendingId || pendingId === initialPendingRef.current) return;
-		if (!requiresReveal && atBottomRef.current) void suppressFoldDuringReveal();
-		// fire only when a NEW question lands
-	}, [pendingId]);
-
-	// ── Fold machine (position, not velocity — owner, scroll round 1) ──
-	// The dock is an overlay: folding is visual-only and scroll geometry never
-	// moves, so the thresholds can hug the bottom. Leave it → fold; reach it
-	// again → re-open. The dead band keeps trackpad drift from chattering.
-	const expandedRef = useRef(expanded);
-	expandedRef.current = expanded;
-	// Dock ownership (the fold machine, the reserve immunity, the arrival
-	// states): a pending question OR an active practice problem — either
-	// replaces the composer and owns the band.
-	const pendingRef = useRef(!!pending || !!practice);
-	pendingRef.current = !!pending || !!practice;
-	const requiresRevealRef = useRef(requiresReveal);
-	requiresRevealRef.current = requiresReveal;
-	const revealedRef = useRef(revealed);
-	revealedRef.current = revealed;
-
-	// The plan marginalia's flank width (owner, plan-placement round): from
-	// the DOCK container's right edge to the block's right edge — the bare
-	// diagram's canvas. Tracked LIVE by a ResizeObserver on the block
-	// (owner, resize round): every geometry change — window resize, sidebar
-	// toggle, scrollbar appearance, the box's own rewrap — reports the real
-	// width instantly, so the fade floor never lags behind reality (the old
-	// render-time measurement went stale during drag-resizes and the mount
-	// decision popped late).
-	const [flankW, setFlankW] = useState(0);
-	const flankWRef = useRef(0);
-	// Part A of the same round (the resize mute): any block size change
-	// stamps this — the fold machine ignores scroll events for a beat after,
-	// because a resize/rewrap re-clamps scrollTop and emits PHANTOM scroll
-	// events mid-transient (the box flickered to the bar and back).
-	// Width changes stamp HERE (column resizes); height growth stamps at
-	// the OFFER (see offer below) — the spacer growing is the phantom-scroll
-	// source, not the field stretching. SHRINKS never stamp anywhere: the
-	// fold's own morph shrinks the block and gives back the reserve, and
-	// stamping that self-mutes the at-bottom re-expand — the box got stuck
-	// collapsed (resize round).
-	const geometryAtRef = useRef(0);
-	useIsoLayoutEffect(() => {
-		const block = blockRef.current;
-		if (!block) return;
-		const measure = () => {
-			const next = Math.round(block.offsetWidth / 2 - DOCK_W / 2 - 2 * MARGIN_GAP);
-			if (Math.abs(next - flankWRef.current) > 1) {
-				flankWRef.current = next;
-				setFlankW(next);
-				geometryAtRef.current = Date.now();
-			}
-		};
-		measure();
-		const ro = new ResizeObserver(measure);
-		ro.observe(block);
-		return () => ro.disconnect();
-	}, []);
-
-	// The overlay must not paint over the scroller's scrollbar (owner, scroll
-	// round 2): the scroller reserves symmetric gutters (scrollbar-gutter:
-	// stable both-edges), so inset the overlay's right edge by the gutter —
-	// zero on macOS overlay scrollbars, the real width on classic platforms.
-	// The same measure owns the QUESTION/PROBLEM HEIGHT CAP (owner round,
-	// 2026-10-05): the old fixed fractions (55dvh / 40vh) cut long problems
-	// off absurdly short — the cap is now the AVAILABLE COLUMN (the
-	// scroller already starts below the top bar) minus a 2rem breathing
-	// gap, carried as --dock-max-h for the docks' scroll areas.
-	const [sbInset, setSbInset] = useState(0);
-	const [dockMaxH, setDockMaxH] = useState<number | null>(null);
-	useEffect(() => {
-		const el = scrollRef.current;
-		if (!el) return;
-		const measure = () => {
-			setSbInset(Math.round((el.offsetWidth - el.clientWidth) / 2));
-			setDockMaxH(Math.max(el.clientHeight - 32, 160));
-		};
-		measure();
-		window.addEventListener("resize", measure);
-		return () => window.removeEventListener("resize", measure);
-	}, [scrollRef]);
-
-	// GROWTH MUTE (owner round, 2026-10-05 — the generation churn): during a
-	// live turn the transcript content grows and stick-to-bottom chases it;
-	// the transient distance-from-bottom used to read as the learner
-	// leaving, folding the dock open↔bar ("disappear and appear again").
-	// A ResizeObserver on the scroller's content stamps the SAME mute the
-	// dock's own resizes use — growth frames can never fold. Shrinks stamp
-	// nothing (the fold's own morph shrinks the reserve; muting that would
-	// self-mute the at-bottom re-expand).
-	const growthAtRef = useRef(0);
-	useEffect(() => {
-		const el = scrollRef.current;
-		const content = el?.firstElementChild as HTMLElement | null | undefined;
-		if (!el || !content) return;
-		let prevH = content.getBoundingClientRect().height;
-		const ro = new ResizeObserver(() => {
-			const h = content.getBoundingClientRect().height;
-			if (h > prevH + 0.5) growthAtRef.current = Date.now();
-			prevH = Math.max(prevH, h);
-		});
-		ro.observe(content);
-		return () => ro.disconnect();
-	}, [scrollRef]);
-
-	// Wheel over the dock must still scroll the transcript (owner, scroll
-	// round 2): the overlay is a SIBLING of the scroller, so the browser's
-	// native scroll chaining stops at the overlay (the old in-flow dock
-	// chained for free). Internal scrollers — the question area, textarea
-	// overflow, the model menus — keep native scrolling, including their
-	// own edge chaining; only when nothing under the cursor can take the
-	// delta do we forward it to the transcript.
-	useEffect(() => {
-		const root = blockRef.current;
-		const el = scrollRef.current;
-		if (!root || !el) return;
-		const canScroll = (n: HTMLElement, dir: number) => {
-			if (n.scrollHeight - n.clientHeight < 2) return false; // not scrollable
-			return dir < 0 ? n.scrollTop > 0 : n.scrollTop < n.scrollHeight - n.clientHeight - 0.5;
-		};
-		const onWheel = (e: WheelEvent) => {
-			if (e.deltaY === 0) return;
-			for (let n = e.target as HTMLElement | null; n && n !== root; n = n.parentElement) {
-				if (n instanceof HTMLElement && canScroll(n, e.deltaY)) return; // native
-			}
-			e.preventDefault();
-			el.scrollTop += e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1);
-		};
-		root.addEventListener("wheel", onWheel, { passive: false });
-		return () => root.removeEventListener("wheel", onWheel);
-	}, [scrollRef]);
-
-	// ── The reserve: the spacer's height, reported upward ──
-	// Grows immediately (typing, new variants). NEVER drops while a question
-	// is open — a shrinking reserved tail is scroll geometry and the browser
-	// clamp would pin a nearby learner to the bottom (the old oscillation).
-	// In chat mode drops apply (the composer's typing shrink is today's
-	// harmless in-flow behavior; nothing auto-expands there).
-	const reserveRef = useRef(0);
-	const blockRef = useRef<HTMLDivElement>(null);
-	const offer = (blockH: number) => {
-		const next = blockH + GRADIENT_H;
-		if (next <= reserveRef.current + 0.5 && pendingRef.current) return; // fold immunity
-		// Reserve GROWTH is the phantom-scroll SOURCE (flicker round,
-		// 2026-09-26): the spacer's height lands in this commit, the smooth
-		// catch-up lags it by the growth amount, and the position machine
-		// used to read that lag as the learner leaving — form → bar → form
-		// (the dictation flush, reproduced d≈152 > COLLAPSE_DIST). Stamp the
-		// mute right where the spacer grows: it covers the scroll events of
-		// THIS growth no matter how long after the field stretched (the
-		// field grows on its own render; the offer lands on the NEXT
-		// DockOverlay render — ~1s apart live). Shrinks never stamp (the
-		// fold's own give-back must not self-mute the re-expand).
-		if (shouldStampGeometryMute(next, reserveRef.current, pendingRef.current)) geometryAtRef.current = Date.now();
-		reserveRef.current = next;
-		onReserve(next);
-	};
-
-	// Explicit expand (bar click): the smooth scroll to the bottom takes
-	// hundreds of ms, during which the position is still legitimately inside
-	// the collapse zone — the machine would instantly re-collapse the dock
-	// (open → snap shut → reopen at the bottom, the flicker). Suppress the
-	// collapse branch until the reveal scroll settles or is interrupted.
-	// (Flicker round, 2026-09-26: extracted — the probe arrival at the
-	// bottom is the SAME motion class and needs the same cover; the owner's
-	// phrasing: the arrival's open and its scroll-to-bottom "should be the
-	// same kind of motion".)
-	const expandIntentRef = useRef(false);
-	const intentTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-	const suppressFoldDuringReveal = () => {
-		expandIntentRef.current = true;
-		clearTimeout(intentTimerRef.current);
-		intentTimerRef.current = setTimeout(() => {
-			expandIntentRef.current = false;
-		}, 2000);
-		return Promise.resolve(scrollToBottom()).finally(() => {
-			clearTimeout(intentTimerRef.current);
-			expandIntentRef.current = false;
-		});
-	};
-	const expandAndReveal = () => {
-		setRevealed(true); // the teach-check invitation was accepted (W5)
-		setExpanded(true);
-		void suppressFoldDuringReveal();
-	};
-	const expandAndRevealRef = useRef(expandAndReveal);
-	expandAndRevealRef.current = expandAndReveal;
-	// ENTER OPENS THE WAITING CHECK (owner, keyboard round 2026-10-06):
-	// while a question waits with the dock CLOSED — behind its reveal
-	// invitation or collapsed by scroll — Enter is never dead. Any live
-	// dictation FINISHES FIRST (the flush lands in the reading-thinking
-	// field, its live claim — the nothing-gets-lost law), then the check
-	// opens. A typing surface or a focused button owns its own Enter (the
-	// reading-thinking field opens from INSIDE when the check is closed;
-	// a focused button activates natively) — this listener claims only
-	// the dead case: plain focus with Enter doing nothing.
-	useEffect(() => {
-		if (!pending || expanded) return;
-		const onKeyDown = (e: KeyboardEvent) => {
-			if (e.key !== "Enter" || e.altKey) return;
-			if (e.shiftKey && !e.metaKey && !e.ctrlKey) return;
-			const t = e.target as HTMLElement | null;
-			if (
-				t &&
-				((t.tagName === "INPUT" && (t as HTMLInputElement).type !== "range") ||
-				t.tagName === "TEXTAREA" ||
-				t.isContentEditable ||
-				t.closest("button"))
-			)
-				return;
-			e.preventDefault();
-			void finishDictation().then(() => {
-				expandAndRevealRef.current();
-			});
-		};
-		document.addEventListener("keydown", onKeyDown);
-		return () => document.removeEventListener("keydown", onKeyDown);
-	}, [pending, expanded]);
-
-	useEffect(() => {
-		const el = scrollRef.current;
-		if (!el) return;
-		const onScroll = () => {
-			if (!pendingRef.current) return;
-			// Resize mute (owner, resize round): a geometry change re-clamps
-			// scrollTop and the browser emits the clamp as a scroll event —
-			// reading the transient position folded the box to the bar for a
-			// flicker. Real scrolling resumes after the brief mute window.
-			if (Date.now() - geometryAtRef.current < 400) return;
-			// Growth mute (owner round, 2026-10-05): the transcript growing
-			// under a live turn is not the learner leaving.
-			if (Date.now() - growthAtRef.current < 400) return;
-			const d = el.scrollHeight - el.clientHeight - el.scrollTop;
-			if (expandedRef.current) {
-				// INTENT-GATED FOLD (owner ruling, 2026-10-05): distance alone
-				// folded on stick-to-bottom's catch-up transients; a real fold
-				// needs the distance AND stick-to-bottom agreeing the learner
-				// left the bottom.
-				if (d > COLLAPSE_DIST && !expandIntentRef.current && !atBottomRef.current) setExpanded(false);
-			} else if (d < EXPAND_DIST) {
-				// Teach checks stay collapsed until the learner opens them (W5): the
-				// at-bottom auto-expand would pop the form over the teaching.
-				if (requiresRevealRef.current && !revealedRef.current) return;
-				setExpanded(true);
-				void scrollToBottom();
-			}
-		};
-		el.addEventListener("scroll", onScroll, { passive: true });
-		return () => el.removeEventListener("scroll", onScroll);
-	}, [scrollRef, scrollToBottom]);
-
-	// The settled block height (gradient excluded), offered to the spacer.
-	// Only ever called with NATURAL heights — never the animated mid-morph
-	// value (the iso effect's getAnimations guard wraps every call).
-	const measureBlock = () => {
-		const b = blockRef.current;
-		if (b) offer(b.getBoundingClientRect().height);
-	};
-
-	const mode = pending
-		? `question:${pending.toolCallId}`
-		: practice
-			? `practice:${practice.toolCallId}`
-			: "chat";
-	// The opening variant of a session appears instantly — the fade/rise is
-	// reserved for mid-session transitions.
-	const initialModeRef = useRef(mode);
-
-	// Height morph: animate the shell from its previous height to its new one
-	// whenever the variant (chat ↔ question ↔ collapsed bar) changes. Typing
-	// growth keeps the same stateKey and is NOT animated.
-	const shellRef = useRef<HTMLDivElement>(null);
-	// The fold's CONTENT fade (owner round, 2026-10-05): the shell height
-	// morphs, but the bar↔form content used to hard-swap. A WAAPI fade/rise
-	// on the toggle — no remount, so the question form's state survives.
-	const contentRef = useRef<HTMLDivElement>(null);
-	const prevExpandedForFadeRef = useRef(expanded);
-	useIsoLayoutEffect(() => {
-		if (prevExpandedForFadeRef.current === expanded) return;
-		prevExpandedForFadeRef.current = expanded;
-		contentRef.current?.animate(
-			[{ opacity: 0, transform: "translateY(6px)" }, { opacity: 1, transform: "translateY(0)" }],
-			{ duration: 160, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
-		);
-	}, [expanded]);
-	// The height-morph key (components/dock-state-key.ts): the expanded
-	// term (the fold) belongs to EVERY docked variant — question AND
-	// practice (owner fix, 2026-10-06). Typing growth keeps the key and
-	// never animates; the fold/unfold morphs like teaching always has.
-	const stateKey = dockStateKey(mode, !!pending || !!practice, expanded);
-	const prevRef = useRef<{ key: string; height: number } | null>(null);
-	useIsoLayoutEffect(() => {
-		const el = shellRef.current;
-		if (!el) return;
-		const p = prevRef.current;
-		if (p && p.key === stateKey) {
-			// Same variant: keep the settled height fresh, but never measure while
-			// a morph is in flight — getBoundingClientRect would read the ANIMATED
-			// value and corrupt the start height of the next morph.
-			if (el.getAnimations().length === 0) {
-				const h = el.getBoundingClientRect().height;
-				p.height = h;
-				measureBlock(); // typing growth → the spacer grows with the box
-			}
-			return;
-		}
-		el.getAnimations().forEach((a) => a.cancel()); // flush to natural height before measuring
-		const h = el.getBoundingClientRect().height;
-		// Variant change → re-reserve. Growth applies instantly; a drop (the
-		// fold, or question → composer) is filtered by the offer policy.
-		measureBlock();
-		if (p && Math.abs(p.height - h) > 1) {
-			el.animate([{ height: `${p.height}px` }, { height: `${h}px` }], {
-				duration: 120,
-				easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
-			});
-		}
-		prevRef.current = { key: stateKey, height: h };
-	});
-
+		const t = window.setInterval(() => setNow(Date.now()), 1000);
+		return () => window.clearInterval(t);
+	}, [problemId]);
+	const secs = Math.floor((now - start) / 1000);
 	return (
-		<div className="pointer-events-none absolute inset-x-0 bottom-0" style={{ right: sbInset }}>
-			<div className="h-24 bg-gradient-to-t from-background via-background/85 to-transparent" />
-			<div ref={blockRef} className="relative bg-background pb-5" style={{ "--dock-max-h": dockMaxH ? `${dockMaxH}px` : undefined } as React.CSSProperties}>
-				<div className={DOCK}>
-					{setupCta}
-					{/* The queued-steer indicator (owner spec 2026-10-03): quiet
-					    one-liners above the shell - right-aligned to where its corner
-					    rounding starts, truncated, no background, no container. A
-					    line dies when its card lands (visibleQueuedSteers). */}
-					<QueuedSteersBody steers={queuedSteers} />
-					{/* The reading-thinking field (owner 2026-10-03): mounted while a
-					    teach-phase check waits — the same cue that collapses it. It
-					    claims dictated speech until the learner reveals the check
-					    (the dock reclaims then). Rides the check answer on submit. */}
-					{pending && requiresReveal && (
-						<ReadingThinkingField
-							value={readingThinking}
-							onChange={onReadingThinking}
-							onEscape={dictationCancel}
-							onOpen={
-								!expanded
-									? () => {
-											void finishDictation().then(() => {
-												expandAndRevealRef.current();
-											});
-										}
-									: undefined
-							}
-							claim={revealPending}
-						/>
-					)}
-					<div ref={shellRef} className="pointer-events-auto overflow-hidden rounded-2xl border bg-card shadow-lg">
-						<div
-						ref={contentRef}
-						key={mode}
-						className={mode === initialModeRef.current ? undefined : "dock-variant"}
-					>
-							{pending ? (
-								<QuestionDock
-									toolName={pending.tool as "quiz" | "probe" | "ask_user_question" | "explain" | "recall"}
-									toolCallId={pending.toolCallId}
-									input={pending.input as never}
-									expanded={expanded}
-									reveal={revealPending}
-									phase={phase}
-									onExpand={expandAndReveal}
-									onSubmit={onSubmitAnswer}
-									onEscape={dictationCancel}
-									dictationClaim={!revealPending}
-									compactionRunning={compactionRunning}
-								/>
-							) : practice ? (
-								<PracticeDock
-									problemCallId={practice.toolCallId}
-									input={practice.input as { statement: string }}
-									expanded={expanded}
-									onExpand={() => {
-										setExpanded(true);
-										void suppressFoldDuringReveal();
-									}}
-									onSubmit={onSubmitThinking}
-									onEscape={dictationCancel}
-									compactionRunning={compactionRunning}
-								/>
-							) : (
-								composer
-							)}
-						</div>
-					</div>
-					{/* The stats row: beneath the composer/question shell, not
-					    flush to the screen bottom — static height, outside the
-					    morphing shell so it never joins a height animation. */}
-					<StatsBar
-						turns={turns}
-						contextTokens={contextTokens}
-						pricing={pricing}
-						dictationSlot={dictationSlot}
-						chatId={chatId}
-					/>
-					{/* The scroll-down disc (moved here from the Conversation,
-					    owner refinement round 2026-09-24): anchored to the BLOCK's
-					    top edge — above the composer shell AND the stats row, in
-					    the gradient's transparent band — so it never overlaps
-					    any dock element. Because the anchor is the block itself
-					    (not the scroller's bottom), it rides every height change
-					    LIVE: typing growth, a pending question expanding the
-					    band, the 180ms fold morph. pointer-events-auto: the
-					    overlay is none by default. The isAtBottom/scrollToBottom
-					    context still reaches it — DockOverlay is a Conversation
-					    child. */}
-					<ConversationScrollButton className="pointer-events-auto bottom-full mb-2" />
-				</div>
-				{/* The plan marginalia (owner, plan-placement round): the bare
-				    diagram in the band's right flank — boundaless, meet-fitted, part
-				    of the lesson's page rather than a floating widget. Mounted only
-				    while a question owns the band (its reserved height is the canvas);
-				    folding the dock fades + blurs it out of existence, so reading
-				    the transcript in full wipes the margin clean. Click → popup.
-				    Width (owner, resize round): the box shrinks continuously with
-				    the flank; below MARGIN_MIN_W it FADES (never pops away — no
-				    mid-question unmount), and widening past the floor fades it
-				    back in. */}
-				{pending && plan && (
-					<Hint label="Open the full plan" side="bottom">
-<button
-						type="button"
-						data-testid="plan-marginalia"
-						onClick={onOpenPlan}
-						style={{ left: `calc(50% + ${DOCK_W / 2 + MARGIN_GAP}px)` }}
-						className={`absolute bottom-5 right-4 top-0 cursor-pointer transition-[filter,opacity] duration-300 ease-out ${
-							expanded && flankW >= MARGIN_MIN_W
-								? "pointer-events-auto opacity-100 blur-0"
-								: "pointer-events-none opacity-0 blur-md"
-						}`}
-					>
-						{plan}
-					</button>
-</Hint>
-				)}
-			</div>
-		</div>
+		<span className="mono" style={{ fontSize: 12, color: "var(--muted)" }} key={problemId}>
+			{Math.floor(secs / 60)}:{String(secs % 60).padStart(2, "0")} on this one
+		</span>
 	);
 }

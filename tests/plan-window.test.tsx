@@ -1,7 +1,5 @@
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { PlanMarginalia, planExists } from "../components/plan-window.tsx";
 import { blockLayout, edgePathD, type LayoutNode, type PopupMessage } from "../components/plan-block.tsx";
 import type { PlanTree } from "../src/core/contracts.ts";
 
@@ -43,51 +41,6 @@ function transcript(tree: PlanTree, taggedNodeId?: string): PopupMessage[] {
 			: []),
 	];
 }
-
-describe("planExists", () => {
-	it("false without a tree — the phantom-click gate (owner report, 2026-10-01)", () => {
-		// A JSX element is always truthy; the WRAPPER must gate on real
-		// presence or an invisible clickable button sits in the flank.
-		assert.equal(planExists([]), false);
-		assert.equal(planExists(transcript({ nodes: [], edges: [], version: 0 })), false);
-	});
-
-	it("true once the transcript holds a plan tree", () => {
-		assert.equal(planExists(transcript(CHAIN)), true);
-	});
-});
-
-describe("PlanMarginalia render", () => {
-	it("renders nothing until a tree exists", () => {
-		assert.equal(renderToStaticMarkup(<PlanMarginalia messages={[]} />), "");
-	});
-
-	it("renders the FULL plan (padded full-extent viewBox), not a windowed crop", () => {
-		const html = renderToStaticMarkup(<PlanMarginalia messages={transcript(CHAIN)} />);
-		// The viewBox covers the whole layout plus the glow-clearing pad —
-		// never the retired window's 2:1 crop.
-		const layout = blockLayout(CHAIN.nodes, CHAIN.edges);
-		const pad = 24; // MARGIN_PAD: GRAPH_PAD + 16 (glow halo clearance)
-		const vb = `viewBox="${-pad} ${-pad} ${layout.width + 2 * pad} ${layout.height + 2 * pad}"`;
-		assert.ok(html.includes(vb), `expected ${vb} in the svg`);
-		assert.ok(!/viewBox="-?\d+(\.\d+)? -?\d+(\.\d+)? 360 180"/.test(html), "the windowed viewBox is retired");
-		// Meet-fit mode: the svg fills the band box (h-full w-full), letting
-		// preserveAspectRatio contain the diagram in the flank.
-		assert.ok(html.includes('font-family:var(--font-prose)'), "fill mode classes");
-	});
-
-	it("glows the current node and dims the not-yet-visited (live statuses)", () => {
-		const html = renderToStaticMarkup(<PlanMarginalia messages={transcript(CHAIN, "b")} />);
-		// The yellow blurred halo marks the tagged check's node…
-		assert.ok(html.includes("fill-brand/20"), "glow on the current node");
-		assert.ok(html.includes('data-testid="plan-node-b" data-status="current"'), "b is current");
-		// …and arrows into upcoming nodes carry the dimmed head.
-		assert.ok(
-			html.includes("url(#:r0:-dim)") || /url\(#\S*-dim\)/.test(html),
-			"dimmed arrowhead into the upcoming node",
-		);
-	});
-});
 
 // ─── The canvas must cover the arrows (owner, 2026-10-10) ────────────────────
 // The owner's REAL linear-algebra plan (chat_mv19m6xe, plan_init's mermaid
