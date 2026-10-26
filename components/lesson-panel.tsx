@@ -27,6 +27,8 @@ import { BrailleSpinner } from "@/components/braille-spinner";
 import { revealArrival } from "@/components/chat";
 import { finishDictation } from "@/components/dictation";
 import { JobsContext } from "@/components/jobs-context";
+import { PracticeDock } from "@/components/practice-dock";
+import { OUTCOME_CHIP, OUTCOME_LABEL } from "@/components/practice-cards";
 import { latestTree, type PopupMessage } from "@/components/plan-block";
 import { QuestionDock } from "@/components/question-dock";
 import { ReadingThinkingField } from "@/components/reading-thinking";
@@ -282,6 +284,112 @@ export function LessonPanel({
 						</p>
 					))}
 			</div>
+		</aside>
+	);
+}
+
+// ─── Practice ───────────────────────────────────────────────────────────────
+
+export interface SetProblem {
+	id: string;
+	/** The conclude's outcome once the problem is closed; null while open. */
+	outcome: string | null;
+}
+
+/** Pure: the practice set so far, from the transcript — each settled
+ *  `problem` call opens an entry, each acknowledged `conclude` closes the
+ *  latest open one with its outcome. A problem's ack carries no payload,
+ *  so the view keeps a settled pose at input-available (view.ts, the
+ *  placeholder fork); errored and still-streaming calls count for nothing.
+ *  Exported for tests and the header. */
+export function practiceSet(messages: readonly PopupMessage[]): SetProblem[] {
+	const set: SetProblem[] = [];
+	for (const m of messages) {
+		for (const part of m.parts) {
+			if (part.type === "tool-problem") {
+				if (part.state !== "input-available" && part.state !== "output-available") continue;
+				set.push({ id: (part as { toolCallId?: string }).toolCallId ?? `p${set.length}`, outcome: null });
+			} else if (part.type === "tool-conclude" && part.state === "output-available") {
+				const open = [...set].reverse().find((p) => p.outcome === null);
+				const outcome = (part.input as { outcome?: unknown } | undefined)?.outcome;
+				if (open) open.outcome = typeof outcome === "string" ? outcome : "movedOn";
+			}
+		}
+	}
+	return set;
+}
+
+/**
+ * THE PRACTICE PANEL (v4): the practice session's right-hand column on a
+ * wide window — your working for the open problem (the PracticeDock form,
+ * the statement left to the problem card beside it), then the set so far
+ * with each problem's outcome.
+ */
+export function PracticePanel({
+	messages,
+	practice,
+	onSubmitThinking,
+	compactionRunning,
+	dictationCancel,
+}: {
+	messages: readonly PopupMessage[];
+	practice: { toolCallId: string; input: unknown } | null;
+	onSubmitThinking: (text: string) => void;
+	compactionRunning: boolean;
+	dictationCancel?: () => void;
+}) {
+	const set = useMemo(() => practiceSet(messages), [messages]);
+	return (
+		<aside
+			aria-label="Your working and this set"
+			data-testid="practice-panel"
+			className="flex w-95 shrink-0 flex-col overflow-hidden border-l border-border bg-card"
+			style={{ "--lh-prose-size": "15px" } as React.CSSProperties}
+		>
+			<div className="lh-drag flex h-15 shrink-0 items-center border-b border-border px-4">
+				<h2 className="text-sm font-semibold">Your working</h2>
+			</div>
+			<div className="min-h-0 flex-1 overflow-y-auto p-3">
+				{practice ? (
+					<div className="overflow-hidden rounded-xl border border-border bg-popover">
+						<PracticeDock
+							problemCallId={practice.toolCallId}
+							input={practice.input as { statement: string }}
+							expanded
+							onExpand={() => {}}
+							onSubmit={onSubmitThinking}
+							onEscape={dictationCancel}
+							compactionRunning={compactionRunning}
+							showStatement={false}
+						/>
+					</div>
+				) : (
+					<p className="px-2 py-2 text-sm text-muted-foreground">
+						{set.length > 0
+							? "No problem open. Press Enter in the box below for the next one, or ask about the last."
+							: "The first problem arrives once the session opens."}
+					</p>
+				)}
+			</div>
+			{set.length > 0 && (
+				<div className="border-t border-border px-4 py-3" data-testid="practice-set">
+					<h3 className="pb-1 text-xs font-semibold text-faint">This set</h3>
+					<ol className="flex flex-col">
+						{set.map((p, i) => (
+							<li key={p.id} className="flex h-9 items-center gap-2 border-b border-border text-sm last:border-b-0">
+								<span className={cn("flex-1", p.outcome === null && "font-semibold")}>Problem {i + 1}</span>
+								{p.outcome === null ? (
+									<span className="rounded px-1.5 py-0.5 text-xs font-medium text-muted-foreground">Working</span>
+								) : (
+									<span className={cn("rounded px-1.5 py-0.5 text-xs font-medium", OUTCOME_CHIP[p.outcome] ?? OUTCOME_CHIP.movedOn)}>
+										{OUTCOME_LABEL[p.outcome] ?? p.outcome}
+									</span>
+								)}
+							</li>
+						))}
+					</ol>
+				</div>
+			)}
 		</aside>
 	);
 }

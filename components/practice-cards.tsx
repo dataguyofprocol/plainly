@@ -72,7 +72,7 @@ export function ProblemCard({ part }: ArtifactPartProps) {
 	);
 }
 
-const OUTCOME_LABEL: Record<string, string> = {
+export const OUTCOME_LABEL: Record<string, string> = {
 	solved: "Solved",
 	solvedWithHints: "Solved with hints",
 	movedOn: "Moved on",
@@ -85,7 +85,7 @@ const OUTCOME_LABEL: Record<string, string> = {
  * green (the "correct" twin), solved-with-hints amber (succeeded with
  * cost), surrendered red (the problem beat the learner), moved on muted
  * (the agent's call, not a verdict against him). */
-const OUTCOME_CHIP: Record<string, string> = {
+export const OUTCOME_CHIP: Record<string, string> = {
 	solved: "bg-good/15 text-good",
 	solvedWithHints: "bg-warn/15 text-warn",
 	movedOn: "bg-muted text-muted-foreground",

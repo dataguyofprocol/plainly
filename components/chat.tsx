@@ -77,7 +77,7 @@ import {
 	questionNeedsReveal,
 } from "@/src/core";
 import { ReadingThinkingField } from "@/components/reading-thinking";
-import { LESSON_PANEL_MIN, LessonPanel, planProgress } from "@/components/lesson-panel";
+import { LESSON_PANEL_MIN, LessonPanel, PracticePanel, planProgress, practiceSet } from "@/components/lesson-panel";
 import { cn } from "@/lib/utils";
 import { currentUserThinkingOpen, setAllUserThinkingOpen } from "@/components/thinking-block";
 import { slotsConfigured, type ModelsSettings } from "@/src/core";
@@ -512,7 +512,7 @@ export function Chat({
 	// THE LESSON PANEL (v4 redesign, 2026-10-26): with room for a reading
 	// column AND the panel, the question moves beside the text; narrower,
 	// the bottom dock keeps it. Measured on the session surface (the
-	// sidebar's width already excluded). Practice keeps its dock.
+	// sidebar's width already excluded). Practice gets its own panel.
 	const surfaceRef = useRef<HTMLDivElement>(null);
 	const [wide, setWide] = useState(false);
 	useEffect(() => {
@@ -524,8 +524,9 @@ export function Chat({
 		ro.observe(el);
 		return () => ro.disconnect();
 	}, []);
-	const panelOn = wide && kind !== "practice";
+	const panelOn = wide;
 	const lessonProgress = useMemo(() => (kind === "practice" ? null : planProgress(latestTree(messages), messages)), [kind, messages]);
+	const setProgress = useMemo(() => (kind === "practice" ? practiceSet(messages) : null), [kind, messages]);
 
 	/* The READING-THINKING channel (owner 2026-10-03): a draft field for
 	 * thinking while reading the teaching prose, mounted while a check waits
@@ -1302,6 +1303,30 @@ export function Chat({
 						{/* Where the lesson is (v4): POSITION in the plan, never
 						    mastery — statuses derive from which node the latest check
 						    was about (lesson-panel.tsx planProgress). */}
+						{setProgress && setProgress.length > 0 && (
+							<span className="hidden shrink-0 items-center gap-2.5 md:flex" data-testid="practice-progress">
+								<span className="text-sm text-muted-foreground">Problem {setProgress.length}</span>
+								<span className="hidden gap-1 lg:flex" role="img" aria-label={`${setProgress.filter((p) => p.outcome).length} of ${setProgress.length} problems done`}>
+									{setProgress.map((p) => (
+										<i
+											key={p.id}
+											className={cn(
+												"h-1.5 w-6 rounded-full",
+												p.outcome === null
+													? "bg-foreground"
+													: p.outcome === "solved"
+														? "bg-good"
+														: p.outcome === "solvedWithHints"
+															? "bg-warn"
+															: p.outcome === "surrendered"
+																? "bg-danger"
+																: "bg-input",
+											)}
+										/>
+									))}
+								</span>
+							</span>
+						)}
 						{lessonProgress && lessonProgress.currentIndex !== null && (
 							<span className="hidden shrink-0 items-center gap-2.5 md:flex" data-testid="lesson-progress">
 								<span className="text-sm text-muted-foreground">
@@ -1654,7 +1679,7 @@ export function Chat({
 					// Wide lessons: the question lives in the lesson panel, so
 					// the dock is composer-only (no fold, no reserve to defend).
 					pending={panelOn ? null : pending}
-					practice={activeProblem}
+					practice={panelOn ? null : activeProblem}
 					compactionRunning={compacting}
 					onSubmitThinking={submitThinking}
 					chatId={chatId}
@@ -1713,7 +1738,9 @@ export function Chat({
 									? "Ask anything, or press Enter for the next one."
 									: panelOn && pending
 										? "Answer the question on the right to continue…"
-										: undefined
+										: panelOn && activeProblem
+											? "Work the problem on the right — or ask about it once it's done…"
+											: undefined
 							}
 						/>
 					}
@@ -1739,7 +1766,16 @@ export function Chat({
 				<AbortTurnDialog mode={abortAsk} onClose={() => setAbortAsk(null)} onConfirm={confirmAbort} busy={busy} />
 				</div>
 			</div>
-			{panelOn && (
+			{panelOn && kind === "practice" && (
+				<PracticePanel
+					messages={messages}
+					practice={activeProblem}
+					onSubmitThinking={submitThinking}
+					compactionRunning={compacting}
+					dictationCancel={dictation.cancel}
+				/>
+			)}
+			{panelOn && kind !== "practice" && (
 				<LessonPanel
 					messages={messages}
 					pending={pending}

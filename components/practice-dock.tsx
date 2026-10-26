@@ -47,9 +47,27 @@ export interface PracticeDockProps {
 	 *  and say so in the hint row. The server registry is the real gate;
 	 *  this is the affordance. */
 	compactionRunning?: boolean;
+	/** The statement block (v4): the lesson panel hides it — the problem
+	 *  card already shows it in the centre column beside the panel. */
+	showStatement?: boolean;
 }
 
-export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmit, onEscape, compactionRunning = false }: PracticeDockProps) {
+/** The hint request (v4 redesign, 2026-10-26): practice has ONE lane and
+ *  the agent reads the register from the text (the doctrine's hint
+ *  ladder), so asking for a hint is plain words through that lane — any
+ *  working so far rides along, so the hint can build on it. */
+export const HINT_REQUEST = "Could I have a hint?";
+
+export function PracticeDock({
+	problemCallId,
+	input,
+	expanded,
+	onExpand,
+	onSubmit,
+	onEscape,
+	compactionRunning = false,
+	showStatement = true,
+}: PracticeDockProps) {
 	const [thinking, setThinking] = useState("");
 	// Ref MIRRORS the field ("nothing gets lost", the question-dock
 	// discipline): a submit resuming after `await finishDictation()` reads
@@ -75,6 +93,14 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 		thinkingRef.current = "";
 		setThinking("");
 		onSubmit(text);
+	};
+
+	const askHint = () => {
+		if (compactionRunning) return;
+		const work = thinkingRef.current.trim();
+		thinkingRef.current = "";
+		setThinking("");
+		onSubmit(work ? `${work}\n\n${HINT_REQUEST}` : HINT_REQUEST);
 	};
 
 	/* ENTER SUBMITS FROM ANYWHERE (owner round 6, 2026-10-05): dictation
@@ -106,12 +132,14 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 			    cards' label row — owner round, 2026-10-05) + the statement,
 			    markdown + LaTeX rendered, capped by the measured column
 			    (--dock-max-h; the old fixed 40vh cut long problems short). */}
-			<div className="max-h-[var(--dock-max-h,40vh)] overflow-y-auto px-4 pt-3 pb-2">
-				<div className="mb-1 text-xs font-medium text-muted-foreground">Problem</div>
-				<div className="lh-prose text-[15px]">
-					<MessageResponse>{typeof input.statement === "string" ? repairMathForDisplay(input.statement) : input.statement}</MessageResponse>
+			{showStatement && (
+				<div className="max-h-[var(--dock-max-h,40vh)] overflow-y-auto px-4 pt-3 pb-2">
+					<div className="mb-1 text-xs font-medium text-muted-foreground">Problem</div>
+					<div className="lh-prose text-[15px]">
+						<MessageResponse>{typeof input.statement === "string" ? repairMathForDisplay(input.statement) : input.statement}</MessageResponse>
+					</div>
 				</div>
-			</div>
+			)}
 
 			{/* The learner's half: Enter SENDS (owner round 2, 2026-10-05);
 			    Shift+Enter makes a newline — less to decide about. */}
@@ -119,8 +147,9 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 				data-testid="practice-thinking-field"
 				className="m-1.5 rounded-[10px] border border-border/70 bg-background/60 transition-colors focus-within:border-primary/50"
 			>
-				<div className="px-2.5 pt-2 text-xs font-medium text-muted-foreground">
-					Your thinking
+				<div className="flex items-baseline justify-between gap-2 px-2.5 pt-2 text-xs text-muted-foreground">
+					<span className="font-medium">Your thinking</span>
+					<span aria-hidden>{compactionRunning ? "compacting session…" : "↵ submits · ⇧↵ newline"}</span>
 				</div>
 				<textarea
 					value={thinking}
@@ -155,15 +184,22 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 				    one p-1 row. Corner radii concentric: shell 16 − m-1.5 (6) =
 				    field 10 − p-1 (4) = button 6. */}
 				<div className="flex items-center justify-between gap-2 p-1">
-					<span aria-hidden className="pl-1.5 text-xs text-muted-foreground">
-						{compactionRunning ? "compacting session…" : "↵ submits · ⇧↵ newline"}
-					</span>
+					<Button
+						type="button"
+						variant="outline"
+						data-testid="practice-hint"
+						disabled={compactionRunning}
+						onClick={askHint}
+						className="h-9 rounded-[6px] px-3 text-sm font-medium"
+					>
+						Ask for a hint
+					</Button>
 					<Button
 						type="button"
 						data-testid="practice-send"
 						disabled={thinking.trim().length === 0 || compactionRunning}
 						onClick={() => submit()}
-						className="ml-auto h-9 rounded-[6px] px-3.5 text-sm font-medium"
+						className="h-9 rounded-[6px] px-3.5 text-sm font-medium"
 					>
 						Submit thinking
 					</Button>

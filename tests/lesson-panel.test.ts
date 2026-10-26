@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { LESSON_PANEL_MIN, planProgress } from "../components/lesson-panel.tsx";
+import { LESSON_PANEL_MIN, planProgress, practiceSet } from "../components/lesson-panel.tsx";
 import type { PlanTree } from "../src/core/index.ts";
 
 const tree: PlanTree = {
@@ -49,5 +49,37 @@ describe("planProgress", () => {
 
 	it("the panel threshold leaves a reading column beside a 380px panel", () => {
 		assert.ok(LESSON_PANEL_MIN - 380 >= 600);
+	});
+});
+
+describe("practiceSet", () => {
+	const part = (type: string, state: string, extra: Record<string, unknown> = {}) => ({ parts: [{ type, state, ...extra }] });
+
+	it("settled problems open entries; acked concludes close the latest open one", () => {
+		const set = practiceSet([
+			part("tool-problem", "input-available", { toolCallId: "p1" }),
+			part("tool-conclude", "output-available", { input: { outcome: "solved" } }),
+			part("tool-problem", "input-available", { toolCallId: "p2" }),
+		]);
+		assert.deepEqual(set, [
+			{ id: "p1", outcome: "solved" },
+			{ id: "p2", outcome: null },
+		]);
+	});
+
+	it("errored and still-streaming poses count for nothing", () => {
+		const set = practiceSet([
+			part("tool-problem", "input-streaming", { toolCallId: "p1" }),
+			part("tool-problem", "output-error", { toolCallId: "p2" }),
+		]);
+		assert.deepEqual(set, []);
+	});
+
+	it("a conclude without a recognised outcome reads as moved on", () => {
+		const set = practiceSet([
+			part("tool-problem", "input-available", { toolCallId: "p1" }),
+			part("tool-conclude", "output-available", { input: {} }),
+		]);
+		assert.equal(set[0]!.outcome, "movedOn");
 	});
 });
