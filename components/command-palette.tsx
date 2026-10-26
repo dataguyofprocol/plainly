@@ -206,7 +206,7 @@ function PaletteDialog({
 	return createPortal(
 		<div
 			data-testid="command-palette"
-			className="fixed inset-0 z-50 flex items-start justify-center bg-foreground/10 px-4 pt-[14vh] backdrop-blur-[2px]"
+			className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[14vh] lh-scrim"
 			{...backdropDismiss}
 		>
 			<div

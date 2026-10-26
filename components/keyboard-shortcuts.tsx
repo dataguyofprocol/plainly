@@ -162,7 +162,7 @@ function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 	return (
 		<div
 			data-testid="cheat-sheet"
-			className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+			className="fixed inset-0 z-50 flex items-center justify-center lh-scrim"
 			{...backdropDismiss}
 		>
 			<div

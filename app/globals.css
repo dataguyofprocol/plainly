@@ -414,6 +414,15 @@ body {
 	}
 }
 
+/* THE SCRIM (v4 redesign, 2026-10-26): every modal's backdrop — a soft
+   ink tint with a light blur, so the app recedes without washing out. One
+   class, so dialogs never disagree about it again. */
+.lh-scrim {
+	background: rgb(25 28 26 / 0.18);
+	-webkit-backdrop-filter: blur(3px);
+	backdrop-filter: blur(3px);
+}
+
 /* Settings dialog pop (settings-app wave, 2026-09-20): a short fade +
    2% settle-scale — understated by design, the app's motion taste
    (200ms sidebar, 150ms here); honors reduced-motion by appearing. */

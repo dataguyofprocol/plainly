@@ -39,7 +39,7 @@ export function ConnectionDialog({ children, onClose, busy, label, testid, backd
 		document.addEventListener("keydown", key, true);
 		return () => { document.removeEventListener("keydown", key, true); if (previous?.isConnected) previous.focus(); };
 	}, []);
-	return createPortal(<div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80" data-testid={backdropTestid} {...backdropDismiss}>
-		<div ref={ref} role="dialog" aria-modal="true" aria-label={label} aria-busy={busy} data-testid={testid} onClick={(event) => event.stopPropagation()} className="settings-dialog-pop mx-4 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-md border border-border bg-card p-5 shadow-xl">{children}</div>
+	return createPortal(<div className="fixed inset-0 z-[60] flex items-center justify-center lh-scrim" data-testid={backdropTestid} {...backdropDismiss}>
+		<div ref={ref} role="dialog" aria-modal="true" aria-label={label} aria-busy={busy} data-testid={testid} onClick={(event) => event.stopPropagation()} className="settings-dialog-pop mx-4 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl border border-border bg-card p-5 shadow-xl">{children}</div>
 	</div>, document.body);
 }
