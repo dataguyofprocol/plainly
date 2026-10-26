@@ -5,10 +5,8 @@
  * every reasoning chain of the graph in one FULL-BLEED surface — the blur
  * + translucent background IS the surface, no inner card. The top bar is
  * THE shared TopBar (standardization ruling: one element, every surface —
- * h-15, lh-drag with carve-outs, select-none, sidebar reopen, traffic-
- * light gutter; born from this overlay's hand-rolled bar breaking every
- * rule at once). The overlay (z-40) covers home's floating header while
- * open, so the TopBar's own SidebarToggle is the reopen path.
+ * h-15, lh-drag with carve-outs, select-none; born from this overlay's
+ * hand-rolled bar breaking every rule at once).
  *
  * HIERARCHY (three levels, one click each): CLUSTER (the birth session —
  * a chat or a notes file; a chain lives where its CONCLUSION was born,
@@ -238,7 +236,7 @@ export function ChainTableBody({
 	return (
 		<div data-testid="chain-table" className="relative flex h-full min-h-0 flex-col">
 			{/* THE shared top bar (standardization ruling): drag mechanics,
-			    sidebar reopen, traffic-light gutter — the same element as every
+			    the same element as every
 			    chat surface. NO TITLE (owner round 11, 2026-10-05): the serif
 			    title register is RESERVED — it always names a session; the
 			    chain table names nothing, so its bar carries counts + search +

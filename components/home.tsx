@@ -10,7 +10,6 @@ import { ComposerActions, NodePickerControl } from "@/components/composer-action
 import { useStrongKeyless, useZeroKeys, ZeroKeysPill } from "@/components/setup-cta";
 import { DictationBar, joinDictation, useDictation } from "@/components/dictation";
 import { useFieldCycle } from "@/components/field-cycle";
-import { SidebarToggle } from "@/components/sidebar";
 import { StatsBar } from "@/components/stats-bar";
 import type { TurnUsage } from "@/src/core";
 
@@ -194,16 +193,6 @@ export function Home({
 				)}
 			</main>
 
-			{/* Header floats over the graph — pointer-events-none except the
-			    toggle, so the canvas stays draggable/hoverable around it. Carries
-			    no app-region of its own: the strip's drag comes from the mask
-			    div above, and the toggle's lh-no-drag subtracts from it (it is
-			    later in the tree, so the subtraction sticks). */}
-			<header className="pointer-events-none absolute inset-x-0 top-0 flex items-center gap-2 px-3 py-2">
-				<div className="pointer-events-auto">
-					<SidebarToggle />
-				</div>
-			</header>
 
 			{/* New session — same floating blob as the chat composer, docked
 			    OVER the graph (no gradient: the graph runs clean under it to the

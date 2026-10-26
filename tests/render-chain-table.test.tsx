@@ -13,7 +13,7 @@
  * a fuzzy search that auto-expands matching clusters.
  *
  * ROUND 2 (owner refinements, 2026-09-29 late): the top bar is THE
- * shared TopBar (h-15, lh-drag + select-none, sidebar reopen, standard
+ * shared TopBar (h-15, lh-drag + select-none, standard
  * title size); PROMINENT indentation carries the hierarchy — the ONLY
  * lines left are the separators between cluster groups (vertical column
  * hairlines and per-row lines are gone); statement rows are PLAIN (no

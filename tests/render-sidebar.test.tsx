@@ -116,7 +116,7 @@ describe("SessionRow", () => {
 
 	it("active row is visually marked by the background alone (owner, round 5: no weight change)", () => {
 		const html = render(item({}), true);
-		assert.ok(html.includes("bg-accent"), "active background");
+		assert.ok(html.includes("bg-popover"), "active background (v4: the raised white row)");
 		assert.ok(!html.includes("font-medium"), "weight is not a second channel doing the same job");
 	});
 });

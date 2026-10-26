@@ -21,6 +21,7 @@
 
 export type KeyAction =
 	| "toggle-dictation"
+	| "open-omnibar"
 	| "open-model-picker"
 	| "cycle-thinking"
 	| "toggle-sidebar"
@@ -57,15 +58,21 @@ export interface KeyActionDef {
 export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "toggle-dictation", label: "Toggle dictation", scope: "global", binding: "mod+d" },
 	{ id: "open-settings", label: "Open settings", scope: "global", binding: "mod+," },
-	{ id: "open-model-picker", label: "Model selector", scope: "global", binding: "mod+k" },
+	// ⌘K = the omnibar (v4 redesign, owner 2026-10-26): search sessions and
+	// ideas, start a lesson or practice — the Mac "go anywhere" convention.
+	// The model selector moved to ⇧⌘M (it stays one click away on every
+	// model chip).
+	{ id: "open-omnibar", label: "Search and start", scope: "global", binding: "mod+k" },
+	{ id: "open-model-picker", label: "Model selector", scope: "global", binding: "mod+shift+m" },
 	{ id: "cycle-thinking", label: "Cycle thinking level", scope: "global", binding: "shift+tab" },
-	{ id: "toggle-sidebar", label: "Toggle sessions sidebar", scope: "global", binding: "mod+b" },
+	{ id: "toggle-sidebar", label: "Expand or collapse the sidebar", scope: "global", binding: "mod+b" },
+	// Session search lives in the omnibar now (v4): ⇧⌘F opens it too.
 	{ id: "sessions-search", label: "Search sessions", scope: "global", binding: "mod+shift+f" },
 	// (The Alt+↑/↓/↵ session cycle was RETIRED, owner 2026-10-10: barely
-	// used, felt laggy. Session navigation lives IN the search now — ↑/↓
-	// walk the filtered list, Enter opens (first match when nothing
-	// walked) — see sidebar.tsx's search input.)
-	{ id: "jump-graph", label: "Graph view", scope: "global", binding: "mod+g" },
+	// used, felt laggy. Session navigation lives IN the omnibar — ↑/↓
+	// walk the results, Enter opens (the first result when nothing is
+	// walked) — see command-palette.tsx.)
+	{ id: "jump-graph", label: "Knowledge graph", scope: "global", binding: "mod+g" },
 	{ id: "new-session", label: "New session", scope: "global", binding: "mod+n" },
 	{ id: "rename-session", label: "Rename session", scope: "chat", binding: "f2" },
 	{ id: "toggle-user-thinking", label: "Toggle all your thinking", scope: "chat", binding: "mod+t" },

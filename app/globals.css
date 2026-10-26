@@ -476,8 +476,6 @@ body {
                        clickable non-natives only)
    - .lh-lights-gutter  the sidebar LH band's traffic-light gutter: lights
                        end at x≈68, the wordmark starts at 80px (5rem)
-   - .lh-closed-toggle  same gutter for the sidebar toggle when the sidebar
-                       is closed — the lights are static, the toggle moves
    ───────────────────────────────────────────────────────────────────────── */
 .lh-electron .lh-drag {
 	-webkit-app-region: drag;
@@ -509,9 +507,6 @@ body {
 }
 .lh-electron[data-lh-platform="darwin"] .lh-lights-gutter {
 	padding-left: calc(92px / var(--lh-zoom));
-}
-.lh-electron[data-lh-platform="darwin"] .lh-closed-toggle {
-	margin-left: calc(92px / var(--lh-zoom));
 }
 
 /* Windows/Linux Window Controls Overlay: Chromium publishes the usable
