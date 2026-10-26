@@ -177,6 +177,19 @@ body {
 	line-height: var(--lh-prose-leading);
 }
 
+/* The answered card (v4 compact record): a past answer is context, not
+   the lesson — the question at 14px, options and the tucked "why" in the
+   UI sans. Unlayered on purpose: .lh-prose above beats utilities. */
+.lh-answered .lh-prose {
+	font-size: 14px;
+	line-height: 1.5;
+}
+.lh-answered .lh-answered-ui .lh-prose {
+	font-family: var(--font-ui);
+	font-size: 13px;
+	line-height: 1.45;
+}
+
 /* Session-name weight: v4 sets its serif titles in Literata 500 — the
    variable font takes any weight, so one explicit value covers both the
    serif and (toggle off) the Manrope rendering. */

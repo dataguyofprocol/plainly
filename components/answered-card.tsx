@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { CONFIDENCE_LEVEL_COLORS, nearestLevel } from "@/components/confidence-colors";
 import { GlyphMark } from "@/components/ui/glyph-mark";
 import { ThinkingBlock } from "@/components/thinking-block";
@@ -60,8 +61,7 @@ export function AnsweredCard({ answer, input }: { answer: QuestionAnswerData; in
 		<div
 			// Compact record (v4): the card reads at 14px — a past answer is
 			// context, not the lesson — with options in the UI sans.
-			className="rounded-xl border bg-card px-4 py-3 text-card-foreground [&>*:last-child]:mb-0"
-			style={{ "--lh-prose-size": "14px" } as React.CSSProperties}
+			className="lh-answered rounded-xl border bg-card px-4 py-3 text-card-foreground [&>*:last-child]:mb-0"
 			data-testid="answered-card"
 		>
 			<div className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -100,7 +100,7 @@ export function AnsweredCard({ answer, input }: { answer: QuestionAnswerData; in
 			)}
 
 			{((answer.options?.length ?? 0) > 0 || answer.other) && (
-				<div className="flex flex-col gap-1 font-ui text-[13px] leading-snug [&_.lh-prose]:font-ui [&_.lh-prose]:text-[13px]">
+				<div className="lh-answered-ui flex flex-col gap-1 font-ui text-[13px] leading-snug">
 					{answer.options?.map((opt) => {
 						const sel = selectedIdx.has(opt.index);
 						const key = isQuiz && correctIdx.has(opt.index);
@@ -203,27 +203,26 @@ export function AnsweredCard({ answer, input }: { answer: QuestionAnswerData; in
 				/>
 			)}
 
-			{/* px-3→removed: card p-4 + box px-3 double-inset sat the "Why" label deeper
-			    than the option box edges (owner, round 3). Sides flush with everything
-			    else; py-2 stays for vertical air. */}
 			{isQuiz && answer.explanation && (
 				/* The TUCKED explanation — ALL questions (owner, 2026-10-07): the
 				   verdict shows, the explanation sits collapsed behind the Why
 				   toggle — viewable, never center stage. Identical to the
 				   prediction pattern it generalizes (owner, 2026-10-03). */
-				<div className="mt-2" data-testid="tucked-explanation">
+				<div className="mt-2.5" data-testid="tucked-explanation">
+					{/* A real control (owner, 2026-10-26: "doesn't look like a
+					    button"): a small pill with a turning chevron. */}
 					<button
 						type="button"
+						aria-expanded={whyOpen}
 						onClick={() => setWhyOpen((v) => !v)}
-						className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+						className="inline-flex h-6 items-center gap-1 rounded-full border border-border bg-background px-2.5 font-ui text-xs font-semibold text-foreground/70 transition-colors hover:border-foreground/25 hover:text-foreground"
 					>
+						<ChevronRight aria-hidden className={cn("size-3 transition-transform", whyOpen && "rotate-90")} />
 						{whyOpen ? "Hide why" : "Why"}
 					</button>
 					{whyOpen && (
-						<div className="mt-1.5 rounded-lg bg-muted py-2 text-sm text-foreground/50">
-							<span className="font-medium text-muted-foreground">Why: </span>
-							{/* The markdown wrapper must go truly inline — a block <p> after the
-							   "Why:" label created the oversized leading gap (owner's fix list). */}
+						<div className="mt-2 rounded-lg border border-border/70 bg-foreground/[0.03] px-3 py-2 lh-answered-ui font-ui text-[13px] leading-relaxed text-foreground/80">
+							{/* The markdown wrapper must go truly inline (owner's fix list). */}
 							<MessageResponse className="inline [&_p]:inline [&_p]:m-0">{answer.explanation}</MessageResponse>
 						</div>
 					)}
@@ -234,7 +233,7 @@ export function AnsweredCard({ answer, input }: { answer: QuestionAnswerData; in
 			    — one field, reasoning included — shown on submit; no verdict,
 			    the model's next reply IS the grading. */}
 			{isExplain && answer.committed && (
-				<div className="mt-3 rounded-lg bg-muted py-2 text-sm text-muted-foreground">
+				<div className="lh-answered-ui mt-3 rounded-lg border border-border/70 bg-foreground/[0.03] px-3 py-2 text-[13px] text-muted-foreground">
 					<span className="font-medium text-foreground">The answer: </span>
 					<MessageResponse className="inline [&_p]:inline [&_p]:m-0">{answer.committed}</MessageResponse>
 				</div>
