@@ -1,6 +1,7 @@
 import {
 	clampThinkingLevel,
 	createModels,
+	createProvider,
 	getSupportedThinkingLevels,
 	type Api,
 	type Model,
@@ -8,9 +9,11 @@ import {
 	type StreamFunction,
 } from "@earendil-works/pi-ai";
 import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
+import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { type ModelRole } from "../../config.ts";
 import { DEFAULT_THINKING_ORDER } from "../core/settings.ts";
+import { customProviderEnvVar, type CustomProviderEntry } from "../core/custom-providers.ts";
 import packageMetadata from "../../package.json" with { type: "json" };
 import { chatGPTModel } from "./chatgpt-bridge.ts";
 import { chatGPTStream } from "./chatgpt-stream.ts";
@@ -62,8 +65,85 @@ export function piModels() {
 	if (!collection) {
 		collection = createModels({ identity: APP_IDENTITY });
 		for (const provider of builtinProviders()) collection.setProvider(provider);
+		syncCustomProviders();
 	}
 	return collection;
+}
+
+// ─── Custom OpenAI-compatible providers (custom-endpoint wave, 2026-10-26) ──
+// The entries live in the settings record, which this layer may not read
+// (architecture law — agent never imports server/store): the server
+// registers a SOURCE once and calls syncCustomProviders() after every
+// write. The collection is patched IN PLACE (setProvider/deleteProvider),
+// never rebuilt — live engines hold a reference to it.
+
+let customSource: () => readonly CustomProviderEntry[] = () => [];
+let customIds = new Set<string>();
+
+/** The key a keyless endpoint is sent: openai-completions refuses to
+ *  dispatch without one, and servers started without auth ignore it. */
+export const CUSTOM_PROVIDER_NO_KEY = "no-key";
+
+/** Register where the custom entries come from (the server's settings
+ *  read). Applies immediately when the collection already exists. */
+export function setCustomProviderSource(source: () => readonly CustomProviderEntry[]): void {
+	customSource = source;
+	if (collection) syncCustomProviders();
+}
+
+/** Re-read the source and patch the collection: upsert every entry,
+ *  delete the ones that left. Idempotent. */
+export function syncCustomProviders(): void {
+	const models = collection;
+	if (!models) return; // the first piModels() call syncs
+	const entries = customSource();
+	const next = new Set(entries.map((e) => e.id));
+	for (const id of customIds) if (!next.has(id)) models.deleteProvider(id);
+	for (const entry of entries) models.setProvider(customProvider(entry));
+	customIds = next;
+}
+
+/** One custom entry as a pi-ai provider: openai-completions at the entry's
+ *  base URL, auth from its LH_CUSTOM_* var (the keys seam reflects the
+ *  stored key into env) or the no-key placeholder — a keyless provider is
+ *  configured by design. Models get conservative defaults: text-only,
+ *  no reasoning, 128k context, 8192 output, cost 0 (pricing treats every
+ *  custom model as UNPRICED, server/pricing.ts — the zeros are never
+ *  shown as $0). The compat pins avoid the OpenAI-only request features
+ *  (store, the developer role, max_completion_tokens) that self-hosted
+ *  servers commonly reject. */
+export function customProvider(entry: CustomProviderEntry) {
+	const envVar = customProviderEnvVar(entry.id);
+	const models: Model<"openai-completions">[] = entry.models.map((id) => ({
+		id,
+		name: id,
+		api: "openai-completions",
+		provider: entry.id,
+		baseUrl: entry.baseUrl,
+		reasoning: false,
+		input: ["text"],
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: 128_000,
+		maxTokens: 8192,
+		compat: { supportsStore: false, supportsDeveloperRole: false, maxTokensField: "max_tokens" },
+	}));
+	return createProvider({
+		id: entry.id,
+		name: entry.name,
+		baseUrl: entry.baseUrl,
+		auth: {
+			apiKey: {
+				name: `${entry.name} API key`,
+				resolve: async ({ ctx, signal }) => {
+					signal.throwIfAborted();
+					const key = await ctx.env(envVar);
+					return key ? { auth: { apiKey: key }, source: envVar } : { auth: { apiKey: CUSTOM_PROVIDER_NO_KEY }, source: "keyless" };
+				},
+			},
+		},
+		models,
+		api: openAICompletionsApi(),
+	});
 }
 
 /** OpenRouter API key (BYOK); tests never read this — they inject engines. */
