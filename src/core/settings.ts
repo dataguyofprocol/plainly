@@ -29,6 +29,7 @@
 
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { AUTH_PROVIDER_KEYS } from "./auth-keys.ts";
+import { sanitizeCustomProviders, type CustomProviderEntry } from "./custom-providers.ts";
 import type { ModelRole } from "../../config.ts";
 import type { ChatSettings } from "./contracts/chat.ts";
 import type { SearchEngineId } from "./search.ts";
@@ -360,6 +361,15 @@ export interface CompactionSettings {
 	thresholdTokens?: number;
 }
 
+/** Provider settings (custom-endpoint wave, 2026-10-26). Written only by
+ *  /api/providers/custom — never a PUT /api/settings/[section] section.
+ *  Unknown keys inside the section ride along (forward-compat). */
+export interface ProvidersSettings {
+	/** The user's OpenAI-compatible endpoints (core/custom-providers.ts). */
+	custom?: CustomProviderEntry[];
+	[key: string]: unknown;
+}
+
 /** THE record. Every section optional (delta); unknown top-level keys are
  *  preserved verbatim by the sanitizer (forward-compat with newer records). */
 export interface UserSettings {
@@ -371,6 +381,7 @@ export interface UserSettings {
 	appearance?: AppearanceSettings;
 	graph?: GraphSettings;
 	compaction?: CompactionSettings;
+	providers?: ProvidersSettings;
 	[key: string]: unknown;
 }
 
@@ -618,6 +629,16 @@ function sanitizeCompaction(raw: Record<string, unknown>): CompactionSettings {
 	return out;
 }
 
+/** The providers section: custom entries sanitized (invalid ones drop),
+ *  any other key preserved verbatim. */
+function sanitizeProviders(raw: Record<string, unknown>): ProvidersSettings {
+	const out: ProvidersSettings = { ...raw };
+	delete out.custom;
+	const custom = sanitizeCustomProviders(raw.custom);
+	if (custom.length) out.custom = custom;
+	return out;
+}
+
 /**
  * Coerce arbitrary JSON (disk file, network body) into a valid delta record:
  * known fields validated strictly (invalid ones drop/clamp per module doc),
@@ -648,6 +669,9 @@ export function sanitizeUserSettings(raw: unknown): UserSettings | null {
 		if (r.compaction !== undefined && r.compaction !== null && typeof r.compaction === "object") {
 			out.compaction = sanitizeCompaction(r.compaction as Record<string, unknown>);
 		}
+	}
+	if (r.providers !== null && typeof r.providers === "object" && !Array.isArray(r.providers)) {
+		out.providers = sanitizeProviders(r.providers as Record<string, unknown>);
 	}
 	// Unknown top-level keys ride along untouched (forward-compat). One
 	// known-DEAD key is stripped instead of riding: `chat` (the old
