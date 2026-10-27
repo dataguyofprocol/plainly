@@ -10,83 +10,77 @@
 
 <p align="center">
   <a href="https://github.com/dataguyofprocol/plainly/releases">Download</a> ·
-  <a href="#how-it-works">How it works</a> ·
-  <a href="#whats-new-in-010">What's new</a> ·
+  <a href="#how-a-lesson-works">How it works</a> ·
+  <a href="#new-in-010">What's new</a> ·
   <a href="docs/development.md">Documentation</a> ·
   <a href="https://github.com/dataguyofprocol/plainly/issues">Issues</a>
 </p>
 
-Plainly uses AI agents to plan and teach lessons from your current understanding to your goal. It builds a detailed picture of what you understand and how you reason. That picture is updated as you learn.
+Tell Plainly what you want to understand. It finds out what you already know, maps a path from there to your goal, and teaches you one step at a time.
 
-Instead of just giving you an explanation, it uses your answers and thinking to decide what you need next. Teaching builds understanding one reasoning step at a time. Practice makes it usable. A persistent knowledge graph carries it across sessions.
+Instead of handing you an explanation, it reads your answers and your reasoning and decides what you need next. Everything you learn goes into a knowledge graph, so the next session picks up where this one ended.
 
 ![A Plainly lesson: the explanation on the left, the open question in the side panel](docs/assets/lesson.png)
 
-## How it works
+## How a lesson works
 
-1. **Measure.** Before teaching, the agent finds where your understanding ends on each part the lesson depends on. Your answers, how sure you are, and your thinking show it where to start.
-2. **Plan.** It works out a dependency map from that starting point to your goal. The Path tab shows the plan and where you are in it, and the lesson adapts when your understanding turns out different.
-3. **Teach.** Each step builds on something you already understand. You predict, read the explanation, and check your understanding. The question sits in a panel beside the text, so you can read and answer side by side. Confusions are repaired before anything is built on them. The aim is for the goal to feel obviously true, not merely familiar.
-4. **Practice.** Separate sessions pose sets of five problems that need the right knowledge to come to mind without being named first. You work in the panel and ask for help one step at a time: a nudge, a bigger hint, then the first step.
+1. **Measure:** before teaching anything, it asks questions to find where your understanding runs out.
+2. **Plan:** it maps the steps from there to your goal. The Path tab shows the map and where you are on it, and the plan changes when your answers surprise it.
+3. **Teach:** each step builds on something you already get. You predict, read, then check yourself, with the question in a panel right beside the text. Confusions get fixed before anything is built on top of them.
+4. **Practice:** sets of five problems where you have to recall the right idea without being told which one.
 
-**Think out loud.** Every question has a thinking field for your reasoning, uncertainties, and reactions in your own words, and a four-level "How sure?" switch: guessing, unsure, fairly sure, certain. This is how the agent gets a detailed picture rather than just a record of right and wrong answers. You can type or use dictation.
+The goal is for the idea to feel obviously true, not just familiar.
 
-The agent can also research questions in the background, create visual explanations, and build interactive demonstrations.
+Every question comes with a box for your thinking and a "How sure?" switch: guessing, unsure, fairly sure, or certain. Type or dictate. That's what gives Plainly a detailed picture of how you think, beyond a record of right and wrong answers.
+
+When a picture would help, the agent can draw a diagram or build an interactive demo. It can also go research a question in the background while you keep learning.
 
 ## Pick up where you left off
 
 ![Plainly Home: one composer, what is waiting on you, and this week's progress](docs/assets/home.png)
 
-Home has one field. Type what you want to understand and choose **Learn** or **Practice**, or pick one of the suggestions drawn from your graph. Below it, **Continue** shows the question that is waiting on you, and **This week** shows your minutes against a weekly goal, with lessons, new ideas, and practice alongside.
+Home is one text box. Type a topic and pick Learn or Practice, or start from a suggestion pulled from your graph. Underneath sits the question that's waiting on you and this week's minutes against your goal.
 
-Press ⌘K anywhere to start a session or find a past session or idea. Lessons and practice sets waiting on you stay listed in the sidebar.
+Press ⌘K anywhere to start something new or find an old session or idea.
 
 ## Practice
 
 ![A Plainly practice problem with a nudge in the working panel](docs/assets/practice.png)
 
-Your working goes in the panel. Hints read what you have written so far and answer only the next thing you are stuck on, so a nudge is a sentence or two, not a solution. The problem card records which hints you used, and **This set** tracks each of the five problems: solved, solved with hints, or skipped.
+Write your working in the panel. When you're stuck, ask for a nudge, then a bigger hint, then the first step. Hints read what you've written so far and answer only the next thing blocking you, so a nudge is a sentence or two. The problem card remembers which hints you used.
 
-## Knowledge that carries forward
-
-What you are taught accumulates as propositions and reasoning chains: individual claims and the premises that lead to them. The Knowledge page shows this structure by topic, with links back to the sessions it came from. You can also import notes.
+## Knowledge that sticks around
 
 ![The Plainly knowledge graph with an idea selected and its chain lit](docs/assets/knowledge.png)
 
-Select an idea to light its chain and see what it rests on and what it leads to. **Add to practice** queues it for a practice set; **Go deeper** opens a new session on it. Future teaching sessions read the graph instead of starting from scratch. It stores the ideas and their connections, not ratings of your ability.
+What you learn piles up as ideas and the reasoning that links them. Click one to light up what it rests on and what it leads to, then add it to practice or open a deeper session on it. You can import your own notes too.
 
-## Download and get started
+Future lessons read this graph instead of starting from scratch. It holds ideas and how they connect. It never scores you.
 
-**[Download from GitHub Releases](https://github.com/dataguyofprocol/plainly/releases)**
+## Get started
 
-- **macOS (Apple Silicon):** DMG. Drag the app to Applications. The app is not yet signed with an Apple Developer ID, so the first time, right-click it and choose **Open**.
-- **Windows and Linux:** builds are coming; for now, run from source (see [Development](#development-and-support)).
+**[Download for macOS (Apple Silicon)](https://github.com/dataguyofprocol/plainly/releases)**
 
-On first launch, connect a provider: OpenAI, OpenRouter, Anthropic, DeepSeek, Z.AI, or any OpenAI-compatible endpoint (Ollama, vLLM, and similar), with 30+ options in all. Then choose your models and start a session with what you want to understand. Optional dictation and web search use separate service keys.
+Drag it to Applications. The app isn't signed with an Apple Developer ID yet, so the first time, right-click it and choose Open. That's also why updates aren't automatic for now: grab new versions from Releases.
 
-In-app updates on macOS need a Developer ID signature, so for now download new versions from Releases.
+Windows and Linux builds are coming. Until then, [run from source](#development).
 
-## What's new in 0.1.0
-
-Plainly 0.1.0 is the first release under the new name. Compared with LearnHarness 0.3.7, it adds:
-
-- **A new interface.** A calmer, redesigned look throughout, in light and dark (follows your system or set it in Settings), with a grouped sidebar that folds to a rail, and ⌘K to start or find anything.
-- **Home.** One composer for Learn and Practice, what is waiting on you, and a weekly progress strip with a goal.
-- **Lessons with a side panel.** The open question, the plan (Path), and background helpers sit beside the text instead of under it.
-- **Four-level confidence.** "How sure?" is guessing, unsure, fairly sure, or certain.
-- **Practice rebuilt.** A working panel, sets of five, and short hints in three steps: nudge, bigger hint, first step.
-- **Knowledge page.** Topics, an idea card with what each idea rests on and leads to, and Add to practice / Go deeper.
-- **Custom providers.** Connect any OpenAI-compatible endpoint, with its models listed alongside the built-in ones.
-- **Moving from LearnHarness.** On first launch, Plainly copies your LearnHarness data into its own folder. The original folder is left untouched.
+Plainly runs on your models. Connect OpenAI, Anthropic, OpenRouter, DeepSeek, Z.AI, or any OpenAI-compatible endpoint like Ollama or vLLM (30+ options in all), pick your models, and start a lesson. Dictation and web search are optional and use their own keys.
 
 ## Your keys, your data
 
-- **Your keys and models.** No Plainly subscription or markup. You pay your providers for usage; a live cost meter shows model costs.
-- **Local storage.** Your chats, graph, settings, and API keys live on your machine. Learning records are plain files you can inspect.
-- **External services.** Models run through your configured providers. Model requests send the context needed for the task; web research and dictation also contact external services. Local storage does not mean offline processing.
-- **Inspectable behavior.** System prompts are visible and editable. The app is open source under the AGPL-3.0 license.
+- No Plainly subscription, no markup. You pay your providers directly, and a live meter shows what each session costs.
+- Your chats, graph, settings, and API keys live on your machine as plain files you can open and read.
+- Local storage doesn't mean offline. Model calls, web research, and dictation send what the task needs to those services.
+- Every system prompt is visible and editable, and the whole app is open source.
 
-## Development and support
+## New in 0.1.0
+
+This is the first release under the Plainly name. Coming from LearnHarness 0.3.7, you get a redesigned interface with dark mode, the new Home screen, lessons with a side panel, rebuilt practice, the Knowledge page, and custom OpenAI-compatible providers.
+
+On first launch, Plainly copies your LearnHarness data into its own folder and leaves the original untouched.
+
+## Development
 
 ```bash
 npm install
@@ -94,9 +88,7 @@ npm run dev        # http://localhost:3000
 npm test           # deterministic, no LLM, no network
 ```
 
-See the [development guide](docs/development.md), [architecture](docs/architecture.md), and [desktop release guide](docs/desktop-release.md).
-
-Questions, bug reports, and feature requests: [GitHub Issues](https://github.com/dataguyofprocol/plainly/issues).
+Read the [development guide](docs/development.md), the [architecture notes](docs/architecture.md), and the [desktop release guide](docs/desktop-release.md). Bugs, questions, and ideas go in [GitHub Issues](https://github.com/dataguyofprocol/plainly/issues).
 
 ## License
 
