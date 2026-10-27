@@ -3,8 +3,8 @@
  * plus CLI end-to-end runs, all offline against fixtures. The expected asset
  * names asserted here are the ones verified against the INSTALLED
  * app-builder-lib 26.15.3 (see the script header for the derivation):
- * 11 assets — 4 installers (dmg / NSIS exe / AppImage / deb), the mac
- * updater ZIP, its/exe/dmg blockmaps, and the three latest*.yml feeds.
+ * 10 assets — the mac ZIP and install.sh, 3 installers (NSIS exe /
+ * AppImage / deb), the zip/exe blockmaps, and the three latest*.yml feeds.
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -34,7 +34,7 @@ function asset(id: number, name: string, overrides: Partial<ReleaseAsset> = {}):
 	return { id, name, size: 5000, state: "uploaded", ...overrides };
 }
 
-/** The complete, healthy 11-asset draft for a version. */
+/** The complete, healthy 10-asset draft for a version. */
 function healthyRelease(version: string, tagForm: "v" | "bare" = "v"): ReleaseRecord {
 	const e = expectedAssets(version);
 	return {
@@ -64,14 +64,13 @@ function healthyFeeds(version: string, release: ReleaseRecord): Record<string, s
 }
 
 describe("release gate — expected asset inventory", () => {
-	it("is exactly the 11 verified builder outputs for the version", () => {
+	it("is exactly the 9 verified builder outputs plus install.sh for the version", () => {
 		assert.deepEqual(expectedAssets(VERSION).files, [
-			"Plainly-0.2.0-arm64.dmg",
 			"Plainly-0.2.0-arm64-mac.zip",
+			"install.sh",
 			"Plainly-0.2.0-x64-setup.exe",
 			"Plainly-0.2.0-x86_64.AppImage",
 			"Plainly-0.2.0-amd64.deb",
-			"Plainly-0.2.0-arm64.dmg.blockmap",
 			"Plainly-0.2.0-arm64-mac.zip.blockmap",
 			"Plainly-0.2.0-x64-setup.exe.blockmap",
 			"latest-mac.yml",
@@ -163,7 +162,7 @@ describe("release gate — packaging-config drift guard", () => {
 		["mac artifactName", (config) => { (config.mac as Record<string, unknown>).artifactName = "${productName}-${version}.${ext}"; }],
 		["top-level artifactName", (config) => { config.artifactName = "${name}-${version}.${ext}"; }],
 		["productName", (config) => { config.productName = "learnharness"; }],
-		["mac targets", (config) => { (config.mac as Record<string, unknown>).target = [{ target: "dmg", arch: ["arm64"] }]; }],
+		["mac targets", (config) => { (config.mac as Record<string, unknown>).target = [{ target: "dmg", arch: ["arm64"] }, { target: "zip", arch: ["arm64"] }]; }],
 		["win target", (config) => { (config.win as Record<string, unknown>).target = [{ target: "appx", arch: ["x64"] }]; }],
 		["linux targets", (config) => { (config.linux as Record<string, unknown>).target = [{ target: "AppImage", arch: ["x64"] }]; }],
 		["publish provider", (config) => { config.publish = [{ provider: "github", releaseType: "prerelease" }]; }],
@@ -188,8 +187,8 @@ describe("release gate — asset inventory", () => {
 		release.assets = release.assets.filter((entry) => entry.name !== "Plainly-0.2.0-x64-setup.exe.blockmap");
 		release.assets.push(asset(9999, "Plainly-0.2.0-x64.AppImage"));
 		release.assets.push(asset(9998, "Plainly-0.1.0-x64-setup.exe"));
-		release.assets.push(asset(9997, "Plainly-0.2.0-arm64.dmg", { size: 0 }));
-		release.assets.push(asset(9996, "Plainly-0.2.0-arm64.dmg", { state: "starter" }));
+		release.assets.push(asset(9997, "Plainly-0.2.0-arm64-mac.zip", { size: 0 }));
+		release.assets.push(asset(9996, "Plainly-0.2.0-arm64-mac.zip", { state: "starter" }));
 		const verdict = verifyAssets(release, expectedAssets(VERSION));
 		assert.ok(!verdict.ok);
 		const joined = verdict.errors.join("\n");
@@ -204,7 +203,7 @@ describe("release gate — asset inventory", () => {
 
 describe("release gate — updater reference hygiene", () => {
 	it("accepts bare asset names only", () => {
-		assert.ok(isPlainAssetName("Plainly-0.2.0-arm64.dmg"));
+		assert.ok(isPlainAssetName("Plainly-0.2.0-arm64-mac.zip"));
 		for (const bad of ["", ".", "..", "../LearnHarness.zip", "dist/LearnHarness.zip", "https://evil.example/app.zip",
 			"http://evil.example/app.zip", "file:///etc/passwd", "C:\\app.zip", "~x/app.zip", "app.zip?q=1", "app.zip#x"]) {
 			assert.equal(isPlainAssetName(bad), false, bad);
@@ -266,13 +265,13 @@ describe("release gate — update feeds", () => {
 		["mac ZIP not first (legacy path/sha512 would mislead the updater)", (feeds) => {
 			const e = expectedAssets(VERSION);
 			feeds["latest-mac.yml"] = feeds["latest-mac.yml"]!.replace(
-				`files:\n  - url: ${e.mac.zip}\n    sha512: ${sha512(e.mac.zip)}\n    size: 5000\n  - url: ${e.mac.dmg}\n    sha512: ${sha512(e.mac.dmg)}\n    size: 5000\n`,
-				`files:\n  - url: ${e.mac.dmg}\n    sha512: ${sha512(e.mac.dmg)}\n    size: 5000\n  - url: ${e.mac.zip}\n    sha512: ${sha512(e.mac.zip)}\n    size: 5000\n`,
-			).replace(`path: ${e.mac.zip}\nsha512: ${sha512(e.mac.zip)}\n`, `path: ${e.mac.dmg}\nsha512: ${sha512(e.mac.dmg)}\n`);
+				`files:\n`,
+				`files:\n  - url: ${e.mac.installer}\n    sha512: ${sha512(e.mac.installer)}\n    size: 5000\n`,
+			);
 		}, /files\[0\] must be/],
 		["mac legacy path pointing away from files[0]", (feeds) => {
 			const e = expectedAssets(VERSION);
-			feeds["latest-mac.yml"] = feeds["latest-mac.yml"]!.replace(`path: ${e.mac.zip}`, `path: ${e.mac.dmg}`);
+			feeds["latest-mac.yml"] = feeds["latest-mac.yml"]!.replace(`path: ${e.mac.zip}`, `path: ${e.mac.installer}`);
 		}, /top-level path is/],
 		["mac legacy sha512 not matching files[0]", (feeds) => {
 			feeds["latest-mac.yml"] = feeds["latest-mac.yml"]!.replace(`sha512: ${sha512("Plainly-0.2.0-arm64-mac.zip")}\nreleaseDate`, `sha512: ${sha512("tampered")}\nreleaseDate`);
@@ -408,7 +407,7 @@ describe("release gate — CLI (offline, repo config)", () => {
 		try {
 			const result = run(["verify", path.join(root, "releases.json"), path.join(root, "metadata"), "--tag", TAG]);
 			assert.equal(result.status, 0, String(result.stderr));
-			assert.match(result.stdout, /11\/11 expected files present/);
+			assert.match(result.stdout, /10\/10 expected files present/);
 			assert.ok(result.stdout.includes(`OK: draft for ${TAG} is complete`));
 		} finally {
 			fs.rmSync(root, { recursive: true, force: true });
@@ -419,12 +418,12 @@ describe("release gate — CLI (offline, repo config)", () => {
 		const { root } = workspace();
 		try {
 			const release = healthyRelease(VERSION);
-			release.assets = release.assets.filter((entry) => entry.name !== `Plainly-${VERSION}-arm64.dmg.blockmap`);
+			release.assets = release.assets.filter((entry) => entry.name !== `Plainly-${VERSION}-arm64-mac.zip.blockmap`);
 			release.assets.push(asset(9999, "Plainly-0.0.9-x64-setup.exe"));
 			fs.writeFileSync(path.join(root, "releases.json"), JSON.stringify([release]));
 			const result = run(["verify", path.join(root, "releases.json"), path.join(root, "metadata"), "--tag", TAG]);
 			assert.equal(result.status, 1);
-			assert.match(result.stderr, /arm64\.dmg\.blockmap: missing from the release/);
+			assert.match(result.stderr, /arm64-mac\.zip\.blockmap: missing from the release/);
 			assert.match(result.stderr, /0\.0\.9-x64-setup\.exe: unexpected asset/);
 			assert.match(result.stderr, /do not publish/);
 		} finally {

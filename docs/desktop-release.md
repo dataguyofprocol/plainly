@@ -4,11 +4,11 @@
 
 | Platform | Build runner | Packages | In-app update |
 |---|---|---|---|
-| macOS, Apple Silicon | `macos-26` (arm64) | ad-hoc signed DMG + ZIP (not notarized) | none while ad-hoc signed (Squirrel.Mac requires a Developer ID signature) |
+| macOS, Apple Silicon | `macos-26` (arm64) | ad-hoc signed ZIP (not notarized) + `install.sh` | `electron/mac-updater.cjs` (Squirrel.Mac rejects ad-hoc signatures) |
 | Windows, x64 | `windows-2025` | unsigned per-user NSIS installer | NSIS |
 | Linux, x64 | `ubuntu-24.04` | AppImage + `.deb` | AppImage replacement; `.deb` through dpkg/apt with elevation if needed |
 
-**Plainly fork (2026-10-27):** the fork has no Apple Developer ID yet, so macOS builds are ad-hoc signed (`mac.identity: "-"`), hardened runtime and notarization are off, and Gatekeeper asks users to right-click → Open on first launch. Restoring signing means setting `identity` back to auto-discovery, `hardenedRuntime: true`, `notarize: true`, adding the secrets below, and restoring the signed mac step in `release.yml`.
+**Plainly fork (2026-10-27):** the fork has no Apple Developer ID yet, so macOS builds are ad-hoc signed (`mac.identity: "-"`), hardened runtime and notarization are off, and there is no DMG: see [macOS install and updates](#macos-install-and-updates). Restoring signing means setting `identity` back to auto-discovery, `hardenedRuntime: true`, `notarize: true`, adding the secrets below, and restoring the signed mac step in `release.yml`. With a Developer ID, Squirrel.Mac works again, so `mac-updater.cjs` can go and a DMG can come back.
 
 Windows signing is deliberately disabled for this first release. SmartScreen may warn about an unknown publisher on initial installation. AppImage is the primary Linux download because it is self-contained and updates without administrator permission. The installed `electron-updater` 6.8.9 also supports `.deb` updates; an update may request an administrator password. Both use the same download/restart banner.
 
@@ -39,6 +39,25 @@ npx electron-builder --win --x64 --publish never
 npx electron-builder --linux --x64 --publish never
 ```
 
+## macOS install and updates
+
+Plainly has no Apple Developer ID yet, so it can't be notarized. macOS quarantines anything a browser downloads and Gatekeeper calls an un-notarized quarantined app malware; there is no way around that for a browser download. Two pieces avoid it (owner ruling, 2026-10-27):
+
+- **`scripts/install.sh`**, uploaded to every release as `install.sh`. Users run `curl -fsSL https://github.com/dataguyofprocol/plainly/releases/latest/download/install.sh | sh`. curl sets no quarantine flag, so the app opens normally. The script reads `latest-mac.yml`, downloads the zip, checks size and sha512, checks the unpacked app's bundle id, version and signature, and moves it into `/Applications` (or `~/Applications` when `/Applications` isn't writable, or when Plainly is already there). It refuses to run while Plainly is open.
+- **`electron/mac-updater.cjs`**, the in-app updater. Squirrel.Mac only accepts an update signed by the running app's Developer ID; an ad-hoc signature changes every build, so every update would fail. This module checks `latest-mac.yml` at startup and every 24h, downloads and verifies the zip the same way as the script, and shows the "Update ready" banner. On Restart, or any quit, a detached shell helper waits for Plainly to exit, swaps the `.app` in place (putting the old one back if the move fails), and relaunches on Restart. It turns itself off when the app is translocated or its folder isn't writable. Windows/Linux keep electron-updater.
+
+Both read the feed from `https://github.com/dataguyofprocol/plainly/releases/latest/download/`, which only serves the newest **published, non-prerelease** release. Both take `LH_UPDATE_FEED` to point at a local HTTP folder instead, for testing.
+
+Release steps (on an Apple Silicon Mac, with `package.json` at the new version `<v>`):
+
+```sh
+npm run desktop:dist
+gh release create v<v> -R dataguyofprocol/plainly --draft --title "Plainly <v>" --notes-file <notes>
+gh release upload v<v> -R dataguyofprocol/plainly dist/Plainly-<v>-arm64-mac.zip dist/Plainly-<v>-arm64-mac.zip.blockmap dist/latest-mac.yml scripts/install.sh
+```
+
+Then publish the draft. Installed copies pick it up within 24h, or at once from Plainly → Check for Updates….
+
 ## CI vs release
 
 `.github/workflows/ci.yml` runs on main pushes and pull requests:
@@ -46,7 +65,7 @@ npx electron-builder --linux --x64 --publish never
 - Typecheck, full deterministic test suite, and lint on Ubuntu.
 - Native renderer tests plus standalone build/boot-smoke on macOS (`macos-15`), Windows, and Linux. This macOS job does not compile the Icon Composer asset; only release packaging needs the newer runner.
 
-**Plainly fork (2026-10-27): releases are local and macOS-only for now.** The `v*` tag trigger in `release.yml` is commented out, so only the manual mode below runs. A release is `npm run desktop:dist` on an Apple Silicon Mac, then the DMG, ZIP, their blockmaps and `latest-mac.yml` uploaded to a draft GitHub Release with `gh`. Restore the tag trigger when Windows/Linux release through CI again.
+**Plainly fork (2026-10-27): releases are local and macOS-only for now.** The `v*` tag trigger in `release.yml` is commented out, so only the manual mode below runs. A release is `npm run desktop:dist` on an Apple Silicon Mac, then the four macOS assets uploaded with `gh` (see [macOS install and updates](#macos-install-and-updates)). Restore the tag trigger when Windows/Linux release through CI again.
 
 `.github/workflows/release.yml` has two deliberately separate modes:
 
@@ -60,12 +79,12 @@ The three jobs upload distinct updater feeds: `latest-mac.yml`, `latest.yml`, `l
 `verify` runs only on tag pushes (`needs: package`, so after **all three** packaging legs; manual rehearsals upload nothing and skip it). It checks out the tagged revision without persisting credentials and runs `scripts/verify-release.ts`. GitHub requires push access to list **draft** releases, so this job needs `contents: write` even though every API operation is GET-only. The token is exposed only to the release-list and feed-download steps, not dependency installation or the offline validator. The validator:
 
 - finds the draft using the same tag matching as the draft job and electron-builder's publisher — `tag_name` equals `v<version>` **or** the bare `<version>`; zero matches, two matches, or an already-published match fail the run, and a draft matched only via the unprefixed form is flagged with a warning (a later run could create a second draft under the `v`-tag and split the assets — rename before publishing);
-- fails unless the release holds **exactly** these 11 assets — nothing missing, nothing extra (a stale name from an older run is an error), nothing zero-size, nothing still in a non-`uploaded` state:
+- fails unless the release holds **exactly** these 10 assets — nothing missing, nothing extra (a stale name from an older run is an error), nothing zero-size, nothing still in a non-`uploaded` state:
 
 | Asset | Role |
 |---|---|
-| `Plainly-<v>-arm64.dmg` + `.blockmap` | macOS installer |
-| `Plainly-<v>-arm64-mac.zip` + `.blockmap` | macOS updater payload (Squirrel.Mac installs from the ZIP) |
+| `Plainly-<v>-arm64-mac.zip` + `.blockmap` | macOS app (`install.sh` and `mac-updater.cjs` install from it) |
+| `install.sh` | macOS installer (`curl \| sh`), uploaded by the mac job |
 | `Plainly-<v>-x64-setup.exe` + `.blockmap` | Windows NSIS installer |
 | `Plainly-<v>-x86_64.AppImage` | Linux AppImage (no sidecar blockmap) |
 | `Plainly-<v>-amd64.deb` | Linux deb (no sidecar blockmap) |
@@ -93,10 +112,10 @@ The workflow maps the certificate secrets to electron-builder's `CSC_LINK` / `CS
 ## First release runbook
 
 1. Push the implementation; run the manual Desktop release workflow.
-2. Human smoke on Windows/Linux: install/open, window buttons and dragging, sidebar at narrow widths, zoom, setup/keys, session/resume, native PDF/SVG verification and demo helper. macOS is ad-hoc signed: also check right-click → Open on a clean Mac.
+2. Human smoke on Windows/Linux: install/open, window buttons and dragging, sidebar at narrow widths, zoom, setup/keys, session/resume, native PDF/SVG verification and demo helper. macOS: install with the `curl | sh` command on a clean Mac and check it opens without a Gatekeeper prompt.
 3. (Once the fork has a Developer ID) add macOS signing/notarization secrets and restore signing.
 4. Bump `package.json` and the lockfile to the agreed release version; run local gates and push a matching `v...` tag.
-5. Wait for **all three** packaging jobs **and the final Verify draft release job** — the gate mechanically checks the draft's 11 assets and the three update feeds (single draft, right names/version/sizes/upload state, feeds referencing only what the release actually holds). If it fails, fix the cause and re-run the workflow before publishing; electron-builder replaces same-named assets on re-upload, and the gate rejects leftovers.
+5. Wait for **all three** packaging jobs **and the final Verify draft release job** — the gate mechanically checks the draft's 10 assets and the three update feeds (single draft, right names/version/sizes/upload state, feeds referencing only what the release actually holds). If it fails, fix the cause and re-run the workflow before publishing; electron-builder replaces same-named assets on re-upload, and the gate rejects leftovers.
 6. Owner makes the repository (`dataguyofprocol/plainly`) public, publishes the complete draft, then checks the real GitHub update path using a prior installed version.
 
 A full human pass is required before the first three-platform release. Subsequent content-only updates rely on the deterministic suite plus the per-OS build/boot-smoke matrix. Changes to `electron/`, native modules, packaging/updater configuration, or Electron itself call for another platform smoke pass.

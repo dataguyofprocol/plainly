@@ -8,6 +8,8 @@
 #   - the asar holds only the shell (electron/main.cjs + package.json);
 #   - Plainly fork (2026-10-27): macOS builds are ad-hoc signed and NOT
 #     notarized until the fork has its own Developer ID (owner ruling).
+#     Users install with scripts/install.sh (curl sets no quarantine flag,
+#     so Gatekeeper never asks); the zip is the only macOS package.
 appId: app.plainly.Plainly
 productName: Plainly
 directories:
@@ -105,13 +107,11 @@ mac:
     - from: electron/server-title-guard.cjs
       to: server-title-guard.cjs
   icon: build/icon.icon
-  # zip rides next to dmg (flipped 2026-10-08): Squirrel.Mac — Electron's
-  # macOS auto-updater — installs from ZIP and cannot read DMGs. DMG is
-  # for humans; ZIP + blockmap are the updater's payload.
+  # zip only (owner ruling, 2026-10-27): scripts/install.sh and
+  # electron/mac-updater.cjs both install from it. The DMG is gone: a
+  # browser-downloaded DMG is quarantined, and Gatekeeper calls an
+  # un-notarized app inside it malware.
   target:
-    - target: dmg
-      arch:
-        - arm64
     - target: zip
       arch:
         - arm64
@@ -133,27 +133,12 @@ mac:
   entitlements: build/entitlements.mac.plist
   # Signing (Plainly fork, owner ruling 2026-10-27): ad-hoc ("-") until the
   # fork has its own Developer ID. Apple Silicon refuses to run unsigned
-  # code, so ad-hoc is the floor; users right-click → Open on first launch.
-  # Consequence: Squirrel.Mac only installs updates for Developer ID-signed
-  # apps, so macOS auto-update is off in practice until signing returns.
+  # code, so ad-hoc is the floor. Squirrel.Mac rejects ad-hoc updates, so
+  # macOS updates run through electron/mac-updater.cjs instead.
   # To restore: drop identity, set notarize: true, and supply the
   # CSC_*/APPLE_* credentials (see docs/desktop-release.md).
   identity: "-"
   notarize: false
-dmg:
-  title: "${productName} ${version}"
-  # Owner artwork: 540×380 at 1×; the sibling background@2x.png is
-  # combined into a Retina TIFF by dmg-builder. Centres use 1× coordinates.
-  background: build/background.png
-  iconSize: 80
-  contents:
-    - x: 130
-      y: 190
-      type: file
-    - x: 410
-      y: 190
-      type: link
-      path: /Applications
 afterPack: scripts/after-pack.cjs
 win:
   icon: build/icon.ico

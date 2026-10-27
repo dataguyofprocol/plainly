@@ -41,7 +41,7 @@ import {
 	type UserSettings,
 } from "@/src/core";
 import { useAppearance } from "./appearance.tsx";
-import { SettingsGroup, SettingsSection, SettingsRow, Toggle } from "./controls.tsx";
+import { SettingsSection } from "./controls.tsx";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { AgentSection } from "./agent-section.tsx";
 import type { ModelsSettings } from "@/src/core";
@@ -63,7 +63,6 @@ const SECTIONS = [
 	{ id: "appearance", label: "Appearance", icon: "appearance", title: "Appearance", hint: "How lessons read on this device." },
 	{ id: "graph", label: "Knowledge graph", icon: "knowledge", title: "Knowledge graph", hint: "How your graph grows from the lessons you take." },
 	{ id: "keyboard", label: "Keyboard", icon: "keyboard", title: "Keyboard", hint: "Shortcuts, saved on this device." },
-	{ id: "general", label: "General", icon: "tune", title: "General", hint: "App-wide preferences." },
 ] as const satisfies ReadonlyArray<{ id: string; label: string; icon: IconName; title: string; hint: string }>;
 type SectionId = (typeof SECTIONS)[number]["id"];
 
@@ -77,10 +76,6 @@ const DialogContext = createContext<{ open: (section?: string, row?: string) => 
 /** AppShell-level mount: the sidebar row and the mod+, chord call this.
  *  `open(section)` lands the dialog on a specific section (the first-run
  *  setup flow deep-links to Keys when no provider key exists yet). */
-/** The auto-update row's hint (tooltip wave): honest user language — no
- *  stream vocabulary. Exported for the copy pin (tooltip-mechanism test). */
-export const AUTO_UPDATE_HINT = "Automatic updates arrive in an upcoming release";
-
 export function SettingsDialogProvider({
 	children,
 }: {
@@ -356,18 +351,6 @@ export function SettingsDialogBody({
 								</p>
 							</div>
 						)}
-						{active === "general" &&
-							page(
-								<SettingsGroup label="Updates">
-									<SettingsRow label="Automatic updates" hint={AUTO_UPDATE_HINT} testid="row-auto-update">
-										<Toggle
-											checked={record.general?.autoUpdate ?? true}
-											label="auto update"
-											onChange={(on) => void write("general", { autoUpdate: on })}
-										/>
-									</SettingsRow>
-								</SettingsGroup>,
-							)}
 						{active === "keys" && page(<KeysSection initialRow={initialRow ?? undefined} />)}
 						{active === "agent" &&
 							page(

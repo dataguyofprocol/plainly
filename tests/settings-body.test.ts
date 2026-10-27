@@ -20,18 +20,20 @@ import {
 } from "../src/server/settings-body.ts";
 
 describe("parseGeneralSettingsBody", () => {
-	it("parses {} and {autoUpdate} replace-whole", () => {
+	it("parses {} and {dailyGoalMinutes} replace-whole", () => {
 		const empty = parseGeneralSettingsBody({});
 		assert.ok(empty.ok);
 		assert.deepEqual(empty.settings, {});
-		const on = parseGeneralSettingsBody({ autoUpdate: true });
-		assert.ok(on.ok);
-		assert.deepEqual(on.settings, { autoUpdate: true });
+		const goal = parseGeneralSettingsBody({ dailyGoalMinutes: 45 });
+		assert.ok(goal.ok);
+		assert.deepEqual(goal.settings, { dailyGoalMinutes: 45 });
 	});
 
-	it("rejects non-objects and non-boolean autoUpdate", () => {
+	it("rejects non-objects; the retired autoUpdate key is ignored (owner, 2026-10-27)", () => {
 		assert.equal(parseGeneralSettingsBody("x").ok, false);
-		assert.equal(parseGeneralSettingsBody({ autoUpdate: "yes" }).ok, false);
+		const old = parseGeneralSettingsBody({ autoUpdate: false });
+		assert.ok(old.ok);
+		assert.deepEqual(old.settings, {});
 	});
 });
 

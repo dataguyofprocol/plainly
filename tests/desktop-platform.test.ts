@@ -101,9 +101,8 @@ describe("desktop packaging policy", () => {
 	});
 
 	it("ships Mac arm64, Windows NSIS x64, and both Linux x64 channels", () => {
-		assert.deepEqual(config.mac.target, [
-			{ target: "dmg", arch: ["arm64"] }, { target: "zip", arch: ["arm64"] },
-		]);
+		// zip only: install.sh and the in-app updater both install from it.
+		assert.deepEqual(config.mac.target, [{ target: "zip", arch: ["arm64"] }]);
 		assert.deepEqual(config.win.target, [{ target: "nsis", arch: ["x64"] }]);
 		assert.equal(config.win.signExecutable, false);
 		assert.equal(config.win.verifyUpdateCodeSignature, false);
