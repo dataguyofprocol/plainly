@@ -726,6 +726,17 @@ body {
 .lh-electron[data-lh-platform="darwin"] .lh-lights-gutter {
 	padding-left: calc(92px / var(--lh-zoom));
 }
+/* THE macOS TITLE BAR (owner, 2026-10-27): a full-width band the lights
+   sit in (electron/main.cjs centers them at y 26). The sidebar card, the
+   rail and the dock start below it; the page title sits in it.
+   --lh-bar       52pt physical, floored at 36px so the title still fits
+                  zoomed in (then the lights ride a little above center)
+   --lh-lights-end  where content may start: the green light's right edge
+                  (~75pt) + 16pt of air */
+.lh-electron[data-lh-platform="darwin"] {
+	--lh-bar: max(calc(52px / var(--lh-zoom)), 36px);
+	--lh-lights-end: calc(91px / var(--lh-zoom));
+}
 
 /* Windows/Linux Window Controls Overlay: Chromium publishes the usable
    titlebar rectangle in CSS coordinates (including resize/zoom changes).

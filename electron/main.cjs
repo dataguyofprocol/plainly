@@ -342,17 +342,17 @@ function createWindow(url) {
 		width: 1440,
 		height: 900,
 		title: PRODUCT_NAME,
-		// Merged chrome (owner, 2026-09-17): the system title bar is gone;
-		// the app's own 60px header bands ARE the title bar. The traffic
-		// lights float over the sidebar's LH wordmark band, vertically
-		// Aligned to the PHASE PILL's drawn box, not the band's geometric
-		// center (owner ask, 2026-09-17): macOS centers each 12px circle at
-		// y+6.75, and the pill box center measures 29.25 in the running app
-		// (band 0–59.5, pill box 19–39.5) — y 22.5 lands the circles at
-		// 29.25, exactly on the pill. Wordmark gutter: components/sidebar.tsx.
+		// Merged chrome (owner, 2026-09-17): the system title bar is gone.
+		// macOS title bar (owner, 2026-10-27): the renderer reserves a
+		// full-width 52pt bar (--lh-bar, app/globals.css) above the sidebar
+		// card, the rail and the dock; the page title (Lesson/Practice,
+		// Knowledge) sits in it past the lights, Home's is empty. The lights
+		// never move — same spot on every screen and at every zoom — and are
+		// centered on the bar: macOS centers each circle at y+6.75, so
+		// y 19.25 lands them at 26, half of 52.
 		// Dragging comes from the renderer's .lh-drag bands (app/globals.css).
 		...(process.platform === "darwin"
-			? { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 16, y: 22.5 } }
+			? { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 16, y: 19.25 } }
 			: {
 				titleBarStyle: "hidden",
 				// Native min/max/close on the right, at the OS's compact default
@@ -452,12 +452,12 @@ function createWindow(url) {
  * setZoomFactor, and broadcast to the renderer ("lh:zoom" — it publishes
  * --lh-zoom so gutter lengths can divide by it and stay PHYSICAL-
  * constant). The traffic lights themselves stay at their construction
- * position ({x:16, y:22.5} — Electron 44 has NO runtime setter, only
- * the BrowserWindow option), which is HIG-correct anyway: native lights
- * hug the window corner while the web chrome compensates around them.
- * Vertical note: at large factors the taller bands' content centers
- * drift below the fixed lights — accepted (the alternative, moving the
- * lights, is impossible without rebuilding the window). */
+ * position ({x:16, y:19.25}), which is HIG-correct: native lights hug
+ * the window corner while the web chrome compensates around them (the
+ * title bar's height divides by the factor). Electron does have
+ * setWindowButtonPosition; the owner chose fixed lights (2026-10-27).
+ * Vertical note: zoomed past ~1.4 the bar stops shrinking (it must fit
+ * its content), so its content centers drift below the lights — accepted. */
 const ZOOM_LADDER = [0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 
 /* ── Auto-update (Wave C, owner 2026-10-10: silent download + restart ─────

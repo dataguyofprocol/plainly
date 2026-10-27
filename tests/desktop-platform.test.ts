@@ -40,10 +40,10 @@ function windowOptions(platform: string, dark = false) {
 }
 
 describe("desktop window chrome", () => {
-	it("macOS keeps the proven traffic lights and does not enable WCO", () => {
+	it("macOS centers the fixed traffic lights on the 52pt title bar and does not enable WCO", () => {
 		const options = windowOptions("darwin");
 		assert.equal(options.titleBarStyle, "hiddenInset");
-		assert.deepEqual(options.trafficLightPosition, { x: 16, y: 22.5 });
+		assert.deepEqual(options.trafficLightPosition, { x: 16, y: 19.25 });
 		assert.equal(options.titleBarOverlay, undefined);
 		assert.equal(options.autoHideMenuBar, undefined);
 	});
