@@ -7,15 +7,11 @@
  *   window.lh.platform — read-only OS identity for native window-control
  *   gutters (darwin: left traffic lights; win32/linux: right overlay).
  *
- *   window.lh.expandWindow() — widen the window to the sidebar auto-close
- *   threshold (880px) when the sidebar is opened below it. The main
- *   process clamps: no-op if the window is already wide enough.
- *
  *   window.lh.onZoom(cb) / window.lh.getZoom() — the zoom truth (owner
  *   round 7, 2026-10-05): every ⌘±/⌘0 change arrives as "lh:zoom" with
  *   the new factor; getZoom covers the first-paint race. The renderer
- *   publishes it as --lh-zoom so physical-constant lengths (the traffic-
- *   light gutter) can divide by it.
+ *   publishes it as --lh-zoom so physical-constant lengths (the macOS
+ *   title bar) can divide by it.
  *
  *   window.lh.setTheme(mode) — the theme choice ("system" | "light" |
  *   "dark"; dark mode wave, 2026-10-27): main mirrors it into nativeTheme
@@ -62,7 +58,6 @@ contextBridge.exposeInMainWorld("lh", {
 			return () => ipcRenderer.removeListener("lh:subscriptions:changed", listener);
 		},
 	},
-	expandWindow: () => ipcRenderer.send("lh:expand-window"),
 	onZoom: (cb) => {
 		const listener = (_event, factor) => cb(factor);
 		ipcRenderer.on("lh:zoom", listener);
