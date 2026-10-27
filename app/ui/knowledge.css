@@ -141,6 +141,21 @@
 	.v4 .tray.beside { left: 50%; }
 	.v4 .kmain { height: calc(100vh - 57px); padding: 12px; }
 	.v4 .detail { left: 12px; right: 12px; width: auto; top: auto; bottom: 60px; max-height: 60%; }
+	/* macOS: the flat rail holds the title bar (app/ui/shell.css). */
+	.lh-electron[data-lh-platform="darwin"] .v4 .kmain { height: calc(100vh - 57px - var(--lh-bar)); }
+}
+/* macOS title bar (app/globals.css --lh-bar): the header IS the bar — one
+   line in the Lesson title's register (owner, 2026-10-27), the meta
+   inline after the title; beside the rail its title starts past the lights. */
+@media (min-width: 800px) {
+	.lh-electron[data-lh-platform="darwin"] .v4 .kmain { padding-top: 0; }
+	.lh-electron[data-lh-platform="darwin"] .v4 .khead { height: var(--lh-bar); min-height: 0; }
+	.lh-electron[data-lh-platform="darwin"] .v4 .khead-t { flex-direction: row; align-items: baseline; gap: 10px; }
+	.lh-electron[data-lh-platform="darwin"] .v4 .khead h1 { font-family: inherit; font-size: 14px; line-height: 20px; font-weight: 600; letter-spacing: -0.005em; white-space: nowrap; }
+	.lh-electron[data-lh-platform="darwin"] .v4 .kmeta { align-self: auto; font-size: 12px; line-height: 16px; white-space: nowrap; }
+}
+@media (min-width: 800px) and (max-width: 1099px) {
+	.lh-electron[data-lh-platform="darwin"] .v4 .khead { padding-left: max(4px, calc(var(--lh-lights-end) - 76px)); }
 }
 .v4 .ksearch .finput:focus ~ .kbd { opacity: 0; }
 .v4 .ksearch .kbd { transition: opacity var(--dur-1); }

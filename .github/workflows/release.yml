@@ -146,6 +146,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npx electron-builder ${{ matrix.builder_args }} --publish always
+      # The curl | sh entry point (owner ruling 2026-10-27) rides beside the zip.
+      - name: install.sh → draft
+        if: github.event_name == 'push' && runner.os == 'macOS'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$GITHUB_REF_NAME" scripts/install.sh --clobber
       - name: Windows/Linux release → draft
         if: github.event_name == 'push' && runner.os != 'macOS'
         env:
@@ -199,7 +205,6 @@ jobs:
           retention-days: 7
           if-no-files-found: error
           path: |
-            dist/*.dmg
             dist/*.zip
             dist/*.exe
             dist/*.AppImage
@@ -209,8 +214,8 @@ jobs:
 
   # The last gate before a human publishes: after ALL three packaging jobs
   # have uploaded, fail the run unless the tag's single draft release holds
-  # exactly the 11 verified assets (4 installers + mac updater ZIP + their
-  # blockmaps + 3 latest*.yml feeds) and the feeds reference those uploads
+  # exactly the 10 verified assets (mac ZIP + install.sh, 3 installers, the
+  # zip/exe blockmaps, 3 latest*.yml feeds) and the feeds reference those uploads
   # by exact name at the package.json version. Read-only: it never creates,
   # edits, publishes, or deletes anything. Manual rehearsals upload nothing,
   # so there is no draft to verify and the job stays skipped.

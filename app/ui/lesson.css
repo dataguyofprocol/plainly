@@ -343,6 +343,20 @@
 	.v4 .lshell > .rail .tip { display: none; }
 	.v4 .lshell > .rail .fly { position: fixed; left: 12px; right: 12px; top: 60px; width: auto; max-height: calc(100vh - 72px); }
 	.v4 .center { height: calc(100vh - 56px); }
+	/* macOS: the flat rail holds the title bar (app/ui/shell.css). */
+	.lh-electron[data-lh-platform="darwin"] .v4 .lshell > .rail { padding-top: calc(var(--lh-bar) + 8px); }
+	.lh-electron[data-lh-platform="darwin"] .v4 .lshell > .rail .fly { top: calc(var(--lh-bar) + 60px); max-height: calc(100vh - var(--lh-bar) - 72px); }
+	.lh-electron[data-lh-platform="darwin"] .v4 .center { height: calc(100vh - 56px - var(--lh-bar)); }
+}
+/* macOS title bar (app/globals.css --lh-bar): the header IS the bar — its
+   title starts past the lights — and the dock starts below it. */
+@media (min-width: 800px) {
+	.lh-electron[data-lh-platform="darwin"] .v4 .top { height: var(--lh-bar); padding-left: max(24px, calc(var(--lh-lights-end) - 52px)); }
+}
+@media (min-width: 1024px) {
+	.lh-electron[data-lh-platform="darwin"] .v4 .dock { padding-top: calc(var(--lh-bar) + 10px); }
+	.lh-electron[data-lh-platform="darwin"] .v4 .dockin { max-height: calc(100vh - 20px - var(--lh-bar)); }
+	.lh-electron[data-lh-platform="darwin"] .v4 .ls-resize { top: calc(var(--lh-bar) + 12px); }
 }
 @media (max-width: 760px) {
 	.v4 .scroll { padding: 4px 16px 16px; }

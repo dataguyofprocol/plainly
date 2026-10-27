@@ -24,23 +24,20 @@
  *     would shadow every settings-page key change until restart.
  */
 
-const { app, BrowserWindow, Menu, ipcMain, nativeTheme, session, shell, dialog } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, nativeTheme, net: electronNet, session, shell, dialog } = require("electron");
 const { createChatGPT, fileStore } = require("./chatgpt.cjs");
 const { attachChatGPTChild, trustedSender, chatGPTControl } = require("./chatgpt-ipc.cjs");
 const { createSubscriptions, loadSubscriptionSDK } = require("./subscriptions.cjs");
 const { attachSubscriptionChild, subscriptionControl } = require("./subscription-ipc.cjs");
 const { desktopAPIHeaders } = require("./desktop-api.cjs");
 const { migrateUserData } = require("./migrate-data.cjs");
+const { createMacUpdater, feedBaseFromAppUpdate, bundleOf } = require("./mac-updater.cjs");
 const { randomBytes } = require("node:crypto");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
-
-// Mirrors SIDEBAR_AUTOCLOSE in components/sidebar.tsx — keep in sync (the
-// renderer owns the number; this is the IPC widen target).
-const SIDEBAR_AUTOCLOSE = 880;
 
 const PRODUCT_NAME = "Plainly";
 
@@ -342,17 +339,17 @@ function createWindow(url) {
 		width: 1440,
 		height: 900,
 		title: PRODUCT_NAME,
-		// Merged chrome (owner, 2026-09-17): the system title bar is gone;
-		// the app's own 60px header bands ARE the title bar. The traffic
-		// lights float over the sidebar's LH wordmark band, vertically
-		// Aligned to the PHASE PILL's drawn box, not the band's geometric
-		// center (owner ask, 2026-09-17): macOS centers each 12px circle at
-		// y+6.75, and the pill box center measures 29.25 in the running app
-		// (band 0–59.5, pill box 19–39.5) — y 22.5 lands the circles at
-		// 29.25, exactly on the pill. Wordmark gutter: components/sidebar.tsx.
+		// Merged chrome (owner, 2026-09-17): the system title bar is gone.
+		// macOS title bar (owner, 2026-10-27): the renderer reserves a
+		// full-width 52pt bar (--lh-bar, app/globals.css) above the sidebar
+		// card, the rail and the dock; the page title (Lesson/Practice,
+		// Knowledge) sits in it past the lights, Home's is empty. The lights
+		// never move — same spot on every screen and at every zoom — and are
+		// centered on the bar: macOS centers each circle at y+6.75, so
+		// y 19.25 lands them at 26, half of 52.
 		// Dragging comes from the renderer's .lh-drag bands (app/globals.css).
 		...(process.platform === "darwin"
-			? { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 16, y: 22.5 } }
+			? { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 16, y: 19.25 } }
 			: {
 				titleBarStyle: "hidden",
 				// Native min/max/close on the right, at the OS's compact default
@@ -379,11 +376,9 @@ function createWindow(url) {
 		backgroundColor: themeChrome().background,
 		show: false,
 		// Narrow-window behavior (owner, 2026-09-17; v4 rail 2026-10-26): the
-		// PAGE's floor is 640px, and the 72px rail is always beside it, so
-		// the window floor is 712. The expanded sidebar (240) collapses to
-		// the rail below 880 = 640 + 240 in the renderer
-		// (components/sidebar.tsx, SIDEBAR_AUTOCLOSE); its "lh:expand-window"
-		// IPC widens the window back to that threshold.
+		// window floor is 712. The renderer swaps the sidebar card for the
+		// rail below 1100 CSS px and lays the rail flat along the top below
+		// 800 (app/ui/shell.css) — CSS alone, no window resizing.
 		minWidth: 712,
 		minHeight: 600,
 	});
@@ -452,23 +447,24 @@ function createWindow(url) {
  * setZoomFactor, and broadcast to the renderer ("lh:zoom" — it publishes
  * --lh-zoom so gutter lengths can divide by it and stay PHYSICAL-
  * constant). The traffic lights themselves stay at their construction
- * position ({x:16, y:22.5} — Electron 44 has NO runtime setter, only
- * the BrowserWindow option), which is HIG-correct anyway: native lights
- * hug the window corner while the web chrome compensates around them.
- * Vertical note: at large factors the taller bands' content centers
- * drift below the fixed lights — accepted (the alternative, moving the
- * lights, is impossible without rebuilding the window). */
+ * position ({x:16, y:19.25}), which is HIG-correct: native lights hug
+ * the window corner while the web chrome compensates around them (the
+ * title bar's height divides by the factor). Electron does have
+ * setWindowButtonPosition; the owner chose fixed lights (2026-10-27).
+ * Vertical note: zoomed past ~1.4 the bar stops shrinking (it must fit
+ * its content), so its content centers drift below the lights — accepted. */
 const ZOOM_LADDER = [0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 
 /* ── Auto-update (Wave C, owner 2026-10-10: silent download + restart ─────
  * banner; checks at startup + every 24h) ─────────────────────────────────
  *
  * Feed: GitHub Releases (electron-builder.yml publish → app-update.yml,
- * baked + signed into the bundle). macOS needs the app signed (it is —
- * Developer ID) and updates ride the zip target (Squirrel.Mac); blockmaps
- * give differential downloads for free. Windows uses NSIS; Linux uses
- * AppImage or DebUpdater (6.8.9 supports deb; installation can request
- * administrator permission via the package manager — owner 2026-10-11).
+ * baked into the bundle). macOS (Plainly fork, owner 2026-10-27): the app
+ * is ad-hoc signed, which Squirrel.Mac rejects, so electron/mac-updater.cjs
+ * downloads the zip, verifies it, and swaps the .app after quit. Windows
+ * uses NSIS; Linux uses AppImage or DebUpdater (6.8.9 supports deb;
+ * installation can request administrator permission via the package
+ * manager — owner 2026-10-11).
  *
  * Hard rules:
  *  - DEV NEVER UPDATES: !app.isPackaged skips the updater entirely — the
@@ -481,14 +477,16 @@ const ZOOM_LADDER = [0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
  *    latest-mac.yml + zip + blockmap from any localhost HTTP dir and
  *    watch a real installed copy find/download/restart). Test-only seam.
  *
- * Install path: the downloaded update applies on quit (autoInstallOnAppQuit
- * — Squirrel.Mac stages natively and swaps on relaunch). The renderer
- * banner asks for an immediate restart via "lh:update-install"; we kill
- * the child server FIRST — deterministic ordering: the server lives
- * inside the .app bundle Squirrel is about to replace (extraResources),
- * and before-quit alone would race the swap. */
+ * Install path: the downloaded update applies on quit (autoInstallOnAppQuit;
+ * on macOS the will-quit hook hands the staged bundle to the swap helper).
+ * The renderer banner asks for an immediate restart via "lh:update-install";
+ * we kill the child server FIRST — deterministic ordering: the server lives
+ * inside the .app bundle about to be replaced (extraResources), and
+ * before-quit alone would race the swap. */
 const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
-let autoUpdater = null; // electron-updater's, packaged builds only
+let autoUpdater = null; // electron-updater's (Windows/Linux), packaged builds only
+let macUpdater = null; // mac-updater.cjs (macOS), packaged builds only
+let relaunchAfterUpdate = false; // set by the banner's Restart, read at will-quit
 
 function broadcastUpdateStatus(status) {
 	for (const win of BrowserWindow.getAllWindows()) {
@@ -501,6 +499,19 @@ function broadcastUpdateStatus(status) {
 }
 
 function checkForUpdates({ manual = false } = {}) {
+	if (macUpdater) {
+		macUpdater
+			.check()
+			.then((version) => {
+				// Same contract as below: the banner fires once the download is staged.
+				if (manual && !version) dialog.showMessageBox({ type: "info", message: "You're up to date.", detail: `Plainly ${app.getVersion()} is the latest version.` });
+			})
+			.catch((err) => {
+				log(`update check failed: ${err?.message ?? err}`);
+				if (manual) dialog.showMessageBox({ type: "warning", message: "Couldn't check for updates.", detail: String(err?.message ?? err) });
+			});
+		return;
+	}
 	if (!autoUpdater) return;
 	autoUpdater
 		.checkForUpdates()
@@ -524,12 +535,67 @@ function installUpdateNow() {
 	} catch {
 		/* already dead */
 	}
+	if (macUpdater) {
+		relaunchAfterUpdate = true;
+		app.quit();
+		return;
+	}
 	autoUpdater?.quitAndInstall();
+}
+
+function setupMacUpdater() {
+	const appBundle = bundleOf(process.execPath);
+	// A translocated copy (opened from a quarantined download) is read-only,
+	// and a folder this user can't write to can't take the swap.
+	if (appBundle.includes("/AppTranslocation/")) {
+		log("auto-update: app is translocated — updates disabled");
+		return;
+	}
+	try {
+		fs.accessSync(path.dirname(appBundle), fs.constants.W_OK);
+	} catch {
+		log(`auto-update: ${path.dirname(appBundle)} is not writable — updates disabled`);
+		return;
+	}
+	const feed = process.env.LH_UPDATE_FEED;
+	const feedBase = feed
+		? feed.replace(/\/?$/, "/")
+		: feedBaseFromAppUpdate(fs.readFileSync(path.join(process.resourcesPath, "app-update.yml"), "utf8"));
+	if (feed) log(`auto-update: LH_UPDATE_FEED override → ${feedBase}`);
+	macUpdater = createMacUpdater({
+		currentVersion: app.getVersion(),
+		bundleId: "app.plainly.Plainly", // electron-builder.yml appId
+		appBundle,
+		feedBase,
+		workDir: path.join(app.getPath("userData"), "updates"),
+		fetch: (url) => electronNet.fetch(url),
+		log: (m) => log(`updater: ${m}`),
+		onStaged: (version) => {
+			log(`update downloaded: ${version} — banner shown`);
+			broadcastUpdateStatus({ status: "downloaded", version });
+		},
+	});
+	app.on("will-quit", () => {
+		try {
+			macUpdater.applyOnExit({ relaunch: relaunchAfterUpdate });
+		} catch (err) {
+			log(`update swap failed to start: ${err?.message ?? err}`);
+		}
+	});
 }
 
 function setupAutoUpdater() {
 	if (!app.isPackaged) {
 		log("auto-update: dev build — updater disabled");
+		return;
+	}
+	if (process.platform === "darwin") {
+		try {
+			setupMacUpdater();
+		} catch (err) {
+			macUpdater = null;
+			log(`auto-update: mac updater unavailable (${err?.message ?? err}) — updates disabled`);
+		}
 		return;
 	}
 	try {
@@ -725,29 +791,17 @@ async function main() {
 	setupAutoUpdater();
 	ipcMain.on("lh:update-install", () => installUpdateNow());
 
-	// Sidebar-at-narrow-window (owner, 2026-09-17): the renderer auto-closes
-	// the sidebar below SIDEBAR_AUTOCLOSE (880px); opening it again at that
-	// width asks the window to widen instead — the layout never has to
-	// accommodate a narrow window + open sidebar. Top-left stays fixed, the
-	// window grows right. No-op when already wide.
 	// The renderer's first paint can race did-finish-load — it asks for
 	// the current factor itself (mirrors "lh:zoom" pushes).
 	ipcMain.handle("lh:zoom:get", (event) => BrowserWindow.fromWebContents(event.sender)?.webContents.getZoomFactor() ?? 1);
-	ipcMain.on("lh:expand-window", (event) => {
-		const win = BrowserWindow.fromWebContents(event.sender);
-		if (!win) return;
-		const { x, y, width, height } = win.getBounds();
-		const target = SIDEBAR_AUTOCLOSE;
-		if (width < target) win.setBounds({ x, y, width: target, height });
-	});
 	app.on("activate", () => {
 		if (BrowserWindow.getAllWindows().length === 0) { chatgpt?.resume(); subscriptions?.resume(); createWindow(url); }
 	});
 	createWindow(url);
 	log(`window open: ${url}`);
 	// First update check AFTER the window exists (the downloaded-banner
-	// push needs a listener); dev builds no-op (no autoUpdater).
-	if (autoUpdater) {
+	// push needs a listener); dev builds no-op (no updater).
+	if (autoUpdater || macUpdater) {
 		checkForUpdates();
 		setInterval(() => checkForUpdates(), UPDATE_CHECK_INTERVAL_MS);
 	}

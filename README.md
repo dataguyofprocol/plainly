@@ -9,7 +9,7 @@
 <p align="center"><strong>An agent harness for learning.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/dataguyofprocol/plainly/releases">Download</a> ·
+  <a href="#get-started">Install</a> ·
   <a href="#how-a-lesson-works">How it works</a> ·
   <a href="#new-in-010">What's new</a> ·
   <a href="docs/development.md">Documentation</a> ·
@@ -59,9 +59,15 @@ Future lessons read this graph instead of starting from scratch. It holds ideas 
 
 ## Get started
 
-**[Download for macOS (Apple Silicon)](https://github.com/dataguyofprocol/plainly/releases)**
+On a Mac with Apple Silicon, paste this into Terminal:
 
-Drag it to Applications. The app isn't signed with an Apple Developer ID yet, so the first time, right-click it and choose Open. That's also why updates aren't automatic for now: grab new versions from Releases.
+```sh
+curl -fsSL https://github.com/dataguyofprocol/plainly/releases/latest/download/install.sh | sh
+```
+
+It installs Plainly in Applications and opens it. Plainly then updates itself: new versions download in the background and install when you restart. Plainly isn't signed with an Apple Developer ID yet, and macOS blocks unsigned apps downloaded in a browser, which is why there's no download link. The [script](scripts/install.sh) is short if you want to read it first.
+
+To uninstall, delete Plainly from Applications. Your data stays in `~/Library/Application Support/Plainly` until you delete that too.
 
 Windows and Linux builds are coming. Until then, [run from source](#development).
 

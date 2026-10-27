@@ -108,6 +108,8 @@ export function SidebarCard({
 	const here = placeOf(pathname);
 	return (
 		<>
+			{/* macOS title bar's drag band (app/ui/shell.css .titlebar). */}
+			<div className="titlebar lh-drag" aria-hidden="true" />
 			<aside className="side" aria-label="Navigation">
 				<div className="sidein glass">
 					<div className="side-brand lh-drag">
@@ -428,7 +430,13 @@ function RenameRow({ chat, onCommit, onCancel }: { chat: V4Chat; onCommit: (t: s
 /** The rail of Lesson and Practice. */
 export function Rail({ active }: { active?: Place }) {
 	const chats = useChats();
-	return <RailNav chats={chats} active={active} />;
+	return (
+		<>
+			{/* macOS title bar's drag band (app/ui/shell.css .titlebar). */}
+			<div className="titlebar lh-drag" aria-hidden="true" />
+			<RailNav chats={chats} active={active} />
+		</>
+	);
 }
 
 /** One rail item's tooltip (a real element, so it can carry a key hint). */

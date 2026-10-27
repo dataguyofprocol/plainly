@@ -40,10 +40,10 @@ function windowOptions(platform: string, dark = false) {
 }
 
 describe("desktop window chrome", () => {
-	it("macOS keeps the proven traffic lights and does not enable WCO", () => {
+	it("macOS centers the fixed traffic lights on the 52pt title bar and does not enable WCO", () => {
 		const options = windowOptions("darwin");
 		assert.equal(options.titleBarStyle, "hiddenInset");
-		assert.deepEqual(options.trafficLightPosition, { x: 16, y: 22.5 });
+		assert.deepEqual(options.trafficLightPosition, { x: 16, y: 19.25 });
 		assert.equal(options.titleBarOverlay, undefined);
 		assert.equal(options.autoHideMenuBar, undefined);
 	});
@@ -85,7 +85,7 @@ describe("desktop window chrome", () => {
 		runInNewContext(readFileSync(new URL("../electron/preload.cjs", import.meta.url), "utf8"), context);
 		assert.equal(bridge.platform, "win32");
 		assert.deepEqual(Object.keys(bridge).sort(), [
-			"chatgpt", "expandWindow", "getZoom", "installUpdate", "onUpdateStatus", "onZoom", "platform", "setTheme", "subscriptions",
+			"chatgpt", "getZoom", "installUpdate", "onUpdateStatus", "onZoom", "platform", "setTheme", "subscriptions",
 		]);
 		assert.deepEqual(Object.keys(bridge.subscriptions as object).sort(), ["cancel", "consent", "disconnect", "login", "onChange", "open", "respond", "retry", "status"]);
 	});
@@ -101,9 +101,8 @@ describe("desktop packaging policy", () => {
 	});
 
 	it("ships Mac arm64, Windows NSIS x64, and both Linux x64 channels", () => {
-		assert.deepEqual(config.mac.target, [
-			{ target: "dmg", arch: ["arm64"] }, { target: "zip", arch: ["arm64"] },
-		]);
+		// zip only: install.sh and the in-app updater both install from it.
+		assert.deepEqual(config.mac.target, [{ target: "zip", arch: ["arm64"] }]);
 		assert.deepEqual(config.win.target, [{ target: "nsis", arch: ["x64"] }]);
 		assert.equal(config.win.signExecutable, false);
 		assert.equal(config.win.verifyUpdateCodeSignature, false);

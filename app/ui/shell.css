@@ -117,11 +117,17 @@
 .v4 .fly-foot { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
 .v4 .fly .ghost { width: 100%; }
 
-/* Electron (merged chrome): clear the macOS traffic lights. */
-.v4 .rail-lights { display: none; }
-.lh-electron[data-lh-platform="darwin"] .v4 .side-brand { padding-left: calc(60px / var(--lh-zoom)); }
-.lh-electron[data-lh-platform="darwin"] .v4 .rail-lights { display: block; width: 100%; height: calc(28px / var(--lh-zoom)); flex: none; }
-.lh-electron[data-lh-platform="darwin"] .v4 .rail .fly { top: calc(40px / var(--lh-zoom)); }
+/* Electron on macOS: the title bar (--lh-bar, app/globals.css). The
+   .titlebar band is the window-drag surface across the top (first in the
+   DOM, so later carve-outs subtract from it); the card, the main column
+   and the rail start below it. */
+.v4 .titlebar, .v4 .rail-lights { display: none; }
+.lh-electron[data-lh-platform="darwin"] .v4 .titlebar { display: block; position: absolute; top: 0; left: 0; right: 0; height: var(--lh-bar); }
+.lh-electron[data-lh-platform="darwin"] .v4 .side { padding-top: var(--lh-bar); }
+.lh-electron[data-lh-platform="darwin"] .v4 .main { padding-top: calc(24px + var(--lh-bar)); }
+.lh-electron[data-lh-platform="darwin"] .v4 .rail { padding-top: 0; }
+.lh-electron[data-lh-platform="darwin"] .v4 .rail-lights { display: block; width: 100%; height: var(--lh-bar); margin-bottom: 8px; flex: none; }
+.lh-electron[data-lh-platform="darwin"] .v4 .rail .fly { top: calc(var(--lh-bar) + 12px); max-height: calc(100vh - var(--lh-bar) - 24px); }
 
 /* ── Responsive ────────────────────────────────────────────────────── */
 @media (max-width: 1099px) {
@@ -140,6 +146,12 @@
 	.v4 .side-rail .tip { display: none; }
 	.v4 .side-rail .fly { position: fixed; left: 12px; right: 12px; top: 60px; width: auto; max-height: calc(100vh - 72px); }
 	.v4 .main { padding: 16px; }
+	/* macOS: the flat rail's own band grows to hold the title bar; the
+	   lights band leaves the row (it would take the row's full width). */
+	.lh-electron[data-lh-platform="darwin"] .v4 .side-rail { padding-top: calc(var(--lh-bar) + 8px); }
+	.lh-electron[data-lh-platform="darwin"] .v4 .rail-lights { position: absolute; top: 0; left: 0; right: 0; width: auto; margin: 0; }
+	.lh-electron[data-lh-platform="darwin"] .v4 .side-rail .fly { top: calc(var(--lh-bar) + 60px); max-height: calc(100vh - var(--lh-bar) - 72px); }
+	.lh-electron[data-lh-platform="darwin"] .v4 .main { padding-top: 16px; }
 }
 
 /* New lesson / New practice: two action rows under the places, set off by

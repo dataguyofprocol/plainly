@@ -466,7 +466,7 @@ The renderer gets projected status, public device user codes, prompts and contro
 
 - Two portless settings adapters re-exported through the server barrel; `observability.ts` imports `chatStore` directly. The "only `stores.ts` imports adapters" rule is documentation-only.
 - `scripts/` and `electron/` are lint-exempt; scripts act as extra composition roots (and backfills are, by design, extra graph writers); `tests/` imports freely across layers.
-- Small conventional-only sync points: `SIDEBAR_AUTOCLOSE` mirrored in `electron/main.cjs` ↔ `components/sidebar.tsx`; IPC channel names mirrored by comment; the jobs dir path hardcoded in the adapter rather than `config.ts`.
+- Small conventional-only sync points: IPC channel names mirrored by comment; the jobs dir path hardcoded in the adapter rather than `config.ts`.
 
 ---
 

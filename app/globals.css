@@ -680,20 +680,20 @@ body {
 /* ─────────────────────────────────────────────────────────────────────────
    Electron merged chrome (owner, 2026-09-17). The system title bar is
    hidden (macOS hiddenInset; Windows/Linux hidden + native controls
-   overlay in electron/main.cjs); the app's 60px bands are the drag surface.
+   overlay in electron/main.cjs); the app's header bands are the drag
+   surface (the Lesson/Knowledge headers, the card's brand row, and on
+   macOS the full-width title bar).
    Everything here is inert in the plain browser — it keys off <html class="lh-electron">, which
-   SidebarProvider sets after mount when it detects the Electron shell.
+   ShellProvider (components/sidebar.tsx) sets after mount when it detects the Electron shell.
 
-   - .lh-drag        window-drag region — on a dedicated mask div in
-                       home.tsx placed FIRST in the page DOM (the mask
-                       resolves by DOM order, not z-index: no-drag subtracts
-                       only regions added earlier in the tree)
+   - .lh-drag        window-drag region. Drag regions resolve by DOM order,
+                       not z-index: no-drag subtracts only regions added
+                       earlier in the tree, so the macOS .titlebar band
+                       (components/v4/shell.tsx) comes FIRST in each screen
    - .lh-no-drag     carve-out for interactive elements inside a drag band
                        (native interactive elements carve out AUTOMATICALLY —
                        see the auto carve-out rule below; manual use is for
                        clickable non-natives only)
-   - .lh-lights-gutter  the sidebar LH band's traffic-light gutter: lights
-                       end at x≈68, the wordmark starts at 80px (5rem)
    ───────────────────────────────────────────────────────────────────────── */
 .lh-electron .lh-drag {
 	-webkit-app-region: drag;
@@ -712,19 +712,24 @@ body {
 .lh-electron .lh-drag :is(button, input, textarea, select, a, summary, [contenteditable]) {
 	-webkit-app-region: no-drag;
 }
-/* 92px = measured lights' right edge (~75pt) + the lights' own 16px
-   inset from the window edge — comfortable, symmetric air (owner).
-   PHYSICAL-CONSTANT under zoom (owner round 7, 2026-10-05): ⌘±/⌘0 scale
+/* PHYSICAL-CONSTANT under zoom (owner round 7, 2026-10-05): ⌘±/⌘0 scale
    every CSS px by the zoomFactor while the native lights never move —
-   so these lengths DIVIDE by --lh-zoom (published by the renderer from
-   the lh:zoom IPC) to render at the same physical size at every zoom.
-   The graph button stays glued next to the lights zoomed in; nothing
-   slides under them zoomed out. Default 1 until the first push lands. */
+   so lengths measured against the lights DIVIDE by --lh-zoom (published
+   by the renderer from the lh:zoom IPC) to render at the same physical
+   size at every zoom. Default 1 until the first push lands. */
 .lh-electron {
 	--lh-zoom: 1;
 }
-.lh-electron[data-lh-platform="darwin"] .lh-lights-gutter {
-	padding-left: calc(92px / var(--lh-zoom));
+/* THE macOS TITLE BAR (owner, 2026-10-27): a full-width band the lights
+   sit in (electron/main.cjs centers them at y 26). The sidebar card, the
+   rail and the dock start below it; the page title sits in it.
+   --lh-bar       52pt physical, floored at 36px so the title still fits
+                  zoomed in (then the lights ride a little above center)
+   --lh-lights-end  where content may start: the green light's right edge
+                  (~75pt) + 16pt of air */
+.lh-electron[data-lh-platform="darwin"] {
+	--lh-bar: max(calc(52px / var(--lh-zoom)), 36px);
+	--lh-lights-end: calc(91px / var(--lh-zoom));
 }
 
 /* Windows/Linux Window Controls Overlay: Chromium publishes the usable
