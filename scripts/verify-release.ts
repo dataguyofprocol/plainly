@@ -12,13 +12,14 @@
  * builder (app-builder-lib 26.15.3) — these are the artifacts it actually
  * emits for this repo's electron-builder.yml, not pattern guesses:
  *
- *   mac (dmg + zip, arm64; no user artifactName there):
- *     dmg    Plainly-<v>-arm64.dmg       + .blockmap (createBlockmap)
+ *   mac (zip only, arm64; no user artifactName there — the DMG was
+ *        dropped 2026-10-27, owner ruling):
  *     zip    Plainly-<v>-arm64-mac.zip   + .blockmap (createBlockmap;
- *            Squirrel.Mac updates from the ZIP — it IS the updater payload)
- *     feed   latest-mac.yml — files[0] is the ZIP (writeUpdateInfoFiles
- *            sorts zip first) and the legacy top-level path/sha512 point
- *            at it.
+ *            install.sh and electron/mac-updater.cjs both install from it)
+ *     script install.sh — scripts/install.sh, uploaded beside the zip
+ *            (the curl | sh entry point; not a builder output)
+ *     feed   latest-mac.yml — files[0] is the ZIP and the legacy top-level
+ *            path/sha512 point at it.
  *   win (nsis x64; artifactName "${productName}-${version}-${arch}-setup.${ext}"):
  *     exe    Plainly-<v>-x64-setup.exe   + .blockmap (createBlockmap)
  *     feed   latest.yml — a single file entry, the exe.
@@ -87,10 +88,10 @@ export type DraftSelection =
 	| { ok: true; release: ReleaseRecord; warnings: string[] }
 	| Failures;
 
-/** The full expected asset inventory for one version (11 files). */
+/** The full expected asset inventory for one version (10 files). */
 export type ExpectedAssets = {
 	version: string;
-	mac: { dmg: string; zip: string; feed: string };
+	mac: { zip: string; installer: string; feed: string };
 	win: { exe: string; feed: string };
 	linux: { appImage: string; deb: string; feed: string };
 	/** Every asset name the draft must hold, and no others. */
@@ -119,8 +120,8 @@ export function checkVersion(version: unknown): { ok: true; version: string } | 
 /** The exact asset set the installed builder emits for this repo's config. */
 export function expectedAssets(version: string): ExpectedAssets {
 	const mac = {
-		dmg: `${PRODUCT_NAME}-${version}-arm64.dmg`,
 		zip: `${PRODUCT_NAME}-${version}-arm64-mac.zip`,
+		installer: "install.sh",
 		feed: "latest-mac.yml",
 	};
 	const win = {
@@ -132,15 +133,15 @@ export function expectedAssets(version: string): ExpectedAssets {
 		deb: `${PRODUCT_NAME}-${version}-amd64.deb`,
 		feed: "latest-linux.yml",
 	};
-	// Sidecar differential-update blockmaps: emitted for dmg, mac zip and
+	// Sidecar differential-update blockmaps: emitted for the mac zip and
 	// NSIS exe (createBlockmap); AppImage/deb have none in app-builder-lib 26.15.3.
-	const blockmaps = [mac.dmg, mac.zip, win.exe].map((name) => `${name}.blockmap`);
+	const blockmaps = [mac.zip, win.exe].map((name) => `${name}.blockmap`);
 	return {
 		version,
 		mac,
 		win,
 		linux,
-		files: [mac.dmg, mac.zip, win.exe, linux.appImage, linux.deb, ...blockmaps, mac.feed, win.feed, linux.feed],
+		files: [mac.zip, mac.installer, win.exe, linux.appImage, linux.deb, ...blockmaps, mac.feed, win.feed, linux.feed],
 	};
 }
 
@@ -270,7 +271,7 @@ export function verifyConfigAssumptions(config: unknown, pkg: unknown): { ok: tr
 	if (!isPlainObject(config.mac)) bad("mac section missing");
 	else {
 		if (config.mac.artifactName != null) bad("mac.artifactName set — expected names no longer hold");
-		if (!sameTargets(config.mac.target, [{ target: "dmg", arch: ["arm64"] }, { target: "zip", arch: ["arm64"] }])) {
+		if (!sameTargets(config.mac.target, [{ target: "zip", arch: ["arm64"] }])) {
 			bad(`mac.target changed (${JSON.stringify(config.mac.target)}) — expected names no longer hold`);
 		}
 	}
@@ -341,7 +342,7 @@ type FeedExpectation = {
 
 export function feedExpectations(expected: ExpectedAssets): FeedExpectation[] {
 	return [
-		{ file: expected.mac.feed, urls: [expected.mac.zip, expected.mac.dmg], first: expected.mac.zip },
+		{ file: expected.mac.feed, urls: [expected.mac.zip], first: expected.mac.zip },
 		{ file: expected.win.feed, urls: [expected.win.exe] },
 		{ file: expected.linux.feed, urls: [expected.linux.appImage, expected.linux.deb] },
 	];

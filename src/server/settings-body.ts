@@ -75,17 +75,11 @@ function asRecord(body: unknown): Record<string, unknown> | null {
 	return body as Record<string, unknown>;
 }
 
-/** general: { autoUpdate?: boolean, dailyGoalMinutes?: integer 5..240 } */
+/** general: { dailyGoalMinutes?: integer 5..240 } */
 export function parseGeneralSettingsBody(body: unknown): SettingsBodyResult<GeneralSettings> {
 	const raw = asRecord(body);
 	if (!raw) return { ok: false, error: "Invalid JSON body" };
 	const settings: GeneralSettings = {};
-	if (raw.autoUpdate !== undefined) {
-		if (typeof raw.autoUpdate !== "boolean") {
-			return { ok: false, error: "autoUpdate must be a boolean" };
-		}
-		settings.autoUpdate = raw.autoUpdate;
-	}
 	if (raw.dailyGoalMinutes !== undefined) {
 		const goal = raw.dailyGoalMinutes;
 		if (typeof goal !== "number" || !Number.isInteger(goal) || goal < DAILY_GOAL_MIN || goal > DAILY_GOAL_MAX) {

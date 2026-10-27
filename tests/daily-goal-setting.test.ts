@@ -29,9 +29,9 @@ describe("general.dailyGoalMinutes", () => {
 	});
 
 	it("the PUT parser is strict: integer in range or 400", () => {
-		const ok = parseGeneralSettingsBody({ dailyGoalMinutes: 60, autoUpdate: false });
+		const ok = parseGeneralSettingsBody({ dailyGoalMinutes: 60 });
 		assert.ok(ok.ok);
-		assert.deepEqual(ok.settings, { autoUpdate: false, dailyGoalMinutes: 60 });
+		assert.deepEqual(ok.settings, { dailyGoalMinutes: 60 });
 		for (const bad of [4, 241, 30.5, "30", null]) {
 			assert.equal(parseGeneralSettingsBody({ dailyGoalMinutes: bad }).ok, false, String(bad));
 		}

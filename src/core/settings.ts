@@ -232,8 +232,6 @@ export const ROLE_SLOT: Readonly<Record<ModelRole, ModelSlotName>> = {
 /** General settings — app-level behavior. Version DISPLAY and plans login
  *  live outside the record (package.json / auth.json) by owner decision. */
 export interface GeneralSettings {
-	/** Auto-update the app (default ON). Mechanism ships in a later wave. */
-	autoUpdate?: boolean;
 	/** The daily active-learning goal in minutes (v4 redesign, owner
 	 *  2026-10-26): the home's week strip marks a day met at >= this.
 	 *  Integer DAILY_GOAL_MIN..DAILY_GOAL_MAX, factory 30. */
@@ -415,7 +413,7 @@ export interface FactorySettings {
 
 export const FACTORY_SETTINGS: FactorySettings = {
 	version: CURRENT_SETTINGS_VERSION,
-	general: { autoUpdate: true, dailyGoalMinutes: 30 },
+	general: { dailyGoalMinutes: 30 },
 	appearance: {
 		// Theme follows the OS until the user picks (owner, 2026-10-27).
 		// `background` and the emphasis inks are dark-era fields: they stay
@@ -468,8 +466,6 @@ export const DAILY_GOAL_MAX = 240;
 
 function sanitizeGeneral(raw: Record<string, unknown>): GeneralSettings {
 	const out: GeneralSettings = {};
-	const autoUpdate = boolOrDrop(raw.autoUpdate);
-	if (autoUpdate !== undefined) out.autoUpdate = autoUpdate;
 	// clamp-never-reject (the sanitizer's discipline): a finite number
 	// rounds and clamps into range; anything else drops to the factory 30.
 	if (typeof raw.dailyGoalMinutes === "number" && Number.isFinite(raw.dailyGoalMinutes)) {
