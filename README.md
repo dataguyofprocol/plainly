@@ -60,18 +60,17 @@ Select an idea to light its chain and see what it rests on and what it leads to.
 **[Download from GitHub Releases](https://github.com/dataguyofprocol/plainly/releases)**
 
 - **macOS (Apple Silicon):** DMG. Drag the app to Applications. The app is not yet signed with an Apple Developer ID, so the first time, right-click it and choose **Open**.
-- **Windows (x64):** run the installer. It is currently unsigned; Windows may show an “unknown publisher” or SmartScreen warning.
-- **Linux (x64):** make the AppImage executable and open it, or install the Debian/Ubuntu `.deb`.
+- **Windows and Linux:** builds are coming; for now, run from source (see [Development](#development-and-support)).
 
 On first launch, connect a provider: OpenAI, OpenRouter, Anthropic, DeepSeek, Z.AI, or any OpenAI-compatible endpoint (Ollama, vLLM, and similar), with 30+ options in all. Then choose your models and start a session with what you want to understand. Optional dictation and web search use separate service keys.
 
-Windows and Linux update in-app. On macOS, in-app updates need a Developer ID signature, so for now download new versions from Releases.
+In-app updates on macOS need a Developer ID signature, so for now download new versions from Releases.
 
 ## What's new in 0.1.0
 
 Plainly 0.1.0 is the first release under the new name. Compared with LearnHarness 0.3.7, it adds:
 
-- **A new interface.** A calmer, redesigned look throughout, with a grouped sidebar that folds to a rail, and ⌘K to start or find anything.
+- **A new interface.** A calmer, redesigned look throughout, in light and dark (follows your system or set it in Settings), with a grouped sidebar that folds to a rail, and ⌘K to start or find anything.
 - **Home.** One composer for Learn and Practice, what is waiting on you, and a weekly progress strip with a goal.
 - **Lessons with a side panel.** The open question, the plan (Path), and background helpers sit beside the text instead of under it.
 - **Four-level confidence.** "How sure?" is guessing, unsure, fairly sure, or certain.

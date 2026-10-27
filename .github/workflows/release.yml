@@ -1,8 +1,11 @@
 name: Desktop release
 
 on:
-  push:
-    tags: ["v*"]
+  # Plainly fork (owner ruling 2026-10-27): releases are built locally,
+  # macOS only, so a v* tag must not start this workflow. Restore the
+  # tag trigger below when Windows/Linux release through CI again:
+  #   push:
+  #     tags: ["v*"]
   # Manual runs are artifact-only, unsigned, and NEVER create a release.
   # Use this for the first Windows/Linux dress rehearsal without secrets.
   workflow_dispatch:

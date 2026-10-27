@@ -46,6 +46,8 @@ npx electron-builder --linux --x64 --publish never
 - Typecheck, full deterministic test suite, and lint on Ubuntu.
 - Native renderer tests plus standalone build/boot-smoke on macOS (`macos-15`), Windows, and Linux. This macOS job does not compile the Icon Composer asset; only release packaging needs the newer runner.
 
+**Plainly fork (2026-10-27): releases are local and macOS-only for now.** The `v*` tag trigger in `release.yml` is commented out, so only the manual mode below runs. A release is `npm run desktop:dist` on an Apple Silicon Mac, then the DMG, ZIP, their blockmaps and `latest-mac.yml` uploaded to a draft GitHub Release with `gh`. Restore the tag trigger when Windows/Linux release through CI again.
+
 `.github/workflows/release.yml` has two deliberately separate modes:
 
 - **Manual / Run workflow:** unsigned rehearsal installers saved as workflow artifacts for 7 days. No signing secrets needed, no release created, and nothing published. macOS notarization is skipped. Use the Windows/Linux artifacts for the first human smoke pass. These are not production macOS installers.
