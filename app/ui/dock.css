@@ -25,7 +25,7 @@
 .v4 .tabs button .ic { color: var(--faint); transition: color var(--dur-2); }
 .v4 .tabs button:hover:not(.on) { color: var(--ink); background: var(--hover); }
 .v4 .tabs button:active { transform: scale(0.98); }
-.v4 .tabs button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(25 28 26 / 0.1), 0 0 0 0.5px rgb(25 28 26 / 0.06); }
+.v4 .tabs button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(from var(--shadow-ink) r g b / 0.1), 0 0 0 0.5px rgb(from var(--shadow-ink) r g b / 0.06); }
 .v4 .tabs button.on .ic { color: var(--brand); }
 .v4 .tabs button.wait:not(.on) .ic { color: var(--warn); }
 .v4 .tabs .tab-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -72,7 +72,7 @@
 /* Choice cards. */
 .v4 .opts { display: flex; flex-direction: column; gap: 8px; }
 .v4 .opt { position: relative; width: 100%; display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 0; border-radius: 12px; background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong) inset, var(--e1); text-align: left; font-size: 14px; line-height: 20px; color: var(--ink); transition: box-shadow var(--dur-2) var(--ease-out), background var(--dur-2), opacity var(--dur-2), transform var(--dur-1) var(--ease-out); }
-.v4 .opt:hover, .v4 .opt.at { transform: translateY(-1px); box-shadow: 0 0 0 1px rgb(25 28 26 / 0.22) inset, 0 4px 12px -6px rgb(25 28 26 / 0.18); }
+.v4 .opt:hover, .v4 .opt.at { transform: translateY(-1px); box-shadow: 0 0 0 1px rgb(from var(--foreground) r g b / 0.22) inset, 0 4px 12px -6px rgb(from var(--shadow-ink) r g b / 0.18); }
 .v4 .opt:active { transform: scale(0.99); }
 .v4 .opt .k { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 6px; background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong) inset, 0 1px 0 var(--line-strong); font-family: var(--font-jetbrains), monospace; font-size: 12px; line-height: 1; font-weight: 500; color: var(--muted-foreground); transition: background var(--dur-2), color var(--dur-2), box-shadow var(--dur-2); }
 .v4 .opt-tx { min-width: 0; flex: 1; }
@@ -116,7 +116,7 @@
 .v4 .conf button { min-width: 0; height: 30px; padding: 0 4px; border: 0; border-radius: 8px; background: transparent; color: var(--muted-foreground); font-size: 12.5px; line-height: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background var(--dur-2) var(--ease-out), color var(--dur-2), box-shadow var(--dur-2), transform var(--dur-1) var(--ease-out); }
 .v4 .conf button:hover:not(:disabled):not(.on) { color: var(--ink); }
 .v4 .conf button:active:not(:disabled) { transform: scale(0.97); }
-.v4 .conf button.on { background: var(--surface); color: var(--lvl); box-shadow: 0 1px 2px rgb(25 28 26 / 0.12), 0 0 0 0.5px rgb(25 28 26 / 0.06); }
+.v4 .conf button.on { background: var(--surface); color: var(--lvl); box-shadow: 0 1px 2px rgb(from var(--shadow-ink) r g b / 0.12), 0 0 0 0.5px rgb(from var(--shadow-ink) r g b / 0.06); }
 .v4 .conf button:focus-visible { outline: 2px solid var(--lvl); outline-offset: 1px; }
 .v4 .conf.off { opacity: 0.4; }
 .v4 .conf button:disabled { cursor: not-allowed; }

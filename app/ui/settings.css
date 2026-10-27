@@ -135,7 +135,7 @@
 .v4 .st-keyrow .st-text { flex: 1; }
 .v4 .st-mask { font-family: var(--font-jetbrains), monospace; font-size: 12px; line-height: 16px; color: var(--faint); }
 .v4 .st-act { height: 28px; padding: 0 10px; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--ink); background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong) inset; white-space: nowrap; transition: box-shadow var(--dur-1); }
-.v4 .st-keyrow:hover .st-act { box-shadow: 0 0 0 1px rgb(25 28 26 / 0.24) inset; }
+.v4 .st-keyrow:hover .st-act { box-shadow: 0 0 0 1px var(--line-hover) inset; }
 .v4 .st-docs { font-size: 12px; font-weight: 600; }
 /* The provider mark: a tile carrying the initial (drawn by CSS so the
    row's accessible text stays the provider's name alone). */
@@ -197,7 +197,7 @@
 .v4 .mm-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 32px; padding: 6px 10px; border: 0; border-radius: 8px; background: transparent; text-align: left; color: var(--ink); font-size: 13px; transition: background var(--dur-1); }
 .v4 .mm-row:hover, .v4 .mm-row.walk { background: var(--hover); }
 .v4 .mm-row.on { background: var(--brand-soft); }
-.v4 .mm-row.on.walk { background: rgb(21 110 98 / 0.15); }
+.v4 .mm-row.on.walk { background: rgb(from var(--brand) r g b / 0.15); }
 .v4 .mm-row .ic.tick { color: var(--brand); flex: none; }
 .v4 .mm-row.two { flex-direction: column; align-items: stretch; gap: 1px; }
 .v4 .mm-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
@@ -269,7 +269,7 @@
 /* Provider tiles: a grid of choices, the chosen one in brand. */
 .v4 .su-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 8px; }
 .v4 .su-tile { position: relative; display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 10px; border: 0; border-radius: 12px; background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong) inset; text-align: left; font-size: 13px; font-weight: 500; color: var(--ink); transition: box-shadow var(--dur-1), background var(--dur-1), transform var(--dur-1) var(--ease-out); }
-.v4 .su-tile:hover { box-shadow: 0 0 0 1px rgb(25 28 26 / 0.24) inset, var(--e1); }
+.v4 .su-tile:hover { box-shadow: 0 0 0 1px var(--line-hover) inset, var(--e1); }
 .v4 .su-tile:active { transform: scale(0.98); }
 .v4 .su-tile.on { background: var(--brand-soft); box-shadow: 0 0 0 1.5px var(--brand) inset; color: var(--brand); font-weight: 600; }
 .v4 .su-tile .st-avatar { width: 24px; height: 24px; border-radius: 7px; font-size: 12px; background: var(--tint); }

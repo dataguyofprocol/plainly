@@ -418,7 +418,7 @@ export function ModelControl({
 				// coverage) — blurred, fuller opacity, shadowed — so the
 				// graph no longer bleeds through these pills.
 				title={effectiveId ? `${effectiveProvider} · ${effectiveId}` : undefined}
-				className="flex h-7 max-w-56 items-center gap-1.5 rounded-full bg-surface/90 px-2.5 text-xs font-semibold whitespace-nowrap text-foreground shadow-[inset_0_0_0_1px_var(--line-strong),var(--e1)] backdrop-blur transition-shadow hover:shadow-[inset_0_0_0_1px_rgb(25_28_26/0.24),var(--e1)]"
+				className="flex h-7 max-w-56 items-center gap-1.5 rounded-full bg-surface/90 px-2.5 text-xs font-semibold whitespace-nowrap text-foreground shadow-[inset_0_0_0_1px_var(--line-strong),var(--e1)] backdrop-blur transition-shadow hover:shadow-[inset_0_0_0_1px_var(--line-hover),var(--e1)]"
 			>
 				<span className="truncate">{effectiveId ? prettyModel(effectiveId) : "—"}</span>
 				<Icon name="chevron-down" size="xs" className="text-faint" />
@@ -446,7 +446,7 @@ export function ModelControl({
 				// view's floating top-right buttons (import notes, gear,
 				// coverage) — blurred, fuller opacity, shadowed — so the
 				// graph no longer bleeds through these pills.
-				className="flex h-7 items-center gap-1.5 rounded-full bg-surface/90 px-2.5 text-xs font-semibold whitespace-nowrap text-foreground shadow-[inset_0_0_0_1px_var(--line-strong),var(--e1)] backdrop-blur transition-shadow hover:shadow-[inset_0_0_0_1px_rgb(25_28_26/0.24),var(--e1)]"
+				className="flex h-7 items-center gap-1.5 rounded-full bg-surface/90 px-2.5 text-xs font-semibold whitespace-nowrap text-foreground shadow-[inset_0_0_0_1px_var(--line-strong),var(--e1)] backdrop-blur transition-shadow hover:shadow-[inset_0_0_0_1px_var(--line-hover),var(--e1)]"
 			>
 				{/* Just the level — the button reads like the model button reads
 				   the model name (owner, stats-control round 1). */}

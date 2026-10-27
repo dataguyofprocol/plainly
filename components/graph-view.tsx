@@ -73,7 +73,8 @@ import { topicColor } from "@/components/v4/data";
 import { displayTopic } from "@/components/ui/format";
 import { Icon } from "@/components/ui/icon";
 import { planCostLabel } from "@/components/usage-format";
-import { GraphCanvasRenderer, type GraphRenderSettings } from "./graph-canvas.ts";
+import { GraphCanvasRenderer, type CanvasColors, type GraphRenderSettings } from "./graph-canvas.ts";
+import { useResolvedTheme } from "@/components/theme";
 import { usePopoverDismiss } from "@/components/popover-dismiss";
 import { useActivity } from "@/components/activity-dock";
 import { useServerEvent, useServerResync } from "@/components/server-events";
@@ -253,6 +254,23 @@ function tokenHex(cssVar: string): string {
 /** A token's raw CSS colour, alpha kept (canvas takes modern rgb() syntax). */
 function tokenRaw(cssVar: string): string {
 	return getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim() || "transparent";
+}
+
+/** The canvas inks off the CURRENT theme's tokens — read on every data
+ *  feed and again on a theme switch. v4 edges: one quiet ink at low
+ *  alpha — the topic colour lives in the discs and the wash; the brand is
+ *  kept for the lit chain. */
+function canvasInks(v4: boolean): { colors: CanvasColors; edge: string | undefined } {
+	return {
+		colors: {
+			node: tokenHex(NODE_COLOR_TOKEN),
+			edge: tokenHex("--graph-edge"),
+			label: tokenHex("--muted-foreground"),
+			hoverText: tokenHex("--foreground"),
+			...(v4 ? { halo: tokenHex("--surface"), line: tokenRaw("--line-strong") } : {}),
+		},
+		edge: v4 ? `${tokenHex("--graph-edge")}8c` : undefined,
+	};
 }
 
 // ---- Component ------------------------------------------------------------
@@ -1511,9 +1529,7 @@ export function GraphView({
 		// stable colour the topic list and the home page use).
 		const colorOf = new Map<string, string>();
 		if (v4) for (const c of snapshot.clusters) for (const m of c.members) colorOf.set(m, topicColor(c.id));
-		// v4 edges: one quiet ink at low alpha — the topic colour lives in
-		// the discs and the wash; the brand is kept for the lit chain.
-		const v4Edge = v4 ? `${tokenHex("--graph-edge")}8c` : undefined;
+		const inks = canvasInks(v4);
 		// v4 topic labels read like the topic list beside them: its names
 		// (every topic, not only the file-born ones), display-cased.
 		const clusterLabel = (c: { id: string; label: string | null }) => {
@@ -1532,18 +1548,12 @@ export function GraphView({
 			edges: snapshot.edges.map((e) => ({
 				from: e.from,
 				to: e.to,
-				color: v4Edge,
+				color: inks.edge,
 			})),
 			logicalEdges: snapshot.logicalEdges.map((e) => ({ from: e.from, to: e.to })),
 			impLinks: snapshot.impLinks,
 			clusters: snapshot.clusters.map((c) => ({ id: c.id, label: clusterLabel(c), members: c.members, color: v4 ? topicColor(c.id) : undefined })),
-			colors: {
-				node: tokenHex(NODE_COLOR_TOKEN),
-				edge: tokenHex("--graph-edge"),
-				label: tokenHex("--muted-foreground"),
-				hoverText: tokenHex("--foreground"),
-				...(v4 ? { halo: tokenHex("--surface"), line: tokenRaw("--line-strong") } : {}),
-			},
+			colors: inks.colors,
 			// Match the app typography (Manrope via the body's stack).
 			fontFamily: getComputedStyle(document.body).fontFamily,
 			style: v4 ? "v4" : undefined,
@@ -1552,11 +1562,22 @@ export function GraphView({
 		// when a topic is actually renamed or born.
 	}, [snapshot, isEmpty, v4, topicNames]);
 
+	// A theme switch re-inks the graph in place (the data feed above reads
+	// the tokens only when the data moves).
+	const theme = useResolvedTheme();
+	const inkedThemeRef = useRef(theme);
+	useEffect(() => {
+		if (inkedThemeRef.current === theme) return;
+		inkedThemeRef.current = theme;
+		const inks = canvasInks(v4);
+		rendererRef.current?.setColors(inks.colors, inks.edge);
+	}, [theme, v4]);
+
 
 	// v4 feeds: the chain highlight, and the page's camera handle.
 	useEffect(() => {
-		rendererRef.current?.setHighlight(highlight?.ids ?? null, highlight?.selected ?? null);
-	}, [highlight, isEmpty]);
+		rendererRef.current?.setHighlight(highlight?.ids ?? null, highlight?.selected ?? null, tokenHex("--brand"));
+	}, [highlight, isEmpty, theme]);
 	// A search outranks the topic focus: matches outside the focused topic
 	// would otherwise draw stepped back, as if they didn't match.
 	const searching = query.trim() !== "";

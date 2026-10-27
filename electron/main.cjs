@@ -24,7 +24,7 @@
  *     would shadow every settings-page key change until restart.
  */
 
-const { app, BrowserWindow, Menu, ipcMain, session, shell, dialog } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, nativeTheme, session, shell, dialog } = require("electron");
 const { createChatGPT, fileStore } = require("./chatgpt.cjs");
 const { attachChatGPTChild, trustedSender, chatGPTControl } = require("./chatgpt-ipc.cjs");
 const { createSubscriptions, loadSubscriptionSDK } = require("./subscriptions.cjs");
@@ -151,6 +151,49 @@ let subscriptionChild = null;
 // Per-launch request capability, never OAuth tokens and never renderer state.
 let desktopAPISecret = null;
 const trustedAppWindows = new Set();
+
+// THE THEME (dark mode wave, owner 2026-10-27): the renderer owns the
+// choice (settings.json appearance.mode, mirrored to localStorage —
+// components/theme.ts). The shell mirrors it into nativeTheme so the
+// native window ground (resize gaps, first frame) and the window controls
+// match the page. Grounds/inks = app/globals.css --background/--foreground.
+const THEME_CHROME = {
+	light: { background: "#f4f5f2", symbol: "#191c1a" },
+	dark: { background: "#121513", symbol: "#e4e7e3" },
+};
+const THEME_MODES = new Set(["system", "light", "dark"]);
+
+/** The stored mode, read once before the first window so its ground is
+ *  right from frame zero; anything unreadable = "system". In dev
+ *  (LH_DEV_URL) the server reads the repo's data dir, not this one — the
+ *  renderer's first "lh:theme" corrects it. */
+function storedThemeMode() {
+	try {
+		const mode = JSON.parse(fs.readFileSync(path.join(DATA_DIR(), "settings.json"), "utf8"))?.appearance?.mode;
+		return THEME_MODES.has(mode) ? mode : "system";
+	} catch {
+		return "system";
+	}
+}
+
+function themeChrome() {
+	return THEME_CHROME[nativeTheme.shouldUseDarkColors ? "dark" : "light"];
+}
+
+function repaintWindowChrome() {
+	const chrome = themeChrome();
+	for (const win of trustedAppWindows) {
+		if (win.isDestroyed()) continue;
+		win.setBackgroundColor(chrome.background);
+		if (process.platform !== "darwin") {
+			try {
+				win.setTitleBarOverlay({ color: chrome.background, symbolColor: chrome.symbol });
+			} catch {
+				/* no overlay on this platform build */
+			}
+		}
+	}
+}
 
 // A GUI shell must never die to a stray exception (EPIPE dialogs, a race
 // in an event handler): the window + child server are the product, and
@@ -316,7 +359,7 @@ function createWindow(url) {
 				// height. Do not force the zoom-invariant native overlay to match
 				// the renderer's 60 CSS px bar: zooming out would cover its border.
 				// The renderer reserves the actual width via env(titlebar-area-*).
-				titleBarOverlay: { color: "#f4f5f2", symbolColor: "#191c1a" },
+				titleBarOverlay: { color: themeChrome().background, symbolColor: themeChrome().symbol },
 				// Keep the custom bar alone; Alt reveals the native menu.
 				autoHideMenuBar: true,
 			}),
@@ -330,10 +373,10 @@ function createWindow(url) {
 		// the native window surface changes size before Chromium's compositor
 		// has a frame at the new size, and the gap shows the window's NATIVE
 		// background, which flashes against the app. The app background
-		// (#f4f5f2, the v4 light ground) fills the lag instead. `show: false` +
+		// (the current theme's ground, THEME_CHROME) fills the lag instead. `show: false` +
 		// ready-to-show is the same treatment for first paint: the window
 		// appears only once the page has actually rendered.
-		backgroundColor: "#f4f5f2",
+		backgroundColor: themeChrome().background,
 		show: false,
 		// Narrow-window behavior (owner, 2026-09-17; v4 rail 2026-10-26): the
 		// PAGE's floor is 640px, and the 72px rail is always beside it, so
@@ -660,6 +703,17 @@ async function main() {
 			throw new Error("Subscription sign-in requires the desktop app's private server connection.");
 		}
 		return subscriptionControl(command, subscriptions);
+	});
+
+	// The theme: stored mode before the first window; the renderer keeps it
+	// current ("lh:theme" on every load and switch); OS flips repaint.
+	nativeTheme.themeSource = storedThemeMode();
+	nativeTheme.on("updated", repaintWindowChrome);
+	ipcMain.on("lh:theme", (event, mode) => {
+		if (!trustedAppWindows.has(BrowserWindow.fromWebContents(event.sender)) || !trustedSender(event, new URL(url).origin, BrowserWindow)) return;
+		if (!THEME_MODES.has(mode)) return;
+		nativeTheme.themeSource = mode;
+		repaintWindowChrome();
 	});
 
 	installMenu();

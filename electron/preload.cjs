@@ -17,6 +17,10 @@
  *   publishes it as --lh-zoom so physical-constant lengths (the traffic-
  *   light gutter) can divide by it.
  *
+ *   window.lh.setTheme(mode) — the theme choice ("system" | "light" |
+ *   "dark"; dark mode wave, 2026-10-27): main mirrors it into nativeTheme
+ *   and repaints the native window ground and controls.
+ *
  *   window.lh.onUpdateStatus(cb) / window.lh.installUpdate() — the
  *   auto-update channel (Wave C, 2026-10-10): "lh:update-status" pushes
  *   {status:"downloaded", version} once an update is staged; installUpdate
@@ -71,4 +75,5 @@ contextBridge.exposeInMainWorld("lh", {
 		return () => ipcRenderer.removeListener("lh:update-status", listener);
 	},
 	installUpdate: () => ipcRenderer.send("lh:update-install"),
+	setTheme: (mode) => ipcRenderer.send("lh:theme", mode),
 });

@@ -114,7 +114,7 @@
 .v4 a.hm-cell-link:hover .hm-cell-v { color: var(--brand); }
 .v4 .hm-bars { position: relative; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; align-items: end; height: 40px; margin-top: 6px; }
 .v4 .hm-bars i { display: block; min-height: 3px; border-radius: 3px 3px 1px 1px; background: var(--line-strong); transform-origin: bottom; animation: hm-grow 0.9s var(--ease-expo) both; }
-.v4 .hm-bars i.met { background: rgb(21 110 98 / 0.45); }
+.v4 .hm-bars i.met { background: rgb(from var(--brand) r g b / 0.45); }
 .v4 .hm-bars i.today { background: var(--brand); }
 .v4 .hm-bars i.future { height: 3px; background: var(--hover); animation: none; }
 .v4 .hm-goal { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--line-strong); pointer-events: none; }

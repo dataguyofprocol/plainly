@@ -135,7 +135,7 @@ export function Toggle({
 		>
 			<span
 				className={cn(
-					"absolute top-0.5 left-0.5 flex size-4 items-center justify-center rounded-full bg-surface shadow-[0_1px_2px_rgb(25_28_26/0.24)] transition-transform duration-200",
+					"absolute top-0.5 left-0.5 flex size-4 items-center justify-center rounded-full bg-surface shadow-[0_1px_2px_rgb(from_var(--shadow-ink)_r_g_b/0.24)] transition-transform duration-200",
 					checked ? "translate-x-[14px] text-brand" : "translate-x-0 text-muted-foreground",
 				)}
 			>

@@ -280,10 +280,14 @@ export interface MdRenderingSettings {
 	italicColor?: string | null;
 }
 
+/** The theme choice (dark mode wave, owner 2026-10-27). */
+export type ThemeMode = "system" | "light" | "dark";
+
 /** Appearance settings — mode, colors, type, markdown emphasis. */
 export interface AppearanceSettings {
-	/** "dark" | "light" (default dark). */
-	mode?: "dark" | "light";
+	/** "system" follows the OS light/dark preference (default); "light"
+	 *  and "dark" pin one. */
+	mode?: ThemeMode;
 	/** The one user-chosen color; everything else derives per-mode in code.
 	 *  null = the mode's default background. */
 	background?: string | null;
@@ -394,7 +398,7 @@ export interface FactorySettings {
 	version: number;
 	general: Required<GeneralSettings>;
 	appearance: {
-		mode: "dark" | "light";
+		mode: ThemeMode;
 		background: string | null;
 		fontFamily: string | null;
 		proseFontSize: number;
@@ -413,10 +417,11 @@ export const FACTORY_SETTINGS: FactorySettings = {
 	version: CURRENT_SETTINGS_VERSION,
 	general: { autoUpdate: true, dailyGoalMinutes: 30 },
 	appearance: {
-		// Light only since the v4 redesign (2026-10-26): `mode`, `background`
-		// and the emphasis inks stay in the schema (old records still parse)
-		// but the app no longer applies them.
-		mode: "light",
+		// Theme follows the OS until the user picks (owner, 2026-10-27).
+		// `background` and the emphasis inks are dark-era fields: they stay
+		// in the schema (old records still parse) but the app never applies
+		// them in either theme (owner, 2026-10-27).
+		mode: "system",
 		background: null,
 		fontFamily: null, // Literata
 		proseFontSize: 17,
@@ -574,7 +579,7 @@ function sanitizeMdRendering(raw: unknown): MdRenderingSettings {
 
 function sanitizeAppearance(raw: Record<string, unknown>): AppearanceSettings {
 	const out: AppearanceSettings = {};
-	if (raw.mode === "dark" || raw.mode === "light") out.mode = raw.mode;
+	if (raw.mode === "system" || raw.mode === "light" || raw.mode === "dark") out.mode = raw.mode;
 	if (raw.background !== undefined) out.background = sanitizeHexOrNull(raw.background);
 	if (raw.fontFamily !== undefined) {
 		out.fontFamily = typeof raw.fontFamily === "string" && raw.fontFamily.trim() ? raw.fontFamily : null;

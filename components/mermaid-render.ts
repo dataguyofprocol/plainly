@@ -20,36 +20,45 @@ import type { MermaidConfig } from "mermaid";
  *  never render larger than the session's own text). */
 export const MERMAID_FONT_SIZE = 16;
 
-// v4 is light: diagrams render in mermaid's "base" theme, recoloured to the
-// app's tokens (app/globals.css). Mermaid derives tints from these values in
-// JS, so they are literals, not var() — keep them in step with the tokens.
-export const mermaidTheme: MermaidConfig = {
-	fontFamily: "ui-sans-serif, system-ui, sans-serif",
-	fontSize: MERMAID_FONT_SIZE,
-	securityLevel: "strict",
-	theme: "base",
-	themeVariables: {
-		background: "#ffffff",
-		primaryColor: "#ffffff",
-		primaryTextColor: "#191c1a",
-		primaryBorderColor: "#c9ccc7",
-		secondaryColor: "#eef5f3",
-		tertiaryColor: "#f4f5f2",
-		lineColor: "#a3a8a3",
-		textColor: "#191c1a",
-		mainBkg: "#ffffff",
-		nodeBorder: "#c9ccc7",
-		clusterBkg: "#f7f8f6",
-		clusterBorder: "#dcded9",
-		edgeLabelBackground: "#f4f5f2",
-		noteBkgColor: "#fbf3e6",
-		noteBorderColor: "#e6cfa8",
-		actorBkg: "#ffffff",
-		actorBorder: "#c9ccc7",
-		signalColor: "#565c57",
-		labelBoxBkgColor: "#ffffff",
-	},
-};
+// Diagrams render in mermaid's "base" theme, recoloured to the app's tokens
+// (app/globals.css). Mermaid derives tints from these values in JS, so they
+// must be literal colors, not var(): each render reads the tokens' CURRENT
+// values off <html>, so a chart drawn in dark gets the dark set. A chart
+// already on screen keeps the colors it was drawn with.
+export function mermaidTheme(): MermaidConfig {
+	const css = getComputedStyle(document.documentElement);
+	const token = (name: string) => css.getPropertyValue(name).trim();
+	const paper = token("--surface");
+	const ink = token("--foreground");
+	const border = token("--chart-border");
+	return {
+		fontFamily: "ui-sans-serif, system-ui, sans-serif",
+		fontSize: MERMAID_FONT_SIZE,
+		securityLevel: "strict",
+		theme: "base",
+		themeVariables: {
+			background: paper,
+			primaryColor: paper,
+			primaryTextColor: ink,
+			primaryBorderColor: border,
+			secondaryColor: token("--chart-secondary"),
+			tertiaryColor: token("--background"),
+			lineColor: token("--graph-edge"),
+			textColor: ink,
+			mainBkg: paper,
+			nodeBorder: border,
+			clusterBkg: token("--chart-cluster"),
+			clusterBorder: token("--border"),
+			edgeLabelBackground: token("--background"),
+			noteBkgColor: token("--chart-note"),
+			noteBorderColor: token("--chart-note-border"),
+			actorBkg: paper,
+			actorBorder: border,
+			signalColor: token("--muted-foreground"),
+			labelBoxBkgColor: paper,
+		},
+	};
+}
 
 const plugin = createMermaidPlugin();
 
@@ -58,6 +67,6 @@ const plugin = createMermaidPlugin();
  *  returns the stale svg (the bug streamdown's own id minting avoids). */
 export async function renderMermaid(chart: string): Promise<string> {
 	const id = `lh-mermaid-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
-	const { svg } = await plugin.getMermaid(mermaidTheme).render(id, chart);
+	const { svg } = await plugin.getMermaid(mermaidTheme()).render(id, chart);
 	return svg;
 }

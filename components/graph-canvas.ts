@@ -826,6 +826,17 @@ export class GraphCanvasRenderer {
 
 	// ── Public API ──
 
+	/** Theme switch (dark mode wave, 2026-10-27): the same graph in new
+	 *  inks — no sim rebuild, no refit, the camera stays put. `edgeColor`
+	 *  replaces every edge's own ink (the caller gives all edges one). */
+	setColors(colors: CanvasColors, edgeColor: string | undefined): void {
+		if (!this.data) return;
+		this.data.colors = colors;
+		for (const e of this.data.edges) e.color = edgeColor;
+		this.geoVersion++; // edge buckets are keyed by color
+		this.markDirty();
+	}
+
 	setData(data: CanvasData): void {
 		this.data = data;
 		this.nodeById = new Map(data.nodes.map((n) => [n.id, n]));
@@ -971,7 +982,7 @@ export class GraphCanvasRenderer {
 	}
 
 	/** v4: highlight the selected idea's chain (null clears). */
-	setHighlight(ids: ReadonlySet<string> | null, selected: string | null = null, accent = "#156e62"): void {
+	setHighlight(ids: ReadonlySet<string> | null, selected: string | null, accent: string): void {
 		this.highlight = ids && ids.size > 0 ? { ids, selected, accent } : null;
 		this.markDirty();
 	}
@@ -1915,7 +1926,7 @@ export class GraphCanvasRenderer {
 		}
 
 		// 4. Nodes: one cached Path2D per colour, one fill each; v4 nodes
-		// carry a white outline (Knowledge4's 1.5px rim).
+		// carry a surface-colored outline (Knowledge4's 1.5px rim).
 		if (this.nodeBuckets.size > 0) {
 			ctx.fillStyle = data.colors.node;
 			ctx.fill(this.nodesPath);
@@ -1923,7 +1934,7 @@ export class GraphCanvasRenderer {
 				ctx.fillStyle = color;
 				ctx.fill(path);
 			}
-			ctx.strokeStyle = "#ffffff";
+			ctx.strokeStyle = data.colors.halo ?? "#ffffff";
 			ctx.lineWidth = Math.min(1.5 / k, nodeR * 0.3);
 			ctx.stroke(this.nodesPath);
 		} else {

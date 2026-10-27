@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { cn } from "@/lib/utils";
 import { fitGraphView, fitZoomFor, zoomedGraphView, type Viewport } from "@/components/pan-zoom";
 import { renderMermaid } from "@/components/mermaid-render";
+import { useResolvedTheme } from "@/components/theme";
 import { MermaidError } from "@/components/mermaid-error";
 import { Hint } from "@/components/ui/hint";
 import { Icon } from "@/components/ui/icon";
@@ -87,6 +88,8 @@ export function MermaidOverlay({
 	const [svg, setSvg] = useState<string | null>(rawSvg ?? null);
 	const [error, setError] = useState<string | null>(null);
 	const [attempt, setAttempt] = useState(0);
+	// Mermaid bakes colors into the svg: a theme switch redraws the chart.
+	const theme = useResolvedTheme();
 	useEffect(() => {
 		if (rawSvg !== undefined) {
 			setSvg(rawSvg);
@@ -107,7 +110,7 @@ export function MermaidOverlay({
 		return () => {
 			cancelled = true;
 		};
-	}, [rawSvg, chart, attempt]);
+	}, [rawSvg, chart, attempt, theme]);
 
 	// Esc closes — claimed at the document level (THE ONE-ESC LAW, owner
 	// keyboard round 2026-10-06): one Esc, one action; the window chain
@@ -280,7 +283,7 @@ export function MermaidOverlay({
 								data-lh-overlay-chart
 								className={cn(
 									"[&_svg]:h-auto [&_svg]:w-full",
-									rawSvg !== undefined && "bg-white",
+									rawSvg !== undefined && "bg-[var(--figure-paper)]",
 								)}
 								style={rawSvg !== undefined && inverted ? { filter: "invert(1) hue-rotate(180deg)" } : undefined}
 								dangerouslySetInnerHTML={{ __html: svg }}

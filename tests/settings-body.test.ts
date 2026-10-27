@@ -118,6 +118,14 @@ describe("parseAppearanceSettingsBody", () => {
 		});
 	});
 
+	it("accepts every theme mode (dark mode wave, 2026-10-27)", () => {
+		for (const mode of ["system", "light", "dark"] as const) {
+			const r = parseAppearanceSettingsBody({ mode });
+			assert.ok(r.ok);
+			assert.deepEqual(r.settings, { mode });
+		}
+	});
+
 	it("rejects bad enums, ranges, and colors — with specific messages, never clamps", () => {
 		const cases: unknown[] = [
 			{ mode: "sepia" },

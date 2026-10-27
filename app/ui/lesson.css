@@ -151,7 +151,7 @@
 .v4 .ls-sources a:hover { color: var(--brand-hover); text-decoration: underline; text-underline-offset: 2px; }
 .v4 .ls-sources a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The demo's frame and its error line. */
-.v4 .ls-demo-frame { display: block; width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--on-ink); }
+.v4 .ls-demo-frame { display: block; width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--figure-paper); }
 .v4 .ls-callout { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--danger-soft); color: var(--danger); font-size: 13px; line-height: 18px; }
 .v4 .ls-callout > .ic { flex: none; margin-top: 2px; }
 .v4 .ls-callout .ls-callout-b { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -169,7 +169,7 @@
 /* ── Figures ───────────────────────────────────────────────────────── */
 .v4 .ls-figure { display: flex; flex-direction: column; gap: 6px; }
 .v4 .ls-figure.hug { align-self: center; width: fit-content; max-width: 100%; }
-.v4 .ls-figure-img { overflow: hidden; border-radius: 12px; background: var(--on-ink); box-shadow: 0 0 0 1px var(--line), var(--e1); }
+.v4 .ls-figure-img { overflow: hidden; border-radius: 12px; background: var(--figure-paper); box-shadow: 0 0 0 1px var(--line), var(--e1); }
 .v4 .ls-figure-cap { display: flex; align-items: center; gap: 8px; min-height: 28px; color: var(--faint); font-size: 12px; line-height: 16px; }
 .v4 .ls-figure-cap > .ic { flex: none; }
 .v4 .ls-figure-cap .ls-card-x { margin-left: auto; display: flex; align-items: center; gap: 2px; }
@@ -223,7 +223,7 @@
 /* ── Working, error, nudge ─────────────────────────────────────────── */
 .v4 .ls-working { display: flex; align-items: center; gap: 8px; min-height: 26px; color: var(--faint); font-size: 13px; line-height: 18px; font-weight: 500; }
 .v4 .ls-working p { margin: 0; }
-.v4 .ls-error { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--danger-soft); box-shadow: 0 0 0 1px rgb(179 38 30 / 0.16) inset; color: var(--ink); font-size: 13px; line-height: 20px; }
+.v4 .ls-error { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--danger-soft); box-shadow: 0 0 0 1px rgb(from var(--danger) r g b / 0.16) inset; color: var(--ink); font-size: 13px; line-height: 20px; }
 .v4 .ls-error > .ic { flex: none; margin-top: 2px; color: var(--danger); }
 .v4 .ls-error b { display: block; color: var(--danger); font-weight: 600; }
 .v4 .ls-error span { overflow-wrap: anywhere; color: var(--muted-foreground); }
@@ -260,7 +260,7 @@
 .v4 .ls-composer .ls-hint { align-self: center; flex: none; display: inline-flex; align-items: center; gap: 6px; margin-right: 4px; color: var(--faint); font-size: 12px; line-height: 16px; white-space: nowrap; }
 .v4 .ls-composer .ib { width: 36px; height: 36px; border-radius: 10px; }
 /* Send / Stop: a round icon button; Next problem: a brand pill. */
-.v4 .ls-send { flex: none; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: var(--brand); color: var(--on-ink); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 1px 2px rgb(25 28 26 / 0.16); transition: background var(--dur-2), transform var(--dur-1) var(--ease-out), opacity var(--dur-2); }
+.v4 .ls-send { flex: none; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: var(--brand); color: var(--on-ink); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 1px 2px rgb(from var(--shadow-ink) r g b / 0.16); transition: background var(--dur-2), transform var(--dur-1) var(--ease-out), opacity var(--dur-2); }
 .v4 .ls-send:hover { background: var(--brand-hover); }
 .v4 .ls-send:active { transform: scale(0.94); }
 .v4 .ls-send:disabled { background: var(--press); color: var(--faint); box-shadow: none; cursor: not-allowed; transform: none; }

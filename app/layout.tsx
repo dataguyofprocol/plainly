@@ -13,6 +13,7 @@ import "./ui/settings.css";
 import { ActivityProvider } from "@/components/activity-dock";
 import { ServerEventsProvider } from "@/components/server-events";
 import { AppearanceProvider } from "@/components/settings/appearance";
+import { THEME_BOOT_SCRIPT } from "@/components/theme-boot";
 import UpdateBanner from "@/components/update-banner";
 
 // v4 redesign (light, 2026-10-26): chrome = Manrope, teaching prose and
@@ -29,7 +30,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
 	return (
-		<html lang="en" className={`${ui.variable} ${prose.variable} ${mono.variable}`}>
+		// suppressHydrationWarning: the boot script rewrites data-theme before
+		// hydration (components/theme-boot.ts), by design.
+		<html lang="en" data-theme="light" className={`${ui.variable} ${prose.variable} ${mono.variable}`} suppressHydrationWarning>
+			<head>
+				<script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+			</head>
 			<body className="min-h-dvh antialiased">
 			{/* The notification channel rides OUTSIDE everything: sidebar, dock,
 				 and pages all subscribe as the polls retire (push S3, 2026-10-02). */}

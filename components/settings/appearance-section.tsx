@@ -5,11 +5,8 @@
  * Appearance controls resolve against the factory in the provider; writes
  * PUT the whole appearance section and hand the delta back so the CSS
  * variables move IMMEDIATELY (the section's whole point — it must DO
- * something). Hex inputs commit on blur/Enter; the background derives the
- * raised/accent/edge palette in code (components/settings/appearance.tsx).
- * Mode is dark-only this wave: control rendered DISABLED with a note — the
- * light palette is the design wave's work, and a lying control is worse
- * than an honest disabled one.
+ * something). Theme (dark mode wave, owner 2026-10-27): System · Light ·
+ * Dark, first group; the switch itself is components/theme.ts.
  *
  * Graph graying (owner, 2026-09-20) follows the graph viewer's render-panel
  * convention: the whole row dims when a parent is off (stored values
@@ -33,15 +30,24 @@
 import { useEffect, useRef, useState } from "react";
 import {
 	EXTRACTION_CHUNK_TOKENS_FLOOR,
+	FACTORY_SETTINGS,
 	resolveSettings,
 	type AppearanceSettings,
 	type GraphSettings,
+	type ThemeMode,
 } from "@/src/core";
 import { MenuShell } from "@/components/menu-shell";
 import { Hint } from "@/components/ui/hint";
 import { useAppearance } from "./appearance.tsx";
 import { FontMenuList } from "./model-menu";
 import { CommitInput, SelectTrigger, SettingsGroup, SettingsRow, Toggle } from "./controls.tsx";
+
+/** The theme choices, in the control's order (owner, 2026-10-27). */
+const THEME_OPTIONS: ReadonlyArray<{ mode: ThemeMode; label: string }> = [
+	{ mode: "system", label: "System" },
+	{ mode: "light", label: "Light" },
+	{ mode: "dark", label: "Dark" },
+];
 
 /** The factory reading family — the DEFAULT row's identity (unset =
  *  this). Exported for tests. */
@@ -99,6 +105,7 @@ export function AppearanceSection({
 }) {
 	const { appearance: resolved } = useAppearance();
 	const md = appearance?.mdRendering;
+	const themeMode = appearance?.mode ?? FACTORY_SETTINGS.appearance.mode;
 
 	// The font dropdown's open state + its enumeration cache. undefined =
 	// not enumerated yet (desktop: click-bound queryLocalFonts pending);
@@ -186,6 +193,25 @@ export function AppearanceSection({
 
 	return (
 		<>
+			<SettingsGroup label="Theme">
+				<SettingsRow label="Theme" hint="Follows your Mac when set to System" testid="row-theme">
+					<div role="radiogroup" aria-label="Theme" className="seg sm">
+						{THEME_OPTIONS.map(({ mode, label }) => (
+							<button
+								key={mode}
+								type="button"
+								role="radio"
+								aria-checked={themeMode === mode}
+								data-testid={`theme-${mode}`}
+								onClick={() => onSectionChange({ ...appearance, mode })}
+								className={themeMode === mode ? "on" : undefined}
+							>
+								{label}
+							</button>
+						))}
+					</div>
+				</SettingsRow>
+			</SettingsGroup>
 			<SettingsGroup label="Reading" description="Lesson text — changes apply as you make them.">
 				<SettingsRow label="Reading font" hint="Used for lesson text" testid="row-font">
 					<span ref={fontMenuOpen ? menuAnchorRef : undefined} className="st-ctl">

@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /*
  * THE SKIN — wave 5. Design tokens, the single place to restyle the app.
@@ -27,10 +27,11 @@
 	outline: none;
 }
 
-/* Palette — v4 redesign, LIGHT ONLY (owner, 2026-10-26). The app was
-   dark-only; the v4 "arranged" design is a warm off-white ground with ink
-   text and one teal brand accent. Every text/ground pair here passes WCAG
-   4.5:1 (faint on muted is the tightest, ~4.6).
+/* Palette — v4 redesign (owner, 2026-10-26). The v4 "arranged" design
+   is a warm off-white ground with ink text and one teal brand accent; its
+   dark counterpart is the :root[data-theme="dark"] block below (dark
+   mode wave, 2026-10-27). Every text/ground pair here passes WCAG 4.5:1
+   (faint on muted is the tightest, ~4.6).
 
    shadcn semantics are kept so existing utilities keep working:
      --accent      = the HOVER surface (not the brand color)
@@ -43,7 +44,7 @@
    shadow, duration and radius in the app resolves here — the v4 surface
    (app/v4.css) ALIASES these names rather than redefining them, so legacy
    utilities and v4 classes can never drift apart again. No component may
-   hard-code a hex: a future dark theme is one more block of these values.
+   hard-code a hex: the dark theme is one more block of these values.
 
    Ground:   --background (page) < --card (resting) < --surface (raised, white)
    Ink:      --foreground > --muted-foreground > --faint
@@ -146,6 +147,122 @@
 	--lh-prose-leading: 1.65;
 	/* Markdown heading weight (appearance settings). */
 	--lh-heading-weight: 600;
+	/* Practice's warm register ground (was a literal in app/v4.css). */
+	--background-warm: #f5f4f1;
+	/* A control's hairline on hover — one step past --line-strong. */
+	--line-hover: rgb(25 28 26 / 0.24);
+	/* The ink small control shadows mix from (alpha set at the use site
+	   via rgb(from var(--shadow-ink) r g b / a)). */
+	--shadow-ink: #191c1a;
+	/* The figure backing law: models draw figures and demos for a WHITE
+	   page, so their stage stays white in every theme (the per-figure
+	   invert switch is how a reader darkens one). */
+	--figure-paper: #ffffff;
+	/* Mermaid's literals that have no app token (components/mermaid-render.ts
+	   reads these plus --surface/--foreground/--background/--border/
+	   --muted-foreground/--graph-edge at render time). */
+	--chart-border: #c9ccc7;
+	--chart-secondary: #eef5f3;
+	--chart-cluster: #f7f8f6;
+	--chart-note: #fbf3e6;
+	--chart-note-border: #e6cfa8;
+}
+
+/* DARK (owner-approved direction, 2026-10-27). Live when <html> carries
+   data-theme="dark" — set by components/theme.ts from the Theme setting
+   (System · Light · Dark). Same names as the light block; only the
+   values move.
+
+   Ground:   green-tinted charcoal, the light ground's hue carried over.
+   Depth:    raised = lighter (shadows barely read on dark), so
+             --background < --card < --surface < --popover step UP.
+   Ink:      off-white, never pure white; --on-ink flips to the ground so
+             ink buttons invert (light pill, dark label).
+   Accents:  teal, amber and the status inks are lifted until each clears
+             4.5:1 on the ground and on --surface.
+   Field:    the gradient blobs keep their hues, sunk deep so they read as
+             a faint glow rather than a wash. */
+:root[data-theme="dark"] {
+	color-scheme: dark;
+	--background: #121513;
+	--background-warm: #151412;
+	--foreground: #e4e7e3;
+	--card: #171a18;
+	--card-foreground: #e4e7e3;
+	--popover: #222724;
+	--popover-foreground: #e4e7e3;
+	--surface: #1d211e;
+	--on-ink: #121513;
+	--primary: #e4e7e3;
+	--primary-hover: #ffffff;
+	--primary-foreground: #121513;
+	--secondary: #252a27;
+	--secondary-foreground: #e4e7e3;
+	--muted: #252a27;
+	--muted-foreground: #a4aba5;
+	--accent: #262b28;
+	--accent-foreground: #e4e7e3;
+	--destructive: #f0877d;
+	--border: #2d332f;
+	--input: #373e39;
+	--ring: #4fb5a4;
+	--faint: #8a928c;
+	--line: rgb(228 231 227 / 0.08);
+	--line-strong: rgb(228 231 227 / 0.14);
+	--hover: rgb(228 231 227 / 0.06);
+	--press: rgb(228 231 227 / 0.1);
+	--glass: rgb(29 33 30 / 0.62);
+	--glass-strong: rgb(34 39 36 / 0.92);
+	--glass-edge: rgb(255 255 255 / 0.06);
+	--field: rgb(255 255 255 / 0.04);
+	--tint: rgb(228 231 227 / 0.04);
+	--brand: #4fb5a4;
+	--brand-hover: #6dc5b6;
+	--brand-soft: rgb(79 181 164 / 0.14);
+	--brand-line: rgb(79 181 164 / 0.38);
+	--brand-wash: rgb(79 181 164 / 0.07);
+	--practice: #e2a463;
+	--practice-soft: rgb(226 164 99 / 0.16);
+	--practice-hover: #ecb880;
+	--practice-line: rgb(226 164 99 / 0.38);
+	--practice-ring: 0 0 0 3px rgb(226 164 99 / 0.26);
+	--brand-ring: 0 0 0 3px rgb(79 181 164 / 0.28);
+	--warn: #e3a865;
+	--warn-soft: rgb(227 168 101 / 0.16);
+	--warn-line: rgb(227 168 101 / 0.34);
+	--good: #6ccb94;
+	--good-soft: rgb(108 203 148 / 0.15);
+	--danger: #f0877d;
+	--danger-hover: #f4a29a;
+	--danger-soft: rgb(240 135 125 / 0.14);
+	--shadow: rgb(0 0 0 / 0.4);
+	--e1: 0 1px 2px rgb(0 0 0 / 0.32), 0 1px 1px rgb(0 0 0 / 0.16);
+	--e2: 0 1px 2px rgb(0 0 0 / 0.32), 0 12px 32px -8px rgb(0 0 0 / 0.55);
+	--e3: 0 2px 6px rgb(0 0 0 / 0.36), 0 28px 64px -16px rgb(0 0 0 / 0.66);
+	--focus-ring: 0 0 0 3px rgb(79 181 164 / 0.28);
+	--scrim: rgb(0 0 0 / 0.5);
+	--conf-1: #e09a55;
+	--conf-1-soft: rgb(224 154 85 / 0.16);
+	--conf-2: #d2b558;
+	--conf-2-soft: rgb(210 181 88 / 0.16);
+	--conf-3: #5cbfaa;
+	--conf-3-soft: rgb(92 191 170 / 0.15);
+	--conf-4: #6ccb94;
+	--conf-4-soft: rgb(108 203 148 / 0.15);
+	--blob-a: #1c4a42;
+	--blob-b: #22304d;
+	--blob-c: #2a3a25;
+	--blob-warm-a: #4a3320;
+	--blob-warm-b: #1d3a34;
+	--blob-warm-c: #3b2e25;
+	--graph-edge: #5b625d;
+	--line-hover: rgb(228 231 227 / 0.24);
+	--shadow-ink: #000000;
+	--chart-border: #3d4440;
+	--chart-secondary: #1a2a27;
+	--chart-cluster: #181b19;
+	--chart-note: #2a2419;
+	--chart-note-border: #5a4a30;
 }
 
 @theme inline {

@@ -27,13 +27,13 @@ describe("FACTORY_SETTINGS (the compiled factory layer)", () => {
 		// with the message anchors (owner, 2026-10-13)
 		assert.deepEqual(FACTORY_SETTINGS.graph, { enabled: true, rendering: true, extractionChunkTokens: 4096 });
 		const a = FACTORY_SETTINGS.appearance;
-		assert.equal(a.mode, "light");
+		assert.equal(a.mode, "system");
 		assert.equal(a.background, null); // the mode's own default, not a factory hex
 		assert.equal(a.fontFamily, null); // Literata
 		assert.equal(a.proseFontSize, 17);
 		assert.equal(a.sessionNameSerif, true);
 		assert.equal(a.mdRendering.headingWeight, 600);
-		assert.equal(a.mdRendering.boldColor, null); // stored but never applied (light only)
+		assert.equal(a.mdRendering.boldColor, null); // stored but never applied
 		assert.equal(a.mdRendering.italicColor, null);
 	});
 
@@ -95,6 +95,12 @@ describe("sanitizeUserSettings", () => {
 		assert.equal(out.version, CURRENT_SETTINGS_VERSION);
 		assert.deepEqual((out as Record<string, unknown>).futureSection, { knob: 3 });
 		assert.deepEqual(out.general, { autoUpdate: true });
+	});
+
+	it("every theme mode survives sanitize (dark mode wave, 2026-10-27)", () => {
+		for (const mode of ["system", "light", "dark"] as const) {
+			assert.deepEqual(sanitizeUserSettings({ appearance: { mode } })?.appearance, { mode });
+		}
 	});
 
 	it("wrong-typed fields DROP (resolve to factory), never crash", () => {

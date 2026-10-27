@@ -42,14 +42,14 @@
 /* Practice's warm register: the field and the Practice marks turn warm;
    controls, selection and focus stay brand teal (owner, finesse pass). */
 .v4.warm {
-	--bg: #f5f4f1;
+	--bg: var(--background-warm);
 	--teal: var(--brand);
 }
 .v4 a { color: inherit; text-decoration: none; }
 .v4 button, .v4 input, .v4 textarea, .v4 select { font: inherit; color: inherit; letter-spacing: inherit; }
 .v4 button { cursor: pointer; }
 .v4 :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 8px; }
-.v4 ::selection { background: rgb(21 110 98 / 0.18); }
+.v4 ::selection { background: rgb(from var(--brand) r g b / 0.18); }
 .v4 .serif { font-family: var(--font-literata), Literata, Georgia, serif; }
 .v4 .mono { font-family: var(--font-jetbrains), "JetBrains Mono", ui-monospace, monospace; }
 .v4 .num { font-variant-numeric: tabular-nums; }
@@ -116,7 +116,7 @@
 /* ── Buttons ───────────────────────────────────────────────────────── */
 /* .btn = primary (ink). Variants: .brand .secondary .quiet .danger.
    Sizes: .sm 28 · (md) 34 · .lg 40 (.tall is the legacy name for lg). */
-.v4 .btn { height: 34px; padding: 0 14px; border: 0; border-radius: 10px; background: var(--primary); color: var(--on-ink); font-weight: 600; font-size: 13px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; flex: none; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1), 0 1px 2px rgb(25 28 26 / 0.16); transition: transform var(--dur-1) var(--ease-out), background var(--dur-2), box-shadow var(--dur-2), opacity var(--dur-2); }
+.v4 .btn { height: 34px; padding: 0 14px; border: 0; border-radius: 10px; background: var(--primary); color: var(--on-ink); font-weight: 600; font-size: 13px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; flex: none; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1), 0 1px 2px rgb(from var(--shadow-ink) r g b / 0.16); transition: transform var(--dur-1) var(--ease-out), background var(--dur-2), box-shadow var(--dur-2), opacity var(--dur-2); }
 .v4 .btn:hover { background: var(--primary-hover); }
 .v4 .btn:active { transform: scale(0.97); }
 .v4 .btn:disabled, .v4 .btn[aria-disabled="true"] { opacity: 0.35; cursor: not-allowed; transform: none; }
@@ -127,13 +127,13 @@
 .v4 .btn.danger { background: var(--danger); }
 .v4 .btn.danger:hover { background: var(--danger-hover); }
 .v4 .btn.secondary { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line-strong) inset, var(--e1); }
-.v4 .btn.secondary:hover { background: var(--surface); box-shadow: 0 0 0 1px rgb(25 28 26 / 0.24) inset, var(--e1); }
+.v4 .btn.secondary:hover { background: var(--surface); box-shadow: 0 0 0 1px var(--line-hover) inset, var(--e1); }
 .v4 .btn.quiet { background: transparent; color: var(--muted-foreground); box-shadow: none; }
 .v4 .btn.quiet:hover { background: var(--hover); color: var(--ink); }
 .v4 .btn .ic, .v4 .ghost .ic { flex: none; }
 /* .ghost — the outlined button (legacy name; = .btn.secondary at 32px). */
 .v4 .ghost { height: 32px; padding: 0 12px; border: 0; border-radius: 9px; background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line-strong) inset; font-weight: 600; font-size: 13px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; transition: box-shadow var(--dur-2), background var(--dur-2), opacity var(--dur-2), transform var(--dur-1) var(--ease-out); }
-.v4 .ghost:hover { box-shadow: 0 0 0 1px rgb(25 28 26 / 0.24) inset; }
+.v4 .ghost:hover { box-shadow: 0 0 0 1px var(--line-hover) inset; }
 .v4 .ghost:active { transform: scale(0.98); }
 .v4 .ghost.on { box-shadow: 0 0 0 1px var(--brand) inset; color: var(--brand); background: var(--brand-soft); }
 .v4 .ghost:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -160,7 +160,7 @@
 .v4 .seg { display: flex; padding: 2px; border-radius: 10px; background: var(--press); }
 .v4 .seg button { flex: 1; height: 28px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--muted-foreground); font-size: 13px; font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background var(--dur-2) var(--ease-out), color var(--dur-2), box-shadow var(--dur-2); }
 .v4 .seg button:hover:not(.on):not(:disabled) { color: var(--ink); }
-.v4 .seg button.on { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgb(25 28 26 / 0.1), 0 0 0 0.5px rgb(25 28 26 / 0.06); }
+.v4 .seg button.on { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgb(from var(--shadow-ink) r g b / 0.1), 0 0 0 0.5px rgb(from var(--shadow-ink) r g b / 0.06); }
 .v4 .seg button:disabled { cursor: not-allowed; opacity: 0.5; }
 .v4 .seg.sm button { height: 24px; padding: 0 9px; font-size: 12px; border-radius: 7px; }
 
@@ -209,7 +209,7 @@
 
 /* ── Form fields ───────────────────────────────────────────────────── */
 .v4 .finput { height: 40px; width: 100%; padding: 0 12px; border-radius: 10px; border: 0; box-shadow: 0 0 0 1px var(--line-strong) inset; background: var(--surface); outline: none; font-size: 14px; transition: box-shadow var(--dur-2); }
-.v4 .finput:hover { box-shadow: 0 0 0 1px rgb(25 28 26 / 0.24) inset; }
+.v4 .finput:hover { box-shadow: 0 0 0 1px var(--line-hover) inset; }
 .v4 .finput:focus { box-shadow: 0 0 0 1px var(--brand) inset, var(--focus-ring); }
 .v4 .finput::placeholder, .v4 .ftext::placeholder { color: var(--faint); }
 .v4 .finput.sm { height: 32px; font-size: 13px; border-radius: 8px; padding: 0 10px; }
@@ -220,11 +220,11 @@
 .v4 .ferror { font-size: 12px; line-height: 16px; color: var(--danger); }
 /* A select trigger: a secondary button with a trailing chevron. */
 .v4 .selectbtn { height: 32px; padding: 0 8px 0 10px; border: 0; border-radius: 8px; background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong) inset; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: box-shadow var(--dur-1); }
-.v4 .selectbtn:hover { box-shadow: 0 0 0 1px rgb(25 28 26 / 0.24) inset; }
+.v4 .selectbtn:hover { box-shadow: 0 0 0 1px var(--line-hover) inset; }
 .v4 .selectbtn .ic { color: var(--faint); }
 /* A switch: <button role="switch" aria-checked> with no children. */
 .v4 .switch { position: relative; width: 34px; height: 20px; flex: none; padding: 0; border: 0; border-radius: 999px; background: var(--line-strong); transition: background var(--dur-2) var(--ease-out); }
-.v4 .switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgb(25 28 26 / 0.24); transition: transform var(--dur-2) var(--ease-out); }
+.v4 .switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgb(from var(--shadow-ink) r g b / 0.24); transition: transform var(--dur-2) var(--ease-out); }
 .v4 .switch[aria-checked="true"] { background: var(--brand); }
 .v4 .switch[aria-checked="true"]::after { transform: translateX(14px); }
 .v4 .switch:disabled { opacity: 0.4; cursor: not-allowed; }

@@ -15,7 +15,7 @@ const mainRequire = createRequire(mainFile);
 /** Decline the single-instance lock so normal boot never spawns a server.
  * Then call the REAL createWindow with a stub Electron API and inspect its
  * constructor options. No rewritten copy of the production logic. */
-function windowOptions(platform: string) {
+function windowOptions(platform: string, dark = false) {
 	class FakeWindow {
 		constructor(readonly options: unknown) {}
 		webContents = { on() {}, setWindowOpenHandler() {} };
@@ -25,6 +25,7 @@ function windowOptions(platform: string) {
 	const electron = {
 		app: { setName() {}, requestSingleInstanceLock: () => false, quit() {} },
 		BrowserWindow: FakeWindow,
+		nativeTheme: { shouldUseDarkColors: dark },
 		session: { defaultSession: { setPermissionRequestHandler() {}, setPermissionCheckHandler() {} } },
 	};
 	const context = {
@@ -61,6 +62,12 @@ describe("desktop window chrome", () => {
 		});
 	}
 
+	it("the native ground and window controls follow the theme (dark mode wave, 2026-10-27)", () => {
+		assert.equal(windowOptions("darwin").backgroundColor, "#f4f5f2");
+		assert.equal(windowOptions("darwin", true).backgroundColor, "#121513");
+		assert.deepEqual(windowOptions("win32", true).titleBarOverlay, { color: "#121513", symbolColor: "#e4e7e3" });
+	});
+
 	it("preload exposes OS identity without exposing Node/Electron to the renderer", () => {
 		let bridge: Record<string, unknown> = {};
 		const context = {
@@ -78,7 +85,7 @@ describe("desktop window chrome", () => {
 		runInNewContext(readFileSync(new URL("../electron/preload.cjs", import.meta.url), "utf8"), context);
 		assert.equal(bridge.platform, "win32");
 		assert.deepEqual(Object.keys(bridge).sort(), [
-			"chatgpt", "expandWindow", "getZoom", "installUpdate", "onUpdateStatus", "onZoom", "platform", "subscriptions",
+			"chatgpt", "expandWindow", "getZoom", "installUpdate", "onUpdateStatus", "onZoom", "platform", "setTheme", "subscriptions",
 		]);
 		assert.deepEqual(Object.keys(bridge.subscriptions as object).sort(), ["cancel", "consent", "disconnect", "login", "onChange", "open", "respond", "retry", "status"]);
 	});

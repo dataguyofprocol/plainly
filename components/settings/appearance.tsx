@@ -19,6 +19,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { FACTORY_SETTINGS, type AppearanceSettings } from "@/src/core";
+import { applyThemeMode } from "@/components/theme";
 
 /** The resolved, fully-concrete appearance view (delta + factory merged). */
 export function resolveAppearance(delta: AppearanceSettings | undefined) {
@@ -41,10 +42,11 @@ export function resolveAppearance(delta: AppearanceSettings | undefined) {
  *  Absent entries = leave the factory stylesheet value in place. Pure —
  *  exported for tests. */
 export function appearanceVars(a: ReturnType<typeof resolveAppearance>): Record<string, string> {
-	// LIGHT ONLY (v4 redesign, owner 2026-10-26): the palette is fixed. A
+	// The palette is the token layer's (light and dark blocks, app/
+	// globals.css); the theme itself is applied by components/theme.ts. A
 	// stored `background` and the bold/italic inks were picked against the
-	// retired dark curve — applied now they would repaint the light ground
-	// or draw near-white emphasis on it, so they are read but never applied.
+	// retired dark curve — read but never applied, in either theme (owner,
+	// 2026-10-27).
 	const vars: Record<string, string> = {};
 	if (a.fontFamily !== null) {
 		vars["--font-prose"] = `"${a.fontFamily}", var(--font-literata), Georgia, serif`;
@@ -129,9 +131,12 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
 				// slice is unknown-shaped here, so it goes through the same
 				// resolve (absent/invalid fields = factory anyway).
 				const appearance = body.settings?.appearance;
-				setDelta(
-					appearance && typeof appearance === "object" ? (appearance as AppearanceSettings) : undefined,
-				);
+				const next = appearance && typeof appearance === "object" ? (appearance as AppearanceSettings) : undefined;
+				setDelta(next);
+				// The theme applies only once the record is here: applying the
+				// factory "system" first would flash past a stored pin the boot
+				// script already painted (components/theme.ts).
+				applyThemeMode(resolveAppearance(next).mode);
 			})
 			.catch(() => {/* settings stay factory — not worth a crash */});
 		return () => {
@@ -141,6 +146,7 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
 
 	const onAppearanceChange = useCallback((next: AppearanceSettings | undefined) => {
 		setDelta(next);
+		applyThemeMode(resolveAppearance(next).mode);
 	}, []);
 
 	const value = useMemo(

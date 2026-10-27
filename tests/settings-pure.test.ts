@@ -26,7 +26,7 @@ import { setupStage } from "../components/setup-dialog.tsx";
 describe("resolveAppearance — delta over factory", () => {
 	it("absent everything = the factory view", () => {
 		const a = resolveAppearance(undefined);
-		assert.equal(a.mode, "light");
+		assert.equal(a.mode, "system");
 		assert.equal(a.background, null);
 		assert.equal(a.fontFamily, null);
 		assert.equal(a.proseFontSize, 17);
@@ -67,7 +67,7 @@ describe("appearanceVars — the mapping the provider applies", () => {
 		assert.equal(vars["--lh-heading-weight"], "700");
 	});
 
-	it("light only: dark-era background and emphasis inks are never applied", () => {
+	it("dark-era background and emphasis inks are never applied, in either theme", () => {
 		const vars = appearanceVars(
 			resolveAppearance({
 				background: "#101820",
