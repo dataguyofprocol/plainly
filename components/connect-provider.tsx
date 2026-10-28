@@ -18,6 +18,10 @@ import { ProviderMenuList } from "@/components/settings/model-menu";
 import type { ProviderKeyInfo } from "@/components/settings/keys-section";
 import { ProviderMark } from "@/components/settings/connection-controls";
 import { Icon } from "@/components/ui/icon";
+import { CustomModelsField } from "@/components/custom-models-field";
+import type { CustomModelEntry } from "@/src/core";
+
+export { parseModelIds } from "@/components/custom-models-field";
 
 /** Opens setup on the connect screen from anywhere (the ⌘K command,
  *  Settings → Keys). The AppShell's CommandPalette listens. */
@@ -33,11 +37,6 @@ export const FEATURED_PROVIDERS: ReadonlyArray<{ id: string; label: string; keyU
 ];
 
 type Choice = { kind: "key"; provider: ProviderKeyInfo; keyUrl: string | null } | { kind: "custom" } | { kind: "more" } | null;
-
-/** Pure: a model-id list from free text (commas, spaces or newlines). */
-export function parseModelIds(text: string): string[] {
-	return [...new Set(text.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean))];
-}
 
 export function ConnectProviderBody({
 	providers,
@@ -55,9 +54,7 @@ export function ConnectProviderBody({
 	// The OpenAI-compatible form.
 	const [name, setName] = useState("");
 	const [baseUrl, setBaseUrl] = useState("");
-	const [modelText, setModelText] = useState("");
-	const [found, setFound] = useState<string[] | null>(null);
-	const [probing, setProbing] = useState(false);
+	const [models, setModels] = useState<CustomModelEntry[]>([]);
 
 	const byId = useMemo(() => new Map((providers ?? []).map((p) => [p.id, p])), [providers]);
 	const featuredIds = new Set(FEATURED_PROVIDERS.map((f) => f.id));
@@ -88,28 +85,7 @@ export function ConnectProviderBody({
 		notifySettingsSaved("keys");
 	};
 
-	const probe = async () => {
-		if (!baseUrl.trim() || probing) return;
-		setProbing(true);
-		setError(null);
-		const res = await fetch("/api/providers/custom/probe", {
-			method: "POST",
-			headers: { "content-type": "application/json" },
-			body: JSON.stringify({ baseUrl: baseUrl.trim(), ...(key.trim() ? { apiKey: key.trim() } : {}) }),
-		}).catch(() => null);
-		setProbing(false);
-		const body = (await res?.json().catch(() => null)) as { ok?: boolean; models?: string[]; error?: string } | null;
-		if (!body?.ok) {
-			setFound(null);
-			setError(body?.error ?? "Couldn’t reach that endpoint.");
-			return;
-		}
-		setFound(body.models ?? []);
-		if (!modelText.trim() && body.models?.length) setModelText(body.models.slice(0, 3).join(", "));
-	};
-
 	const saveCustom = async () => {
-		const models = parseModelIds(modelText);
 		if (!name.trim() || !baseUrl.trim() || models.length === 0 || busy) return;
 		setBusy(true);
 		setError(null);
@@ -126,8 +102,7 @@ export function ConnectProviderBody({
 		}
 		setName("");
 		setBaseUrl("");
-		setModelText("");
-		setFound(null);
+		setModels([]);
 		setChoice(null);
 		notifySettingsSaved("keys");
 	};
@@ -255,47 +230,14 @@ export function ConnectProviderBody({
 						</span>
 						<input className="finput mono" type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="Paste your key" autoComplete="off" spellCheck={false} />
 					</label>
-					<div className="su-field">
-						<span className="flabel">
-							<label htmlFor="connect-models">Models</label>
-							<button type="button" className="ghost sm" disabled={!baseUrl.trim() || probing} onClick={() => void probe()}>
-								<Icon name={probing ? "loading" : "search"} size="sm" />
-								{probing ? "Looking…" : "Find models"}
-							</button>
-						</span>
-						<input id="connect-models" className="finput mono" value={modelText} onChange={(e) => setModelText(e.target.value)} placeholder="model-id, another-model" spellCheck={false} />
-						{found && found.length > 0 && (
-							<span className="su-chips">
-								{found.slice(0, 24).map((m) => {
-									const on = parseModelIds(modelText).includes(m);
-									return (
-										<button
-											key={m}
-											type="button"
-											className={on ? "chip on" : "chip"}
-											aria-pressed={on}
-											onClick={() => {
-												const ids = parseModelIds(modelText);
-												setModelText((on ? ids.filter((x) => x !== m) : [...ids, m]).join(", "));
-											}}
-										>
-											{on && <Icon name="check" size="xs" />}
-											{m}
-										</button>
-									);
-								})}
-							</span>
-						)}
-						{found && found.length === 0 && <span className="fhint">The server answered but listed no models. Type their ids above.</span>}
-						{!found && <span className="fhint">Separate ids with commas, or let “Find models” ask the server.</span>}
-					</div>
+					<CustomModelsField baseUrl={baseUrl} apiKey={key} models={models} onChange={setModels} autoFill />
 					{error && (
 						<span role="alert" className="ferror">
 							{error}
 						</span>
 					)}
 					<div className="su-form-actions">
-						<button type="submit" className="btn brand" disabled={busy || !name.trim() || !baseUrl.trim() || parseModelIds(modelText).length === 0}>
+						<button type="submit" className="btn brand" disabled={busy || !name.trim() || !baseUrl.trim() || models.length === 0}>
 							{busy ? "Adding…" : "Add provider"}
 						</button>
 					</div>

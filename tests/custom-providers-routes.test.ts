@@ -31,6 +31,7 @@ after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
 const json = (body: unknown) => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
+const text = (id: string) => ({ id, vision: false, thinking: false, contextWindow: 128_000, maxTokens: 8192 });
 const create = (body: unknown) => listRoute.POST(new Request("http://localhost/api/providers/custom", json(body)));
 const update = (id: string, body: unknown) =>
 	idRoute.PUT(new Request(`http://localhost/api/providers/custom/${id}`, { ...json(body), method: "PUT" }), params(id));
@@ -44,7 +45,7 @@ describe("the custom provider routes", () => {
 			id: "custom-local-ollama",
 			name: "Local Ollama",
 			baseUrl: "http://localhost:11434/v1",
-			models: ["llama3", "qwen"],
+			models: [text("llama3"), text("qwen")],
 			keyPresent: false,
 		});
 		const list = await (await listRoute.GET()).json();
@@ -68,7 +69,7 @@ describe("the custom provider routes", () => {
 
 	it("updates fields partially, null removing the key; 404 on unknown id", async () => {
 		const renamed = await (await update("custom-local-ollama-2", { name: "Gateway", models: ["m", "n"] })).json();
-		assert.deepEqual(renamed.provider, { id: "custom-local-ollama-2", name: "Gateway", baseUrl: "https://gw.example/v1", models: ["m", "n"], keyPresent: true });
+		assert.deepEqual(renamed.provider, { id: "custom-local-ollama-2", name: "Gateway", baseUrl: "https://gw.example/v1", models: [text("m"), text("n")], keyPresent: true });
 		const keyless = await (await update("custom-local-ollama-2", { apiKey: null })).json();
 		assert.equal(keyless.provider.keyPresent, false);
 		assert.equal(authStore.authVars().LH_CUSTOM_LOCAL_OLLAMA_2_API_KEY, undefined);
@@ -102,6 +103,29 @@ describe("the custom provider routes", () => {
 		const llama = catalog.models.find((m) => m.provider === "custom-local-ollama" && m.id === "llama3");
 		assert.ok(llama, "custom models federate into the pickers");
 		assert.equal(llama.unpriced, true);
+	});
+
+	it("carries each model's capabilities into the engine and the vision picker", async () => {
+		const res = await update("custom-local-ollama", {
+			models: [
+				"llama3",
+				{ id: "llava", vision: true, contextWindow: 32_768, maxTokens: 4096 },
+				{ id: "qwq", thinking: true, thinkingFormat: "qwen" },
+			],
+		});
+		assert.equal(res.status, 200);
+		const llava = piModels().getModel("custom-local-ollama", "llava");
+		assert.deepEqual(llava?.input, ["text", "image"]);
+		assert.equal(llava?.reasoning, false);
+		assert.equal(llava?.contextWindow, 32_768);
+		assert.equal(llava?.maxTokens, 4096);
+		const qwq = piModels().getModel("custom-local-ollama", "qwq");
+		assert.equal(qwq?.reasoning, true);
+		assert.equal((qwq?.compat as { thinkingFormat?: string } | undefined)?.thinkingFormat, "qwen");
+		const catalog = modelCatalog().models.filter((m) => m.provider === "custom-local-ollama");
+		assert.deepEqual(catalog.filter((m) => m.input.includes("image")).map((m) => m.id), ["llava"], "only vision models fill the vision slot");
+		assert.ok(catalog.find((m) => m.id === "qwq")!.supportedLevels.includes("high"), "a thinking model offers levels");
+		assert.deepEqual(catalog.find((m) => m.id === "llama3")!.supportedLevels, ["off"]);
 	});
 
 	it("prices custom models as unknown, never $0", () => {
@@ -140,12 +164,13 @@ describe("the probe route", () => {
 	it("lists the endpoint's models, sending the key as a bearer token", async () => {
 		let seen: { url: string; auth: string | null } | undefined;
 		customProviderProbe.fetch = async (url, init) => {
+			if (!url.endsWith("/v1/models")) return new Response("no", { status: 404 });
 			seen = { url, auth: new Headers(init.headers).get("authorization") };
 			return Response.json({ object: "list", data: [{ id: "a" }, { id: "b" }, { id: "a" }, { nope: 1 }] });
 		};
 		const res = await probe({ baseUrl: "http://h:8000/v1/", apiKey: "k1" });
 		assert.equal(res.status, 200);
-		assert.deepEqual(await res.json(), { ok: true, models: ["a", "b"] });
+		assert.deepEqual(await res.json(), { ok: true, models: ["a", "b"], detected: {} });
 		assert.deepEqual(seen, { url: "http://h:8000/v1/models", auth: "Bearer k1" });
 	});
 
@@ -155,7 +180,7 @@ describe("the probe route", () => {
 			auth = new Headers(init.headers).get("authorization");
 			return Response.json({ data: [] });
 		};
-		assert.deepEqual(await (await probe({ baseUrl: "http://h/v1" })).json(), { ok: true, models: [] });
+		assert.deepEqual(await (await probe({ baseUrl: "http://h/v1" })).json(), { ok: true, models: [], detected: {} });
 		assert.equal(auth, null);
 	});
 
@@ -176,6 +201,75 @@ describe("the probe route", () => {
 			assert.equal(body.ok, false);
 			assert.match(body.error, pattern);
 		}
+	});
+
+	it("reads capabilities from OpenRouter-style /models fields", async () => {
+		customProviderProbe.fetch = async (url) =>
+			url.endsWith("/models")
+				? Response.json({
+						data: [
+							{ id: "vl", architecture: { input_modalities: ["text", "image"] }, context_length: 200_000, top_provider: { max_completion_tokens: 16_000 }, supported_parameters: ["tools", "reasoning"] },
+							{ id: "txt", architecture: { input_modalities: ["text"] }, supported_parameters: ["tools"] },
+							{ id: "vllm", max_model_len: 32_768 },
+							{ id: "bare" },
+						],
+					})
+				: new Response("no", { status: 404 });
+		const body = await (await probe({ baseUrl: "https://gw.example/api/v1" })).json();
+		assert.deepEqual(body.detected, {
+			vl: { vision: true, thinking: true, contextWindow: 200_000, maxTokens: 16_000 },
+			txt: { vision: false, thinking: false },
+			vllm: { contextWindow: 32_768 },
+		});
+	});
+
+	it("reads capabilities from Ollama's /api/show and LM Studio's /api/v0/models", async () => {
+		const seen: string[] = [];
+		customProviderProbe.fetch = async (url, init) => {
+			seen.push(url);
+			if (url === "http://h:11434/v1/models") return Response.json({ data: [{ id: "llava" }, { id: "qwen3" }, { id: "gemma" }] });
+			if (url === "http://h:11434/api/version") return Response.json({ version: "0.12.0" });
+			if (url === "http://h:11434/api/show") {
+				const model = JSON.parse(String(init.body)).model;
+				if (model === "llava") return Response.json({ capabilities: ["completion", "vision"], model_info: { "llama.context_length": 32_768 } });
+				if (model === "qwen3") return Response.json({ capabilities: ["completion", "tools", "thinking"] });
+				return new Response("not found", { status: 404 });
+			}
+			if (url === "http://h:11434/api/v0/models") return Response.json({ data: [{ id: "gemma", type: "vlm", max_context_length: 8192 }] });
+			return new Response("no", { status: 404 });
+		};
+		const body = await (await probe({ baseUrl: "http://h:11434/v1" })).json();
+		assert.deepEqual(body.detected, {
+			llava: { vision: true, thinking: false, contextWindow: 32_768 },
+			qwen3: { vision: false, thinking: true },
+			gemma: { vision: true, contextWindow: 8192 },
+		});
+		assert.ok(seen.includes("http://h:11434/api/version"));
+	});
+
+	it("skips the native APIs when the base URL does not end in /v1, and survives their failures", async () => {
+		const seen: string[] = [];
+		customProviderProbe.fetch = async (url) => {
+			seen.push(url);
+			if (url.endsWith("/models")) return Response.json({ data: [{ id: "a" }] });
+			throw new TypeError("fetch failed");
+		};
+		assert.deepEqual((await (await probe({ baseUrl: "http://h/openai" })).json()).detected, {});
+		assert.deepEqual(seen, ["http://h/openai/models"]);
+		assert.deepEqual((await (await probe({ baseUrl: "http://h/v1" })).json()).detected, {});
+	});
+
+	it("sends a saved provider's stored key when none is typed", async () => {
+		await create({ name: "Keyed", baseUrl: "http://k/v1", models: ["m"], apiKey: "stored-key" });
+		let auth: string | null = null;
+		customProviderProbe.fetch = async (url, init) => {
+			if (url.endsWith("/models")) auth = new Headers(init.headers).get("authorization");
+			return Response.json({ data: [] });
+		};
+		await probe({ baseUrl: "http://k/v1", providerId: "custom-keyed" });
+		assert.equal(auth, "Bearer stored-key");
+		await probe({ baseUrl: "http://k/v1", providerId: "custom-keyed", apiKey: "typed" });
+		assert.equal(auth, "Bearer typed", "a typed key wins");
 	});
 
 	it("400s a malformed body", async () => {

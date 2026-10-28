@@ -15,7 +15,9 @@
  *    a paste box on a key the UI cannot make live would mislead.
  *  - OpenRouter is NOT special: one provider among 33, a row only when
  *    stored, otherwise it lives in the Add dropdown like everyone else.
- *  - Providers groups API keys, subscriptions, dictation and search.
+ *  - Providers groups API keys, OpenAI-compatible endpoints (their own
+ *    editor — custom-providers-section.tsx), subscriptions, dictation
+ *    and search.
  *    Unknown variables stay masked/read-only at the end of Model API keys.
  *
  * API: GET /api/keys (masked statuses + the providers array), PUT
@@ -27,6 +29,7 @@ import { useEffect, useRef, useState } from "react";
 import { AUTH_KEYS, type AuthKeyStatus } from "@/src/core";
 import { SettingsGroup } from "./controls.tsx";
 import { SubscriptionConnections } from "./subscription-connections.tsx";
+import { CustomProvidersGroup } from "./custom-providers-section.tsx";
 import { ProviderMark } from "./connection-controls.tsx";
 import { ProviderMenuList } from "./model-menu.tsx";
 import { MenuShell } from "@/components/menu-shell";
@@ -539,6 +542,8 @@ export function KeysSection({
 					/>
 				)}
 			</SettingsGroup>
+
+			<CustomProvidersGroup />
 
 			<SettingsGroup
 				label="Subscriptions"
