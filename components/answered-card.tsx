@@ -7,7 +7,7 @@ import { ThinkingBlock } from "@/components/thinking-block";
 import { cn } from "@/lib/utils";
 import { MessageResponse } from "@/components/ai-elements/message";
 import type { QuestionAnswerData } from "@/src/core";
-import { parseAskInput, parseQuizInput } from "@/src/core";
+import { decodeOverescapedNewlines, parseAskInput, parseQuizInput } from "@/src/core";
 
 /**
  * Static rendering of an answered question (tool part in `output-available`).
@@ -62,7 +62,10 @@ export function AnsweredCard({ answer, input }: { answer: QuestionAnswerData; in
 						: "Question";
 	const outcome = !isQuiz ? undefined : answer.dontKnow ? "dontKnow" : answer.correct ? "correct" : "incorrect";
 	const thinking = answer.thinking ?? answer.note;
-	const why = isQuiz && answer.explanation ? answer.explanation : null;
+	// The snapshot froze the explanation as parsed at answer time, so records
+	// answered before the prose escape heal (owner, 2026-10-28) still hold
+	// literal `\n` text — the same decode, display only.
+	const why = isQuiz && answer.explanation ? decodeOverescapedNewlines(answer.explanation) : null;
 
 	return (
 		<>

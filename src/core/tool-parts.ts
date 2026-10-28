@@ -29,9 +29,9 @@
 
 import { Value } from "typebox/value";
 import type { TSchema } from "typebox";
-import { quizDisplayInputSchema, askInputSchema, askOptionProblems, quizInputProblems, explainInputProblems, explainDisplayInputSchema, type AskToolInput, type QuizToolInput, type ExplainToolInput } from "./question-core.ts";
+import { quizDisplayInputSchema, askInputSchema, askOptionProblems, quizInputProblems, explainInputProblems, explainDisplayInputSchema, ASK_PROSE_FIELDS, EXPLAIN_PROSE_FIELDS, QUIZ_PROSE_FIELDS, type AskToolInput, type QuizToolInput, type ExplainToolInput } from "./question-core.ts";
 import { repairMathForDisplay } from "./math-delims.ts";
-import { healEncodedArguments } from "./argument-heal.ts";
+import { healEncodedArguments, healProseEscapes } from "./argument-heal.ts";
 import { probeDoneInputSchema, type ProbeDoneInput } from "./contracts/probe.ts";
 
 /** The pi-boundary parse step, mirrored here (live-smoke fix, 2026-09-26):
@@ -99,8 +99,12 @@ export function parseQuizInput(input: unknown): QuizToolInput | undefined {
 	// record keeps RAW arguments, so the recorded `type: "\"predict\""`
 	// wobble must heal HERE too or a posed quiz renders invisible (the
 	// tool-parts law). healEncodedArguments is the same pure pass the
-	// boundary's withArgumentHeal runs.
-	const healedInput = healEncodedArguments(restoreMathEscapesDeep(input), quizDisplayInputSchema);
+	// boundary's withArgumentHeal runs; healProseEscapes mirrors the
+	// question tools' prepareArguments (owner, 2026-10-28).
+	const healedInput = healProseEscapes(
+		healEncodedArguments(restoreMathEscapesDeep(input), quizDisplayInputSchema),
+		QUIZ_PROSE_FIELDS,
+	);
 	const cleaned = boundaryParse<QuizToolInput>(quizDisplayInputSchema, healedInput);
 	if (!cleaned) return undefined;
 	if (quizInputProblems(cleaned).length > 0) return undefined;
@@ -114,7 +118,7 @@ export function parseQuizInput(input: unknown): QuizToolInput | undefined {
  * keying, so they parse to undefined exactly like the zod seam did).
  */
 export function parseAskInput(input: unknown): AskToolInput | undefined {
-	const cleaned = boundaryParse<AskToolInput>(askInputSchema, restoreMathEscapesDeep(input));
+	const cleaned = boundaryParse<AskToolInput>(askInputSchema, healProseEscapes(restoreMathEscapesDeep(input), ASK_PROSE_FIELDS));
 	if (!cleaned) return undefined;
 	if (askOptionProblems(cleaned.options ?? []).length > 0) return undefined;
 	return cleaned;
@@ -127,7 +131,10 @@ export function parseAskInput(input: unknown): AskToolInput | undefined {
  *  variants share the same fields; the teacher's nodeId is an unknown
  *  key Value.Clean strips, same as the quiz seam. */
 export function parseExplainInput(input: unknown): ExplainToolInput | undefined {
-	const cleaned = boundaryParse<ExplainToolInput>(explainDisplayInputSchema, restoreMathEscapesDeep(input));
+	const cleaned = boundaryParse<ExplainToolInput>(
+		explainDisplayInputSchema,
+		healProseEscapes(restoreMathEscapesDeep(input), EXPLAIN_PROSE_FIELDS),
+	);
 	if (!cleaned) return undefined;
 	if (explainInputProblems(cleaned).length > 0) return undefined;
 	return cleaned;

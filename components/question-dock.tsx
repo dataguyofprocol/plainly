@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { finishDictation, isDictationActive, joinDictation, useDictationTarget } from "@/components/dictation";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { MessageResponse } from "@/components/ai-elements/message";
+import { MathLine } from "@/components/latex-glyph";
 import { ConfidenceLadder } from "@/components/confidence-rail";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,7 @@ import {
 	parseAskInput,
 	parseQuizInput,
 	parseExplainInput,
+	plainText,
 	toggleOption,
 	toggleOther,
 	type AnswerRequest,
@@ -164,23 +166,16 @@ export function QuestionDock({
 	);
 }
 
-/** A plain-text teaser of a question for the collapsed bar: unwrap math, flatten common LaTeX. */
-function teaserText(q: string): string {
-	return q
-		.replace(/\\\(([\s\S]*?)\\\)/g, "$1") // \(...\) inline math
-		.replace(/\\\[([\s\S]*?)\\\]/g, "$1") // \[...\] display math
-		.replace(/\$\$?([^$]*)\$\$?/g, "$1") // standard $...$/$$...$$ math
-		.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, "$1/$2")
-		.replace(/\\([a-zA-Z]+)/g, "$1")
-		.replace(/[{}]/g, "")
-		.replace(/\s+/g, " ")
-		.trim();
-}
-
 /** The collapsed strip. Two species (W5): "collapsed" is the scroll minimization
  *  (kind chip + one-liner + Answer); "reveal" is the teach-check invitation —
  *  a distinct, more inviting affordance, because it asks the learner to start
  *  something, not to resume something. */
+/** The collapsed bar's teaser: plainText's rules, uncapped (CSS clamps) —
+ *  math stays for MathLine (owner ruling 2026-10-28). */
+function teaserText(q: string): string {
+	return plainText(q, Infinity) ?? "";
+}
+
 export function QuestionDockBar({
 	toolName,
 	question,
@@ -209,7 +204,7 @@ export function QuestionDockBar({
 				</span>
 				<span className="qreveal-tx">
 					<span className="qreveal-t">Check your understanding</span>
-					<span className="qreveal-d">{teaserText(question)}</span>
+					<span className="qreveal-d"><MathLine text={teaserText(question)} /></span>
 				</span>
 				<span className="qreveal-go">
 					Open
@@ -221,7 +216,7 @@ export function QuestionDockBar({
 	return (
 		<button type="button" data-testid="question-dock-bar" onClick={onExpand} className="qbar dock-variant">
 			<span className="qbar-k">{label ?? toolLabel ?? (toolName === "quiz" ? "Check" : toolName === "explain" ? "Explain" : "Question")}</span>
-			<span className="qbar-q">{teaserText(question)}</span>
+			<span className="qbar-q"><MathLine text={teaserText(question)} /></span>
 			<span className="qbar-go">
 				Answer
 				<Icon name="arrow-down" size="sm" />
