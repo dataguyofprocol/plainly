@@ -34,6 +34,15 @@ npx tsx --env-file=.env.local scripts/replay-layout.ts        # re-derive layout
 
 For Windows/Linux packages and the three-OS CI/release flow, see [`desktop-release.md`](desktop-release.md). Native renderer binaries are traced per platform, so release builds run on the target OS, not as cross-builds from macOS.
 
+### Git hooks
+
+Lint and typecheck run on every commit; the test suite runs on every push. The hooks are managed by [pre-commit](https://pre-commit.com) (`.pre-commit-config.yaml`). Install it once per clone:
+
+```bash
+brew install pre-commit   # or: pipx install pre-commit
+pre-commit install        # installs the pre-commit and pre-push hooks
+```
+
 ## Environment (`.env.local`)
 
 Secrets and machine-specific paths only. Model choice and thinking budgets are the user's, not the environment's — BYOK model slots live in **settings** (`models` section: strong/cheap/vision, provider + model id + optional thinking level; per-role and per-chat overrides ride on top). The extraction batch threshold is a settings knob too (`graph.extractionChunkTokens`, default 4096, floor 500).

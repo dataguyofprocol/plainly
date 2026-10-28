@@ -1,0 +1,28 @@
+# Local git hooks. Install once per clone: `pre-commit install`
+# (docs/development.md#git-hooks).
+default_install_hook_types: [pre-commit, pre-push]
+
+repos:
+  - repo: local
+    hooks:
+      - id: lint
+        name: eslint
+        entry: npm run lint
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: typecheck
+        name: tsc --noEmit
+        entry: npm run typecheck
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: test
+        name: test suite
+        entry: npm test
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
