@@ -106,26 +106,32 @@ export function syncCustomProviders(): void {
 /** One custom entry as a pi-ai provider: openai-completions at the entry's
  *  base URL, auth from its LH_CUSTOM_* var (the keys seam reflects the
  *  stored key into env) or the no-key placeholder — a keyless provider is
- *  configured by design. Models get conservative defaults: text-only,
- *  no reasoning, 128k context, 8192 output, cost 0 (pricing treats every
- *  custom model as UNPRICED, server/pricing.ts — the zeros are never
- *  shown as $0). The compat pins avoid the OpenAI-only request features
- *  (store, the developer role, max_completion_tokens) that self-hosted
- *  servers commonly reject. */
+ *  configured by design. Each model carries the capabilities the user set
+ *  (vision → image input, thinking → reasoning in the chosen wire format,
+ *  context, max output); cost 0 (pricing treats every custom model as
+ *  UNPRICED, server/pricing.ts — the zeros are never shown as $0). The
+ *  compat pins avoid the OpenAI-only request features (store, the
+ *  developer role, max_completion_tokens) that self-hosted servers
+ *  commonly reject. */
 export function customProvider(entry: CustomProviderEntry) {
 	const envVar = customProviderEnvVar(entry.id);
-	const models: Model<"openai-completions">[] = entry.models.map((id) => ({
-		id,
-		name: id,
+	const models: Model<"openai-completions">[] = entry.models.map((m) => ({
+		id: m.id,
+		name: m.id,
 		api: "openai-completions",
 		provider: entry.id,
 		baseUrl: entry.baseUrl,
-		reasoning: false,
-		input: ["text"],
+		reasoning: m.thinking,
+		input: m.vision ? ["text", "image"] : ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: 128_000,
-		maxTokens: 8192,
-		compat: { supportsStore: false, supportsDeveloperRole: false, maxTokensField: "max_tokens" },
+		contextWindow: m.contextWindow,
+		maxTokens: m.maxTokens,
+		compat: {
+			supportsStore: false,
+			supportsDeveloperRole: false,
+			maxTokensField: "max_tokens",
+			...(m.thinking ? { thinkingFormat: m.thinkingFormat ?? "openai" } : {}),
+		},
 	}));
 	return createProvider({
 		id: entry.id,

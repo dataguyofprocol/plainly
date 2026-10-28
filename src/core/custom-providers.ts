@@ -6,7 +6,7 @@
  * pickers like any built-in provider's.
  *
  * THE RECORD: settings.providers.custom (non-secret — id, name, base URL,
- * the model ids the user typed or probed). THE KEY: optional (local
+ * the models the user typed or probed, each with its capabilities). THE KEY: optional (local
  * servers need none), stored in the SAME auth.json map as every other
  * provider key under LH_CUSTOM_<SLUG>_API_KEY — written only through
  * /api/providers/custom, never through the generic /api/keys gate.
@@ -16,6 +16,33 @@
  * the CRUD + probe in server/custom-providers.ts.
  */
 
+/** How a thinking model is asked to think — pi-ai's openai-completions
+ *  `compat.thinkingFormat` values that need no further configuration
+ *  (chat-template, baseten and ant-ling need extra kwargs or a level map,
+ *  so they are not offered). */
+export const CUSTOM_THINKING_FORMATS = ["openai", "openrouter", "deepseek", "qwen", "qwen-chat-template", "zai", "together", "string-thinking"] as const;
+export type CustomThinkingFormat = (typeof CUSTOM_THINKING_FORMATS)[number];
+
+/** One model's capabilities (per-model capabilities, owner 2026-10-28):
+ *  what the user set or the probe detected. Nothing in an OpenAI-style
+ *  /models answer says what a model can do, so nothing is assumed —
+ *  unset means text-only, no thinking, 128k context, 8192 output. */
+export interface CustomModelEntry {
+	id: string;
+	/** Accepts image input (joins the vision slot's picker). */
+	vision: boolean;
+	/** Can think (reasoning: true — the thinking picker offers levels). */
+	thinking: boolean;
+	/** Present exactly when `thinking` — "openai" (reasoning_effort) unless set. */
+	thinkingFormat?: CustomThinkingFormat;
+	contextWindow: number;
+	maxTokens: number;
+}
+
+export const CUSTOM_MODEL_DEFAULTS = { vision: false, thinking: false, contextWindow: 128_000, maxTokens: 8192 } as const;
+export const CUSTOM_CONTEXT_MIN = 1_024;
+export const CUSTOM_CONTEXT_MAX = 10_000_000;
+
 /** One custom provider as stored in the settings record. */
 export interface CustomProviderEntry {
 	/** "custom-<slug>" — minted once from the first name, stable across renames. */
@@ -24,8 +51,10 @@ export interface CustomProviderEntry {
 	name: string;
 	/** http(s) URL WITHOUT a trailing slash — the OpenAI base (…/v1). */
 	baseUrl: string;
-	/** The model ids this endpoint serves (1..50, unique, non-empty). */
-	models: string[];
+	/** The models this endpoint serves (1..50, unique non-empty ids). Records
+	 *  written before per-model capabilities hold bare id strings; the
+	 *  sanitizer reads those as the defaults. */
+	models: CustomModelEntry[];
 }
 
 /** The GET/POST/PUT view: the stored entry + whether a key is stored. */
@@ -33,8 +62,15 @@ export interface CustomProviderView extends CustomProviderEntry {
 	keyPresent: boolean;
 }
 
-/** The probe route's answer — always HTTP 200; `ok` carries the verdict. */
-export type CustomProviderProbeResult = { ok: true; models: string[] } | { ok: false; error: string };
+/** What the probe could read about one model from the server's own
+ *  metadata — only the fields it actually found. */
+export type CustomModelDetected = Partial<Pick<CustomModelEntry, "vision" | "thinking" | "contextWindow" | "maxTokens">>;
+
+/** The probe route's answer — always HTTP 200; `ok` carries the verdict.
+ *  `detected` holds an entry only for models the server described. */
+export type CustomProviderProbeResult =
+	| { ok: true; models: string[]; detected: Record<string, CustomModelDetected> }
+	| { ok: false; error: string };
 
 export const CUSTOM_PROVIDER_PREFIX = "custom-";
 export const CUSTOM_PROVIDER_ID_RE = /^custom-[a-z0-9-]{1,40}$/;
@@ -100,11 +136,60 @@ export function normalizeBaseUrl(raw: string): string | null {
 	return value;
 }
 
-/** Trimmed, de-duplicated (first wins), blanks dropped; null when anything
- *  is not a string. */
-function cleanModelIds(raw: unknown): string[] | null {
-	if (!Array.isArray(raw) || raw.some((m) => typeof m !== "string")) return null;
-	return [...new Set((raw as string[]).map((m) => m.trim()).filter(Boolean))];
+/** A whole number inside [min, max], else null. */
+function boundedInt(raw: unknown, min: number, max: number): number | null {
+	return typeof raw === "number" && Number.isInteger(raw) && raw >= min && raw <= max ? raw : null;
+}
+
+function isThinkingFormat(raw: unknown): raw is CustomThinkingFormat {
+	return (CUSTOM_THINKING_FORMATS as readonly unknown[]).includes(raw);
+}
+
+/** A model with every capability at its default. */
+export function defaultCustomModel(id: string): CustomModelEntry {
+	return { id, ...CUSTOM_MODEL_DEFAULTS };
+}
+
+/** The canonical form: thinkingFormat present exactly when thinking, and
+ *  maxTokens never above the context window. */
+function settleModel(m: CustomModelEntry): CustomModelEntry {
+	const { thinkingFormat, ...rest } = m;
+	return {
+		...rest,
+		maxTokens: Math.min(m.maxTokens, m.contextWindow),
+		...(m.thinking ? { thinkingFormat: thinkingFormat ?? "openai" } : {}),
+	};
+}
+
+/** Lenient: a bare id string (records before per-model capabilities) or
+ *  an object; a bad capability field falls back to its default. null
+ *  when there is no usable id. */
+function sanitizeModel(raw: unknown): CustomModelEntry | null {
+	if (typeof raw === "string") return raw.trim() ? defaultCustomModel(raw.trim()) : null;
+	if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
+	const r = raw as Record<string, unknown>;
+	const id = typeof r.id === "string" ? r.id.trim() : "";
+	if (!id) return null;
+	return settleModel({
+		id,
+		vision: typeof r.vision === "boolean" ? r.vision : CUSTOM_MODEL_DEFAULTS.vision,
+		thinking: typeof r.thinking === "boolean" ? r.thinking : CUSTOM_MODEL_DEFAULTS.thinking,
+		...(isThinkingFormat(r.thinkingFormat) ? { thinkingFormat: r.thinkingFormat } : {}),
+		contextWindow: boundedInt(r.contextWindow, CUSTOM_CONTEXT_MIN, CUSTOM_CONTEXT_MAX) ?? CUSTOM_MODEL_DEFAULTS.contextWindow,
+		maxTokens: boundedInt(r.maxTokens, 1, CUSTOM_CONTEXT_MAX) ?? CUSTOM_MODEL_DEFAULTS.maxTokens,
+	});
+}
+
+/** Sanitized models, de-duplicated by id (first wins); null when the
+ *  value is not a list. */
+function cleanModels(raw: unknown): CustomModelEntry[] | null {
+	if (!Array.isArray(raw)) return null;
+	const out: CustomModelEntry[] = [];
+	for (const item of raw) {
+		const model = sanitizeModel(item);
+		if (model && !out.some((m) => m.id === model.id)) out.push(model);
+	}
+	return out;
 }
 
 // ─── Read side: the settings sanitizer ─────────────────────────────────────
@@ -124,7 +209,7 @@ export function sanitizeCustomProviders(raw: unknown): CustomProviderEntry[] {
 		if (!name || name.length > CUSTOM_PROVIDER_NAME_MAX) continue;
 		const baseUrl = typeof r.baseUrl === "string" ? normalizeBaseUrl(r.baseUrl) : null;
 		if (!baseUrl) continue;
-		const models = cleanModelIds(r.models)?.slice(0, CUSTOM_PROVIDER_MODELS_MAX);
+		const models = cleanModels(r.models)?.slice(0, CUSTOM_PROVIDER_MODELS_MAX);
 		if (!models?.length) continue;
 		out.push({ id: r.id, name, baseUrl, models });
 	}
@@ -151,9 +236,50 @@ function parseBaseUrl(raw: unknown): CustomProviderParse<string> {
 		: { ok: false, error: "The base URL must be an http:// or https:// URL, e.g. http://localhost:11434/v1" };
 }
 
-function parseModels(raw: unknown): CustomProviderParse<string[]> {
-	const models = cleanModelIds(raw);
-	if (!models) return { ok: false, error: "Models must be a list of model ids" };
+/** One model: a bare id (every capability at its default) or {id, vision?,
+ *  thinking?, thinkingFormat?, contextWindow?, maxTokens?} — an absent
+ *  field takes its default, a present one must be valid. */
+function parseModel(raw: unknown): CustomProviderParse<CustomModelEntry> {
+	if (typeof raw === "string") return { ok: true, value: defaultCustomModel(raw.trim()) };
+	if (raw === null || typeof raw !== "object" || Array.isArray(raw) || typeof (raw as { id?: unknown }).id !== "string") {
+		return { ok: false, error: "Models must be a list of model ids" };
+	}
+	const r = raw as Record<string, unknown>;
+	const id = (r.id as string).trim();
+	for (const field of ["vision", "thinking"] as const) {
+		if (r[field] !== undefined && typeof r[field] !== "boolean") return { ok: false, error: `${id}: ${field} must be true or false` };
+	}
+	if (r.thinkingFormat !== undefined && !isThinkingFormat(r.thinkingFormat)) {
+		return { ok: false, error: `${id}: unknown thinking format "${String(r.thinkingFormat)}"` };
+	}
+	const contextWindow = r.contextWindow === undefined ? CUSTOM_MODEL_DEFAULTS.contextWindow : boundedInt(r.contextWindow, CUSTOM_CONTEXT_MIN, CUSTOM_CONTEXT_MAX);
+	if (contextWindow === null) {
+		return { ok: false, error: `${id}: the context window must be a whole number from ${CUSTOM_CONTEXT_MIN.toLocaleString("en-US")} to ${CUSTOM_CONTEXT_MAX.toLocaleString("en-US")} tokens` };
+	}
+	const maxTokens = r.maxTokens === undefined ? Math.min(CUSTOM_MODEL_DEFAULTS.maxTokens, contextWindow) : boundedInt(r.maxTokens, 1, contextWindow);
+	if (maxTokens === null) return { ok: false, error: `${id}: max output must be a whole number from 1 to the context window` };
+	return {
+		ok: true,
+		value: settleModel({
+			id,
+			vision: (r.vision as boolean | undefined) ?? CUSTOM_MODEL_DEFAULTS.vision,
+			thinking: (r.thinking as boolean | undefined) ?? CUSTOM_MODEL_DEFAULTS.thinking,
+			...(r.thinkingFormat !== undefined ? { thinkingFormat: r.thinkingFormat as CustomThinkingFormat } : {}),
+			contextWindow,
+			maxTokens,
+		}),
+	};
+}
+
+function parseModels(raw: unknown): CustomProviderParse<CustomModelEntry[]> {
+	if (!Array.isArray(raw)) return { ok: false, error: "Models must be a list of model ids" };
+	const models: CustomModelEntry[] = [];
+	for (const item of raw) {
+		const model = parseModel(item);
+		if (!model.ok) return model;
+		// blanks drop, a repeated id keeps the first
+		if (model.value.id && !models.some((m) => m.id === model.value.id)) models.push(model.value);
+	}
 	if (models.length === 0) return { ok: false, error: "Add at least one model id" };
 	if (models.length > CUSTOM_PROVIDER_MODELS_MAX) {
 		return { ok: false, error: `At most ${CUSTOM_PROVIDER_MODELS_MAX} models per provider` };
@@ -174,7 +300,7 @@ export function parseCustomProviderKey(raw: unknown): CustomProviderParse<string
 export interface CustomProviderCreate {
 	name: string;
 	baseUrl: string;
-	models: string[];
+	models: CustomModelEntry[];
 	/** Absent = keyless (an empty string counts as absent). */
 	apiKey?: string;
 }
@@ -203,7 +329,7 @@ export function parseCustomProviderCreate(body: unknown): CustomProviderParse<Cu
 export interface CustomProviderUpdate {
 	name?: string;
 	baseUrl?: string;
-	models?: string[];
+	models?: CustomModelEntry[];
 	/** string = replace the key, null = remove it, absent = untouched. */
 	apiKey?: string | null;
 }
@@ -239,14 +365,23 @@ export function parseCustomProviderUpdate(body: unknown): CustomProviderParse<Cu
 	return { ok: true, value: out };
 }
 
-/** Probe body: {baseUrl, apiKey?}. */
-export function parseCustomProviderProbe(body: unknown): CustomProviderParse<{ baseUrl: string; apiKey?: string }> {
+export interface CustomProviderProbeInput {
+	baseUrl: string;
+	apiKey?: string;
+	/** A saved provider whose stored key to send when no apiKey is given —
+	 *  the edit view probes without the key ever reaching the browser. */
+	providerId?: string;
+}
+
+/** Probe body: {baseUrl, apiKey?, providerId?}. */
+export function parseCustomProviderProbe(body: unknown): CustomProviderParse<CustomProviderProbeInput> {
 	if (body === null || typeof body !== "object" || Array.isArray(body)) {
-		return { ok: false, error: "body must be {baseUrl, apiKey?}" };
+		return { ok: false, error: "body must be {baseUrl, apiKey?, providerId?}" };
 	}
 	const b = body as Record<string, unknown>;
 	const baseUrl = parseBaseUrl(b.baseUrl);
 	if (!baseUrl.ok) return baseUrl;
 	const apiKey = typeof b.apiKey === "string" && b.apiKey.trim() ? b.apiKey.trim() : undefined;
-	return { ok: true, value: apiKey ? { baseUrl: baseUrl.value, apiKey } : { baseUrl: baseUrl.value } };
+	const providerId = typeof b.providerId === "string" && isCustomProviderId(b.providerId) ? b.providerId : undefined;
+	return { ok: true, value: { baseUrl: baseUrl.value, ...(apiKey ? { apiKey } : {}), ...(providerId ? { providerId } : {}) } };
 }

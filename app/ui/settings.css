@@ -286,6 +286,24 @@
 .v4 .su-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 12px; }
 .v4 .su-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .v4 .su-chips .chip { height: 26px; font-size: 12px; font-family: var(--font-jetbrains), monospace; }
+/* Custom provider models: one row per model, its capabilities beneath the id. */
+.v4 .cm-list { display: flex; flex-direction: column; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.v4 .cm-row { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; }
+.v4 .cm-row + .cm-row { border-top: 1px solid var(--line); }
+.v4 .cm-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.v4 .cm-id { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-jetbrains), monospace; font-size: 12px; font-weight: 500; color: var(--ink); }
+.v4 .cm-x { flex: none; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 6px; background: transparent; color: var(--faint); }
+.v4 .cm-x:hover { background: var(--hover); color: var(--ink); }
+.v4 .cm-caps { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.v4 .cm-cap { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+.v4 .cm-limits { display: inline-flex; flex-wrap: wrap; gap: 8px 12px; margin-left: auto; }
+.v4 .cm-num { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted-foreground); }
+.v4 .cm-num .st-num { width: 96px; }
+/* A saved custom provider's editor, unfolded inside the key card. */
+.v4 .st-card > .cp-editor { border-radius: 0; }
+.v4 .cp-editor .su-form-actions { align-items: center; }
+.v4 .cp-delete, .v4 .cp-confirm { margin-right: auto; }
+.v4 .cp-confirm { font-size: 13px; color: var(--ink); }
 .v4 .su-more { max-height: 280px; overflow: auto; }
 .v4 .su-or { display: flex; flex-direction: column; gap: 10px; padding-top: 18px; border-top: 1px solid var(--line); }
 .v4 .su-or .st-card { box-shadow: none; }

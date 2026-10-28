@@ -3,7 +3,9 @@
  * (custom-endpoint wave, 2026-10-26): {providers: [{id, name, baseUrl,
  * models, keyPresent}]}. Keys never leave the store — keyPresent only.
  *
- * POST — add one. Body {name, baseUrl, apiKey?, models}: strict parse
+ * POST — add one. Body {name, baseUrl, apiKey?, models} — each model a
+ * bare id or {id, vision?, thinking?, thinkingFormat?, contextWindow?,
+ * maxTokens?}, absent fields at their defaults: strict parse
  * (core/custom-providers.ts; a bad field is a 400 with a user-facing
  * `error`). The id is minted from the name ("custom-" + slug, -2, -3 …
  * on collision) and never changes. A key is optional — local servers
