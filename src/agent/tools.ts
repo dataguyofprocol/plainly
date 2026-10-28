@@ -2,6 +2,9 @@ import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { invalidInputResult, questionResult, serverExecute } from "./tool-execute.ts";
 import {
+	ASK_PROSE_FIELDS,
+	EXPLAIN_PROSE_FIELDS,
+	QUIZ_PROSE_FIELDS,
 	askInputSchema,
 	askOptionProblems,
 	explainInputBase,
@@ -12,6 +15,7 @@ import {
 	quizInputObject,
 	quizInputProblems,
 } from "../core/question-core.ts";
+import { healProseEscapes } from "../core/argument-heal.ts";
 import { filterEnabledTools, type EnabledTools } from "../core/pending.ts";
 import type { JobRecord } from "../core/contracts.ts";
 import type { JobStore } from "../core/ports.ts";
@@ -63,17 +67,22 @@ export type { ProbeDoneContext } from "./tools/probe.ts";
  *  persists the tool call with its RAW arguments — the client coerces
  *  again in normalizeOptions (question-core), the same parseOptionsIfString.
  *  Anything unparseable passes through untouched: validation then reports
- *  honestly and the agent retries with a real error to learn from. */
-function prepareQuestionArguments<T extends object>(args: unknown): T {
-	if (args && typeof args === "object" && !Array.isArray(args)) {
-		const o = args as { options?: unknown };
-		if (typeof o.options === "string") {
-			const parsed = parseOptionsIfString(o.options);
-			if (parsed !== o.options) return { ...o, options: parsed } as T;
+ *  honestly and the agent retries with a real error to learn from. The
+ *  factory takes the tool's prose field list (question-core). */
+function prepareQuestionArguments(proseFields: readonly string[]) {
+	return <T extends object>(args: unknown): T => {
+		if (args && typeof args === "object" && !Array.isArray(args)) {
+			let o = args as { options?: unknown };
+			if (typeof o.options === "string") {
+				const parsed = parseOptionsIfString(o.options);
+				if (parsed !== o.options) o = { ...o, options: parsed };
+			}
+			// The prose escape heal (owner, 2026-10-28): literal `\n` text in
+			// learner-facing fields decodes to real newlines (argument-heal).
+			return healProseEscapes(o, proseFields) as T;
 		}
-		return o as T;
-	}
-	return args as T;
+		return args as T;
+	};
 }
 
 export const askUserQuestionTool: AgentTool<typeof askInputSchema> = {
@@ -85,7 +94,7 @@ export const askUserQuestionTool: AgentTool<typeof askInputSchema> = {
 		"or you need an open-ended response. ONE question per turn: call a single ask_user_question, then end your " +
 		"turn — his answer determines the next.",
 	parameters: askInputSchema,
-	prepareArguments: prepareQuestionArguments,
+	prepareArguments: prepareQuestionArguments(ASK_PROSE_FIELDS),
 	executionMode: "sequential",
 	execute: async (_toolCallId, input) => {
 		const problems = askOptionProblems(input.options ?? []);
@@ -207,7 +216,7 @@ export const probeQuizTool: AgentTool<typeof probeQuizInputSchema> = {
 	label: "probe",
 	description: quizDescription({ name: "probe", nodeId: false, types: false }),
 	parameters: probeQuizInputSchema,
-	prepareArguments: prepareQuestionArguments,
+	prepareArguments: prepareQuestionArguments(QUIZ_PROSE_FIELDS),
 	executionMode: "sequential",
 	execute: async (_toolCallId, input) => {
 		const problems = quizInputProblems(input);
@@ -226,7 +235,7 @@ export function teachExplainToolFor(
 		label: "explain",
 		description: explainDescription("explain", true),
 		parameters: explainInputObject,
-		prepareArguments: prepareQuestionArguments,
+		prepareArguments: prepareQuestionArguments(EXPLAIN_PROSE_FIELDS),
 		executionMode: "sequential",
 		execute: async (_toolCallId, input) => {
 			const problems = [...explainInputProblems(input)];
@@ -251,7 +260,7 @@ export const probeExplainTool: AgentTool<typeof explainInputBase> = {
 	label: "recall",
 	description: explainDescription("recall", false),
 	parameters: explainInputBase,
-	prepareArguments: prepareQuestionArguments,
+	prepareArguments: prepareQuestionArguments(EXPLAIN_PROSE_FIELDS),
 	executionMode: "sequential",
 	execute: async (_toolCallId, input) => {
 		const problems = explainInputProblems(input);
@@ -378,7 +387,7 @@ export function teachQuizToolFor(ctx: Pick<PlanToolContext, "chatId" | "chatStor
 		label: "quiz",
 		description: quizDescription({ name: "quiz", nodeId: true, types: true }),
 		parameters: quizInputObject,
-		prepareArguments: prepareQuestionArguments,
+		prepareArguments: prepareQuestionArguments(QUIZ_PROSE_FIELDS),
 		executionMode: "sequential",
 		execute: async (_toolCallId, input) => {
 			const problems = [...quizInputProblems(input)];

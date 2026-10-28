@@ -1,4 +1,5 @@
 import katex from "katex";
+import { splitMathSpans } from "@/src/core";
 
 /**
  * THE LaTeX glyph seam (owner ruling, 2026-09-30): UI connectors that
@@ -49,5 +50,38 @@ export function LatexGlyph({
 			// (the same thing rehype-katex injects for markdown math).
 			dangerouslySetInnerHTML={{ __html: latexGlyphHtml(cmd) }}
 		/>
+	);
+}
+
+/** The KaTeX HTML for one preview math run (pure, sync — SSR-safe). A bad
+ *  expression renders KaTeX's own red source text, never throws. */
+function inlineMathHtml(tex: string): string {
+	return katex.renderToString(tex, { throwOnError: false });
+}
+
+/**
+ * One preview line with inline math (owner ruling 2026-10-28): the
+ * one-line previews — the home "Waiting on you" title, the dock's
+ * question teaser — render `$…$` spans as real KaTeX glyphs (the same
+ * seam ruling as LatexGlyph: never font-dependent unicode). Input is
+ * plainText's output: Markdown already stripped, math normalized to
+ * single dollars. Prose runs render as text, an escaped `\$` as `$`.
+ */
+export function MathLine({ text }: { text: string }) {
+	return (
+		<>
+			{splitMathSpans(text).map((span, i) =>
+				span.math ? (
+					<span
+						key={i}
+						// katex.renderToString is the library's own trusted output
+						// (the same thing rehype-katex injects for markdown math).
+						dangerouslySetInnerHTML={{ __html: inlineMathHtml(span.text) }}
+					/>
+				) : (
+					span.text.replace(/\\\$/g, "$")
+				),
+			)}
+		</>
 	);
 }

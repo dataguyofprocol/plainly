@@ -49,6 +49,7 @@ import {
 	type V4Topic,
 } from "@/components/v4/data";
 import { Field, SidebarCard } from "@/components/v4/shell";
+import { MathLine } from "@/components/latex-glyph";
 
 type Mode = "teach" | "practice";
 
@@ -524,7 +525,7 @@ function ContinueCard({ chats, now }: { chats: V4Chat[] | null; now: Date | null
 					)}
 					<span className="hm-ago">{now ? ago(hero.updatedAt, now) : ""}</span>
 				</span>
-				<span className="hm-q serif">{question ?? displayTitle(hero.title)}</span>
+				<span className="hm-q serif">{question ? <MathLine text={question} /> : displayTitle(hero.title)}</span>
 				<span className="hm-cont-foot">
 					<span className="hm-meta">
 						<Icon name={practice ? "practice" : "lesson"} size="sm" />

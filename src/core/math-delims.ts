@@ -570,3 +570,131 @@ export function healOverescapedCommands(text: string): string {
 	}
 	return out.join("");
 }
+
+/**
+ * Over-escaped newline decode (owner ruling 2026-10-28) — the prose twin of
+ * healOverescapedCommands.
+ *
+ * Field evidence (2026-10-28, the poker session): glm-5.3 double-escaped
+ * every probe `explanation` — the saved record holds the two characters
+ * `\` + `n` where a paragraph break was meant, and the learner reads a
+ * literal `\n\n` in the Why block; gpt-5.6-luna copied the pattern later in
+ * the same session. Authoring, not transport: the same session's plan_init
+ * mermaid carried real newlines.
+ *
+ * THE RULE. Only a string with NO real newline is a candidate (a string that
+ * already breaks lines for real meant its `\n` text literally). In it, every
+ * UNESCAPED `\n` OUTSIDE balanced math spans (legacy `\(…\)`/`\[…\]`, dollar
+ * `$…$`/`$$…$$`) and code spans becomes a newline; inside spans nothing is
+ * touched, so `$\nabla$`/`$\neq$` survive. An escaped `\\n` (literal
+ * backslash + n) stays. Callers opt in per field (argument-heal's
+ * healProseEscapes) — code-bearing strings are never passed here.
+ */
+export function decodeOverescapedNewlines(text: string): string {
+	if (text.includes("\n") || !text.includes("\\n")) return text;
+	const out: string[] = [];
+	let i = 0;
+	while (i < text.length) {
+		if (text[i] === "`") {
+			const run = backtickRun(text, i);
+			let j = i + run;
+			while (j < text.length) {
+				const nextRun = backtickRun(text, j);
+				if (nextRun === run) break;
+				j += Math.max(nextRun, 1);
+			}
+			const after = j < text.length ? j + run : i + run;
+			out.push(text.slice(i, after));
+			i = after;
+			continue;
+		}
+		if (text[i] === "\\" && !isEscaped(text, i)) {
+			const next = text[i + 1];
+			if (next === "(" || next === "[") {
+				const closeAt = findClose(text, i + 2, next === "[" ? DISPLAY_CLOSE : INLINE_CLOSE);
+				if (closeAt !== -1) {
+					out.push(text.slice(i, closeAt + 2));
+					i = closeAt + 2;
+					continue;
+				}
+			}
+			if (next === "n") {
+				out.push("\n");
+				i += 2;
+				continue;
+			}
+		}
+		if (text[i] === "$" && !isEscaped(text, i)) {
+			// No real newline means no display block: every run closes inline.
+			const size = dollarRun(text, i);
+			const close = findDollarClose(text, i + size, size, false);
+			if (close) {
+				out.push(text.slice(i, close.after));
+				i = close.after;
+				continue;
+			}
+			out.push(text.slice(i, i + size));
+			i += size;
+			continue;
+		}
+		out.push(text[i]!);
+		i += 1;
+	}
+	return out.join("");
+}
+
+/** One run of a one-line preview: prose, or a math span's inner TeX. */
+export type MathSpan = { math: boolean; text: string };
+
+/**
+ * Split text into prose and math runs for one-line previews (owner ruling
+ * 2026-10-28 — previews render inline KaTeX). Recognizes balanced
+ * `\(…\)`, `\[…\]`, `$$…$$` and `$…$` (an escaped `\$` never opens or
+ * closes); code spans stay prose and are never scanned for math. Unbalanced
+ * openers stay prose. Math runs carry the inner TeX without delimiters.
+ */
+export function splitMathSpans(text: string): MathSpan[] {
+	const out: MathSpan[] = [];
+	let prose = "";
+	const flush = () => {
+		if (prose) out.push({ math: false, text: prose });
+		prose = "";
+	};
+	let i = 0;
+	while (i < text.length) {
+		if (text[i] === "`") {
+			const run = backtickRun(text, i);
+			const close = text.indexOf("`".repeat(run), i + run);
+			const after = close === -1 ? i + run : close + run;
+			prose += text.slice(i, after);
+			i = after;
+			continue;
+		}
+		if (text[i] === "\\" && !isEscaped(text, i) && (text[i + 1] === "(" || text[i + 1] === "[")) {
+			const closeAt = findClose(text, i + 2, text[i + 1] === "[" ? DISPLAY_CLOSE : INLINE_CLOSE);
+			if (closeAt !== -1) {
+				flush();
+				out.push({ math: true, text: text.slice(i + 2, closeAt) });
+				i = closeAt + 2;
+				continue;
+			}
+		}
+		if (text[i] === "$" && !isEscaped(text, i)) {
+			const size = dollarRun(text, i);
+			const closeAt = size === 1 ? findInlineDollarCloseEscapeAware(text, i + 1) : text.indexOf("$$", i + size);
+			if (size <= 2 && closeAt !== -1) {
+				flush();
+				out.push({ math: true, text: text.slice(i + size, closeAt) });
+				i = closeAt + size;
+				continue;
+			}
+			prose += text.slice(i, i + size);
+			i += size;
+			continue;
+		}
+		prose += text[i];
+		i += 1;
+	}
+	flush();
+	return out;
+}

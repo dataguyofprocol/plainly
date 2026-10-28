@@ -188,7 +188,11 @@ export const quizInputBase = Type.Object({
 			"A value that matches no option fails validation and the call is returned to you to fix.",
 	}),
 	details: Type.Optional(
-		Type.String({ description: "Optional extra context or instructions shown under the question." }),
+		Type.String({
+			description:
+				"Optional helper text shown under the question, written to the learner: one or two short sentences " +
+				"that clarify what is being asked. Never restates or previews the options.",
+		}),
 	),
 });
 
@@ -313,7 +317,11 @@ export const explainInputBase = Type.Object({
 			"It is shown to him on submit; your next reply grades the nuance of what he wrote.",
 	}),
 	details: Type.Optional(
-		Type.String({ description: "Optional extra context or instructions shown under the question." }),
+		Type.String({
+			description:
+				"Optional helper text shown under the question, written to the learner: one or two short sentences " +
+				"that clarify what is being asked.",
+		}),
 	),
 });
 
@@ -373,7 +381,11 @@ export const askInputSchema = Type.Object({
 			"The single question to ask the learner. ONE question per turn: ask, then end your turn — the answer determines the next question.",
 	}),
 	details: Type.Optional(
-		Type.String({ description: "Optional extra context or instructions shown under the question." }),
+		Type.String({
+			description:
+				"Optional helper text shown under the question, written to the learner: one or two short sentences " +
+				"that clarify what is being asked. Never restates or previews the options.",
+		}),
 	),
 	options: Type.Optional(
 		Type.Array(Type.Object(askOptionProps), {
@@ -390,6 +402,15 @@ export const askInputSchema = Type.Object({
 // Ask's option sanity (labels non-empty, values distinct — ask is not
 // graded, but duplicate values break the dock's value keying) runs at the
 // call boundary in execute (askOptionProblems, above).
+
+/** The learner-facing prose fields per question tool — the opt-in list for
+ *  argument-heal's healProseEscapes (owner, 2026-10-28), at the boundary
+ *  (tools' prepareArguments) and the display parses (tool-parts) alike.
+ *  Quiz option labels stay out: they are membership-compared against
+ *  `correctAnswer`, and only one side would decode. */
+export const QUIZ_PROSE_FIELDS = ["question", "details", "explanation"] as const;
+export const EXPLAIN_PROSE_FIELDS = ["question", "details", "correctAnswer"] as const;
+export const ASK_PROSE_FIELDS = ["question", "details", "options[].label", "options[].description"] as const;
 
 export type QuizToolInput = Static<typeof quizInputObject>;
 export type AskToolInput = Static<typeof askInputSchema>;

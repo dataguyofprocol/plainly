@@ -42,6 +42,7 @@ import {
 	type LhMarkerMessage,
 	type LhMessage,
 } from "./native-messages.ts";
+import { repairMathForDisplay, splitMathSpans } from "./math-delims.ts";
 
 // ─── the time ledger ────────────────────────────────────────────────────────
 
@@ -169,27 +170,24 @@ export const PENDING_TEXT_MAX = 140;
 /** Markdown → one plain line, capped at `max` chars on a word boundary
  *  with an ellipsis. Light-touch by design: links keep their text,
  *  emphasis/code/heading/quote markers drop, whitespace collapses. Math
- *  delimiters stay (the row may render inline math); a cut that would
- *  leave an unbalanced `$` cuts before it instead. Null for non-strings
- *  and empty results. */
+ *  STAYS as inline `$…$` (owner ruling 2026-10-28 — previews render it
+ *  with KaTeX through MathLine): every delimiter form normalizes to single
+ *  dollars, the display repairs run first (repairMathForDisplay — the raw
+ *  record may carry eaten or doubled backslashes), and Markdown stripping
+ *  never reaches inside a span. A cut that would leave an unbalanced `$`
+ *  cuts before it instead. Null for non-strings and empty results. */
 export function plainText(raw: unknown, max = PENDING_TEXT_MAX): string | null {
 	if (typeof raw !== "string") return null;
-	let text = raw
-		// Math reads as its content (the question bar's teaser rules):
-		// delimiters drop, \frac{a}{b} → a/b, other commands lose their
-		// backslash, braces go.
-		.replace(/\\\(([\s\S]*?)\\\)/g, "$1")
-		.replace(/\\\[([\s\S]*?)\\\]/g, "$1")
-		.replace(/\$\$?([^$]*)\$\$?/g, "$1")
-		.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, "$1/$2")
-		.replace(/\\([a-zA-Z]+)/g, "$1")
-		.replace(/[{}]/g, "")
-		.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-		.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+	const blocks = repairMathForDisplay(raw)
 		.replace(/```[\s\S]*?```/g, " ")
-		.replace(/[*`~]+/g, "")
-		.replace(/(^|\s)_+|_+(?=\s|$)/g, "$1")
-		.replace(/^\s{0,3}(#{1,6}|>|[-+]|\d+\.)\s+/gm, "")
+		.replace(/^\s{0,3}(#{1,6}|>|[-+]|\d+\.)\s+/gm, "");
+	let text = splitMathSpans(blocks)
+		.map((span) => {
+			if (!span.math) return stripInlineMarkdown(span.text);
+			const tex = span.text.trim();
+			return tex ? `$${tex}$` : "";
+		})
+		.join("")
 		.replace(/\s+/g, " ")
 		.trim();
 	if (text.length === 0) return null;
@@ -197,9 +195,19 @@ export function plainText(raw: unknown, max = PENDING_TEXT_MAX): string | null {
 	let cut = text.slice(0, max - 1);
 	const space = cut.lastIndexOf(" ");
 	if (space > max * 0.6) cut = cut.slice(0, space);
-	if ((cut.match(/\$/g)?.length ?? 0) % 2 === 1) cut = cut.slice(0, cut.lastIndexOf("$"));
+	const dollars = [...cut.matchAll(/(?<!\\)\$/g)];
+	if (dollars.length % 2 === 1) cut = cut.slice(0, dollars.at(-1)!.index);
 	text = `${cut.trimEnd()}…`;
 	return text;
+}
+
+/** plainText's prose-run stripping (never applied inside math). */
+function stripInlineMarkdown(text: string): string {
+	return text
+		.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+		.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+		.replace(/[*`~]+/g, "")
+		.replace(/(^|\s)_+|_+(?=\s|$)/g, "$1");
 }
 
 /** Clean (non-errored) tool results by call id. */

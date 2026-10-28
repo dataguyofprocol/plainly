@@ -347,14 +347,29 @@ describe("topics", () => {
 	});
 });
 
-describe("plainText — math reads as its content", () => {
-	it("drops TeX delimiters and commands, keeps subscripts", () => {
+describe("plainText — math stays for MathLine (owner, 2026-10-28)", () => {
+	it("keeps math as single-dollar spans, every delimiter form normalized", () => {
 		assert.equal(
-			plainText("After the step the belief stands at \\(p^- = 0.44\\), with \\frac{1}{2} and $p_1 = 0.70$"),
-			"After the step the belief stands at p^- = 0.44, with 1/2 and p_1 = 0.70",
+			plainText("After the step the belief stands at \\(p^- = 0.44\\), with $$\\frac{1}{2}$$ and $p_1 = 0.70$"),
+			"After the step the belief stands at $p^- = 0.44$, with $\\frac{1}{2}$ and $p_1 = 0.70$",
 		);
+	});
+	it("keeps the poker session's suit commands intact (the clubsuit bug)", () => {
+		assert.equal(
+			plainText("You hold $Q\\clubsuit J\\clubsuit$. The flop is $A\\clubsuit 7\\clubsuit 2\\diamondsuit$."),
+			"You hold $Q\\clubsuit J\\clubsuit$. The flop is $A\\clubsuit 7\\clubsuit 2\\diamondsuit$.",
+		);
+	});
+	it("repairs doubled command backslashes from the raw record", () => {
+		assert.equal(plainText("Plus $K\\\\heartsuit$ on board"), "Plus $K\\heartsuit$ on board");
+	});
+	it("never strips Markdown inside math", () => {
+		assert.equal(plainText("**Bold** and $a_1 * b_2$ and _em_"), "Bold and $a_1 * b_2$ and em");
 	});
 	it("still strips Markdown emphasis", () => {
 		assert.equal(plainText("**Bold** and _em_ and `code`"), "Bold and em and code");
+	});
+	it("an escaped dollar is prose, not a span", () => {
+		assert.equal(plainText("Pot is \\$6 and $x$"), "Pot is \\$6 and $x$");
 	});
 });

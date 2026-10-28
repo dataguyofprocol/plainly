@@ -419,6 +419,23 @@ describe("teach-check reveal (W5 phase separation)", () => {
 		assert.match(html, /Open/, "a clear reveal action");
 	});
 
+	it("the teaser renders suit math as KaTeX, not stripped command names (owner, 2026-10-28)", () => {
+		const html = renderToStaticMarkup(
+				<QuestionDock
+					toolName="quiz"
+					toolCallId="t1"
+					input={{ ...quizInput, question: "You hold $Q\\clubsuit J\\clubsuit$. Outs?" } as never}
+					expanded={false}
+					reveal
+					onExpand={() => {}}
+					onSubmit={() => {}}
+				/>,
+		);
+		assert.match(html, /class="katex"/, "math renders through KaTeX");
+		assert.match(html, /\u2663/, "the club glyph is present");
+		assert.doesNotMatch(html, /Qclubsuit/, "the command name never leaks as letters");
+	});
+
 	it("probe questions keep the plain collapsed bar (no invitation copy)", () => {
 		const html = renderToStaticMarkup(
 				<QuestionDock

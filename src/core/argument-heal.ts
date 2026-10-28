@@ -24,6 +24,8 @@
  * values stay for validation to reject honestly.
  */
 
+import { decodeOverescapedNewlines } from "./math-delims.ts";
+
 /** One property schema of a TypeBox object (the shapes this fork emits:
  * literal unions carry anyOf[{const}], scalars carry type). */
 type PropSchema = {
@@ -88,6 +90,46 @@ export function healEncodedArguments(
 		}
 		if (fixed === undefined && prop.type === "array" && Array.isArray(parsed)) fixed = parsed;
 		if (fixed !== undefined) {
+			healed ??= { ...(args as Record<string, unknown>) };
+			healed[key] = fixed;
+		}
+	}
+	return healed ?? args;
+}
+
+/**
+ * THE PROSE ESCAPE HEAL (owner, 2026-10-28): decodeOverescapedNewlines
+ * over the learner-facing prose fields a caller names — opt-in per field,
+ * never schema-wide, so code-bearing strings (demo files, mermaid, subagent
+ * payloads) are never touched. A field is a top-level key (`"question"`) or
+ * a key inside every object of an array field (`"options[].description"`).
+ * Same contract as healEncodedArguments: untouched args come back as the
+ * same reference, and the pass is idempotent (a decoded string carries a
+ * real newline, which ends its candidacy).
+ */
+export function healProseEscapes(args: unknown, fields: readonly string[]): unknown {
+	if (typeof args !== "object" || args === null || Array.isArray(args)) return args;
+	let healed: Record<string, unknown> | null = null;
+	for (const field of fields) {
+		const [key, inner] = field.split("[].") as [string, string | undefined];
+		const raw = (args as Record<string, unknown>)[key];
+		let fixed: unknown = raw;
+		if (inner === undefined) {
+			if (typeof raw === "string") fixed = decodeOverescapedNewlines(raw);
+		} else if (Array.isArray(raw)) {
+			let items: unknown[] | null = null;
+			raw.forEach((item, i) => {
+				if (typeof item !== "object" || item === null) return;
+				const value = (item as Record<string, unknown>)[inner];
+				if (typeof value !== "string") return;
+				const decoded = decodeOverescapedNewlines(value);
+				if (decoded === value) return;
+				items ??= [...raw];
+				items[i] = { ...(items[i] as Record<string, unknown>), [inner]: decoded };
+			});
+			if (items) fixed = items;
+		}
+		if (fixed !== raw) {
 			healed ??= { ...(args as Record<string, unknown>) };
 			healed[key] = fixed;
 		}
