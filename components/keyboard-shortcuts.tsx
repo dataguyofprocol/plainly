@@ -98,7 +98,7 @@ export function KeyboardShortcuts() {
 				// honestly stoppable, layered by escAbortTarget).
 				if (isDictationActive()) {
 					e.preventDefault();
-					window.dispatchEvent(new CustomEvent("lh:kbd-cancel-dictation"));
+					window.dispatchEvent(new CustomEvent("lh:kbd-stop-dictation"));
 					return;
 				}
 				window.dispatchEvent(new CustomEvent("lh:kbd-abort-turn"));

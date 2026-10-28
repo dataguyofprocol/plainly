@@ -1,7 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { finishDictation, isDictationActive, joinDictation, useDictationTarget } from "@/components/dictation";
+import {
+	DictationErrorLine,
+	DictationMic,
+	finishDictation,
+	isDictationActive,
+	joinDictation,
+	useDictationState,
+	useDictationTarget,
+} from "@/components/dictation";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { MessageResponse } from "@/components/ai-elements/message";
 import { MathLine } from "@/components/latex-glyph";
@@ -12,7 +20,6 @@ import {
 	buildAnswer,
 	normalizeQuizType,
 	CONFIDENCE_LEVELS,
-	kbdEventForAction,
 	emptyDockSelection,
 	normalizeOptions,
 	resolveCorrect,
@@ -317,7 +324,7 @@ function QuestionDockForm({
 	// mode owns "Your answer", select modes own "Your thinking". The claim
 	// is effect-scoped, so the question unmounting releases it and
 	// dictation falls back to the composer automatically.
-	useDictationTarget(
+	const isTarget = useDictationTarget(
 		useCallback(
 			(t: string) => {
 				// Ref-first (see the refs block above): the join is computed from
@@ -339,6 +346,9 @@ function QuestionDockForm({
 		// the reading-thinking field owns dictated speech during the reading.
 		dictationClaim,
 	);
+	/** The run is landing words in THIS field — it outlines itself. */
+	const dictationPhase = useDictationState().phase;
+	const dictating = isTarget && dictationPhase !== "idle";
 
 	const toggle = (idx: number) => setSel(toggleOption(selectMode, sel, idx));
 
@@ -535,7 +545,6 @@ function QuestionDockForm({
 
 	// Lesson4's question: the kind, the serif question, numbered choice
 	// cards, how sure, the thinking field with its mic, then submit.
-	const toggleDictation = () => window.dispatchEvent(new CustomEvent(kbdEventForAction("toggle-dictation")));
 	const keyBadge = (i: number) => (
 		<span className="k" aria-hidden="true">
 			{i + 1}
@@ -713,7 +722,7 @@ function QuestionDockForm({
 								}}
 								placeholder="Your answer, in your own words…"
 								rows={4}
-								className="ftext"
+								className={cn("ftext", dictating && "dictating")}
 							/>
 						) : (
 							<textarea
@@ -739,13 +748,12 @@ function QuestionDockForm({
 								}}
 								placeholder="Why this answer? Whatever comes to mind."
 								rows={phase === "teach" ? 3 : 2}
-								className={cn("ftext", phase === "teach" ? "tall" : "short")}
+								className={cn("ftext", phase === "teach" ? "tall" : "short", dictating && "dictating")}
 							/>
 						)}
-						<button type="button" className={cn("ib sm fmic", isDictationActive() && "on")} aria-label="Dictate" onClick={toggleDictation}>
-							<Icon name="mic" size="sm" />
-						</button>
+						<DictationMic own={isTarget} />
 					</div>
+					<DictationErrorLine show={isTarget} />
 				</div>
 			</form>
 			<div className="qfoot">

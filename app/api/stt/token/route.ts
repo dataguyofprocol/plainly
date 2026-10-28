@@ -32,6 +32,20 @@ export async function GET() {
 		});
 		if (!res.ok) {
 			const detail = await res.text();
+			// 401/403: Deepgram refused the key itself (wrong key, or below
+			// Member) — the client offers "Fix key" for this reason only.
+			if (res.status === 401 || res.status === 403) {
+				return Response.json(
+					{
+						message:
+							res.status === 403
+								? "Deepgram rejected the key (403): it needs the Member role or higher"
+								: "Deepgram rejected the key (401): check it was pasted correctly",
+						reason: "key-rejected",
+					},
+					{ status: 502 },
+				);
+			}
 			return Response.json(
 				{ message: `Deepgram token grant failed (${res.status}): ${detail.slice(0, 200)}` },
 				{ status: 502 },

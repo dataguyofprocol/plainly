@@ -24,7 +24,7 @@ import { SubagentSteerCard } from "@/components/artifacts/steer-card";
 import { Composer } from "@/components/composer";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { QueuedSteersBody } from "@/components/queued-steers";
-import { joinDictation, useDictation } from "@/components/dictation";
+import { DictationErrorLine, DictationWave, joinDictation, useDictation, useDictationState } from "@/components/dictation";
 import { useFieldCycle } from "@/components/field-cycle";
 import { JobsContext } from "@/components/jobs-context";
 import { useServerEvent, useServerResync } from "@/components/server-events";
@@ -612,6 +612,8 @@ export function Chat({
 		// send resuming after `await finish()` reads the dictated tail.
 		append: (t) => applyText(joinDictation(textRef.current, t)),
 	});
+	/** No field claims the run → the composer is the target (outline + error). */
+	const composerIsTarget = useDictationState().claimant === null;
 	/* When a dictation run ends, the bare composer takes focus (owner
 	 * 2026-10-01) — the hands are already on the keyboard from the stop.
 	 * Falling edge of `active` only (idle→idle never focuses), and ONLY the
@@ -634,7 +636,7 @@ export function Chat({
 	// until the current turn ends. Only a QUESTION pending or a turn in
 	// flight (client or server-side wake turn) gates sending.
 	// A LIVE dictation also makes the composer sendable (owner 2026-10-01):
-	// the spoken text is deferred in the run's buffer — Enter must be able
+	// the last phrase may still be in Deepgram's hands — Enter must be able
 	// to trigger the finish-first send (see onSend), not be gated out by an
 	// empty textarea. If nothing was said, the send is a harmless no-op.
 	// Steering (2026-10-03): a turn in flight no longer gates the composer —
@@ -1600,7 +1602,8 @@ export function Chat({
 							onSend={onSend}
 							onStop={abortInFlightTurn}
 							canSend={canSend}
-							onEscape={dictation.active ? dictation.cancel : undefined}
+							onEscape={dictation.active ? dictation.stop : undefined}
+							dictating={dictation.active && composerIsTarget}
 							nextProblem={nextReady}
 							onNext={sendNext}
 							trailing={
@@ -1613,12 +1616,7 @@ export function Chat({
 									onClick={() => (dictation.active ? void dictation.finish() : dictation.toggle())}
 								>
 									{dictation.active ? (
-										<span className="wave" aria-hidden="true">
-											<i />
-											<i />
-											<i />
-											<i />
-										</span>
+										<DictationWave />
 									) : (
 										<Icon name="mic" size="md" />
 									)}
@@ -1635,6 +1633,7 @@ export function Chat({
 											: "Ask about this step, or steer the lesson"
 							}
 						/>
+						<DictationErrorLine show={composerIsTarget} />
 					</div>
 				</div>
 			</div>
@@ -1646,7 +1645,7 @@ export function Chat({
 					practice={activeProblem}
 					onSubmitThinking={submitThinking}
 					compactionRunning={compacting}
-					dictationCancel={dictation.cancel}
+					dictationStop={dictation.stop}
 					turns={turns}
 					hintsUsed={hintsUsed}
 				/>
@@ -1660,7 +1659,7 @@ export function Chat({
 					readingThinking={readingThinking}
 					onReadingThinking={applyReadingThinking}
 					onSubmitAnswer={submitPendingAnswer}
-					dictationCancel={dictation.cancel}
+					dictationStop={dictation.stop}
 					onOpenPlan={() => setPlanOpen(true)}
 					busy={busy}
 					turns={turns}

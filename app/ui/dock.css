@@ -100,7 +100,6 @@
 .v4 .ftext.short { min-height: 64px; }
 .v4 .ftext.tall { min-height: 88px; }
 .v4 .fmic { position: absolute; right: 6px; bottom: 6px; color: var(--faint); }
-.v4 span.fmic { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; pointer-events: none; }
 .v4 .fmic.on { color: var(--brand); }
 
 /* Submit stays in reach: it sticks to the bottom of the scrolling pane. */

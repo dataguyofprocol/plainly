@@ -23,7 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { paletteResults, type PaletteRow } from "@/components/command-palette";
-import { joinDictation, useDictation } from "@/components/dictation";
+import { DictationErrorLine, DictationWave, joinDictation, useDictation } from "@/components/dictation";
 import { useGraphIndex, type IndexedIdea } from "@/components/graph-index";
 import { ModelControl } from "@/components/model-picker";
 import { SetupDialog } from "@/components/setup-dialog";
@@ -316,7 +316,7 @@ function LearnField({
 				)}
 			</h1>
 			<form
-				className={`hm-composer ${mode === "practice" ? "practice" : ""}`}
+				className={`hm-composer ${mode === "practice" ? "practice" : ""} ${dictation.active ? "dictating" : ""}`}
 				role="search"
 				aria-label="Start a lesson or practice, or search your sessions and ideas"
 				onSubmit={(e) => {
@@ -351,7 +351,7 @@ function LearnField({
 							});
 						} else if (e.key === "Escape") {
 							e.stopPropagation();
-							if (dictation.active) dictation.cancel();
+							if (dictation.active) dictation.stop();
 							else if (q) setQuery("");
 							else e.currentTarget.blur();
 						}
@@ -403,12 +403,7 @@ function LearnField({
 						onClick={() => (dictation.active ? void dictation.finish() : dictation.toggle())}
 					>
 						{dictation.active ? (
-							<span className="wave" aria-hidden="true">
-								<i />
-								<i />
-								<i />
-								<i />
-							</span>
+							<DictationWave />
 						) : (
 							<Icon name="mic" size="md" />
 						)}
@@ -459,6 +454,8 @@ function LearnField({
 					</div>
 				)}
 			</form>
+			{/* Home has no claiming fields — the omnibar is always the target. */}
+			<DictationErrorLine show />
 			{suggestions.length > 0 && (
 				<div className="hm-next" aria-label="Next from your graph">
 					{suggestions.slice(0, 3).map((s) => (
