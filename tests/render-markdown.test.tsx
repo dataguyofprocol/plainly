@@ -53,9 +53,11 @@ describe("math delimiter transform (pure unit)", () => {
 		);
 	});
 
-	it("leaves currency untouched", () => {
-		const md = "It costs $5 and $10 more. $$big$$ sums too.";
-		assert.equal(transformMathDelimiters(md), md);
+	it("escapes currency so it never pairs into math", () => {
+		assert.equal(
+			transformMathDelimiters("It costs $5 and $10 more. $$big$$ sums too."),
+			"It costs \\$5 and \\$10 more. $$big$$ sums too.",
+		);
 	});
 
 	it("leaves escaped delimiters untouched (\\\\( is a literal backslash)", () => {
@@ -281,13 +283,15 @@ describe("escaped dollars inside math — transform units", () => {
 	it("does NOT replace even-backslash dollars (row break + dollar keeps closing)", () => {
 		// `$a\\$` closes at that `$` in micromark today — the parity is load-
 		// bearing; replacing it would change span ends for legitimate TeX.
-		const md = "$a\\\\$b$ tail";
-		assert.equal(transformMathDelimiters(md), md);
+		// The trailing `$` cannot open (a space follows): escaped, same render.
+		assert.equal(transformMathDelimiters("$a\\\\$b$ tail"), "$a\\\\$b\\$ tail");
 	});
 
-	it("leaves prose escaped dollars and bare currency untouched", () => {
-		const md = "It costs \\$5 flat, then $5 and $10 more.";
-		assert.equal(transformMathDelimiters(md), md);
+	it("leaves prose escaped dollars untouched and escapes bare currency", () => {
+		assert.equal(
+			transformMathDelimiters("It costs \\$5 flat, then $5 and $10 more."),
+			"It costs \\$5 flat, then \\$5 and \\$10 more.",
+		);
 	});
 
 	it("leaves display spans untouched — a lone $ can't close $$, \\$ already survives", () => {
@@ -295,10 +299,10 @@ describe("escaped dollars inside math — transform units", () => {
 		assert.equal(transformMathDelimiters(md), md);
 	});
 
-	it("leaves code spans, fences, and unbalanced spans untouched", () => {
+	it("leaves code spans and fences untouched; an unbalanced opener is escaped", () => {
 		assert.equal(transformMathDelimiters("Type `$x = \\$5$` literally."), "Type `$x = \\$5$` literally.");
 		assert.equal(transformMathDelimiters("```\n$x = \\$5$\n```"), "```\n$x = \\$5$\n```");
-		assert.equal(transformMathDelimiters("Broken: $x = \\$5"), "Broken: $x = \\$5");
+		assert.equal(transformMathDelimiters("Broken: $x = \\$5"), "Broken: \\$x = \\$5");
 	});
 
 	it("clean spans stay byte-identical; only the escape-bearing span changes", () => {
@@ -343,6 +347,43 @@ describe("escaped dollars inside math — rendering", () => {
 		const html = render("Type `$x = \\$5$` literally.");
 		assert.equal((html.match(/class="katex"/g) ?? []).length, 0, "code is not math");
 		assert.ok(html.includes("$x = \\$5$"), "the literal source stays visible");
+	});
+});
+
+// The poker probes that rendered "$100 into a $" as italic math (2026-10-29).
+const POKER = [
+	"A player bets $100 into a $100 pot as a pure bluff.",
+	"You face a $50 call into a pot that will be $150 after you call.",
+	"$150/($150 + $50) = 75%",
+	"After calling, the final pot is $200. The call risks $50 to win the $150 already available, so break-even equity is $50 / $200 = 25%.",
+];
+
+describe("currency is not math — Pandoc's dollar rule (owner, 2026-10-29)", () => {
+	for (const md of POKER) {
+		it(`renders as prose with every dollar visible: ${md.slice(0, 40)}`, () => {
+			const html = render(md);
+			assert.equal((html.match(/class="katex"/g) ?? []).length, 0, "no math span");
+			assert.ok(html.includes(md), "the exact prose survives");
+		});
+	}
+
+	it("math still renders beside currency", () => {
+		const html = render("Bet $100 when $p > 0.5$, else $x$ and $x = \\$5$.");
+		assert.equal((html.match(/class="katex"/g) ?? []).length, 3);
+		assert.ok(!html.includes("katex-error"));
+		assert.ok(html.includes("Bet $100 when"));
+	});
+
+	it("an opener needs a non-space after it; a closer needs a non-space before it and no digit after", () => {
+		assert.equal(transformMathDelimiters("$ x $"), "\\$ x \\$");
+		assert.equal(transformMathDelimiters("$5 and $x$"), "\\$5 and $x$");
+		assert.equal(transformMathDelimiters("$5-$10"), "\\$5-\\$10");
+		assert.equal(transformMathDelimiters("$a$ and $$b$$"), "$a$ and $$b$$");
+	});
+
+	it("a mid-stream unclosed span shows a literal dollar until its closer arrives", () => {
+		assert.equal(transformMathDelimiters("Let $x + y"), "Let \\$x + y");
+		assert.equal(transformMathDelimiters("Let $x + y$"), "Let $x + y$");
 	});
 });
 

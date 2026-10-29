@@ -135,7 +135,8 @@ function closeEndsLine(text: string, afterClose: number): boolean {
  *  own auto-render scanner skips escaped dollars, and KaTeX renders `\$`
  *  fine — the author's intent is unambiguous: an escaped dollar (odd number
  *  of backslashes before it) never closes the span. Mirrors findDollarClose's
- *  inline rules otherwise (exact size match, whole-run skip). */
+ *  inline rules otherwise (exact size match, whole-run skip). The first bare
+ *  single `$` decides: it closes only when canCloseInlineDollar allows. */
 function findInlineDollarCloseEscapeAware(text: string, from: number): number {
 	for (let j = from; j < text.length;) {
 		if (text[j] !== "$") {
@@ -147,10 +148,38 @@ function findInlineDollarCloseEscapeAware(text: string, from: number): number {
 			continue; // `\$` never closes
 		}
 		const count = dollarRun(text, j);
-		if (count === 1) return j;
+		if (count === 1) return canCloseInlineDollar(text, j) ? j : -1;
 		j += count;
 	}
 	return -1;
+}
+
+/** Currency is not math (owner, 2026-10-29) — Pandoc's dollar rule for
+ *  single-dollar inline math: a `$` opens only when a non-space character
+ *  follows it, and closes only when a non-space character precedes it and
+ *  no digit follows. `$100 into a $100 pot` and `$150/($150 + $50)` stay
+ *  prose; `$x$` and `$x = \$5$` stay math. Costs: `$ x $` and `$x$5` are
+ *  no longer math. */
+function canOpenInlineDollar(text: string, i: number, space = /\s/): boolean {
+	const next = text[i + 1];
+	return next !== undefined && !space.test(next);
+}
+
+function canCloseInlineDollar(text: string, j: number, space = /\s/): boolean {
+	const prev = text[j - 1];
+	const next = text[j + 1];
+	return prev !== undefined && !space.test(prev) && !(next !== undefined && next >= "0" && next <= "9");
+}
+
+/** The debris pass's whitespace: JSON debris (`\f` of `\forall`, `\t` of
+ *  `\to`, `\n` of `\nabla`) is whitespace-shaped, so only a real space
+ *  counts there — `$\forall x$` must still open before it is repaired. */
+const DEBRIS_PASS_SPACE_RE = / /;
+
+/** The closer of the single-dollar inline span opening at `i`, or -1 when
+ *  `i` cannot open one or no valid closer follows (currency, or mid-stream). */
+function findInlineDollarSpanClose(text: string, i: number): number {
+	return canOpenInlineDollar(text, i) ? findInlineDollarCloseEscapeAware(text, i + 1) : -1;
 }
 
 /** Replace `\$` (odd-backslash dollars) inside a math span with the
@@ -255,21 +284,23 @@ export function transformMathDelimiters(markdown: string): string {
 		// out, and cascade). Display runs are copied whole and left untouched —
 		// a lone `$` can't close `$$`, so `\$` already survives there — and
 		// copying the run stops its second `$` posing as an inline opener.
-		// Spans without escaped dollars emit byte-identical text; prose `\$`,
-		// code, and unbalanced spans are untouched.
+		// Spans without escaped dollars emit byte-identical text, copied whole
+		// so their closer is never re-read as an opener; prose `\$` and code
+		// are untouched. A single `$` that cannot pair (currency, or a span
+		// whose closer has not streamed in yet) is escaped to a literal `\$`,
+		// so micromark never pairs it (canOpenInlineDollar).
 		if (ch === "$" && !isEscaped(markdown, i)) {
 			const run = dollarRun(markdown, i);
 			if (run === 1) {
-				const closeAt = findInlineDollarCloseEscapeAware(markdown, i + 1);
+				const closeAt = findInlineDollarSpanClose(markdown, i);
 				if (closeAt !== -1) {
-					const content = markdown.slice(i + 1, closeAt);
-					const replaced = replaceEscapedDollars(content);
-					if (replaced !== content) {
-						out.push(`$${replaced}$`);
-						i = closeAt + 1;
-						continue;
-					}
+					out.push(`$${replaceEscapedDollars(markdown.slice(i + 1, closeAt))}$`);
+					i = closeAt + 1;
+					continue;
 				}
+				out.push("\\$");
+				i += 1;
+				continue;
 			} else {
 				out.push(markdown.slice(i, i + run));
 				i += run;
@@ -386,6 +417,7 @@ function findDollarClose(
 	from: number,
 	size: number,
 	isDisplay: boolean,
+	space?: RegExp,
 ): { at: number; after: number } | undefined {
 	if (isDisplay) {
 		let lineEnd = text.indexOf("\n", from);
@@ -407,7 +439,10 @@ function findDollarClose(
 			continue;
 		}
 		const count = dollarRun(text, j);
-		if (count === size) return { at: j, after: j + count };
+		if (count === size) {
+			// Single dollars follow the currency rule (canOpenInlineDollar).
+			return size === 1 && !canCloseInlineDollar(text, j, space) ? undefined : { at: j, after: j + count };
+		}
 		j += count;
 	}
 	return undefined;
@@ -453,7 +488,9 @@ function restoreDollarMathEscapes(text: string): string {
 		if (text[i] === "$" && !isEscaped(text, i)) {
 			const size = dollarRun(text, i);
 			const isDisplay = dollarIsDisplay(text, i, size);
-			const close = findDollarClose(text, i + size, size, isDisplay);
+			const close = size === 1 && !canOpenInlineDollar(text, i, DEBRIS_PASS_SPACE_RE)
+				? undefined
+				: findDollarClose(text, i + size, size, isDisplay, DEBRIS_PASS_SPACE_RE);
 			if (close) {
 				const debris = isDisplay ? DISPLAY_DEBRIS_RE : DEBRIS_RE;
 				out.push(
@@ -551,7 +588,9 @@ export function healOverescapedCommands(text: string): string {
 		if (text[i] === "$" && !isEscaped(text, i)) {
 			const size = dollarRun(text, i);
 			const isDisplay = dollarIsDisplay(text, i, size);
-			const close = findDollarClose(text, i + size, size, isDisplay);
+			const close = size === 1 && !canOpenInlineDollar(text, i)
+				? undefined
+				: findDollarClose(text, i + size, size, isDisplay);
 			if (close) {
 				out.push(
 					text.slice(i, i + size) +
@@ -681,7 +720,7 @@ export function splitMathSpans(text: string): MathSpan[] {
 		}
 		if (text[i] === "$" && !isEscaped(text, i)) {
 			const size = dollarRun(text, i);
-			const closeAt = size === 1 ? findInlineDollarCloseEscapeAware(text, i + 1) : text.indexOf("$$", i + size);
+			const closeAt = size === 1 ? findInlineDollarSpanClose(text, i) : text.indexOf("$$", i + size);
 			if (size <= 2 && closeAt !== -1) {
 				flush();
 				out.push({ math: true, text: text.slice(i + size, closeAt) });

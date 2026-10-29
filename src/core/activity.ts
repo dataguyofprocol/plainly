@@ -183,7 +183,9 @@ export function plainText(raw: unknown, max = PENDING_TEXT_MAX): string | null {
 		.replace(/^\s{0,3}(#{1,6}|>|[-+]|\d+\.)\s+/gm, "");
 	let text = splitMathSpans(blocks)
 		.map((span) => {
-			if (!span.math) return stripInlineMarkdown(span.text);
+			// Prose dollars are currency: escaped, so MathLine never pairs them
+			// and the cut guard below counts only math dollars.
+			if (!span.math) return stripInlineMarkdown(span.text).replace(/(?<!\\)\$/g, "\\$");
 			const tex = span.text.trim();
 			return tex ? `$${tex}$` : "";
 		})

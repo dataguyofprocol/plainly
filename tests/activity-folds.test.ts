@@ -140,6 +140,12 @@ describe("plainText", () => {
 		const math = plainText(`${"a ".repeat(60)}$x^2 + y^2 = z^2$ tail`, 140)!;
 		assert.equal((math.match(/\$/g)?.length ?? 0) % 2, 0, "never an unbalanced math delimiter");
 	});
+
+	it("escapes currency so previews never pair it into math", () => {
+		assert.equal(plainText("Bets $100 into a $100 pot when $p > 0.5$."), "Bets \\$100 into a \\$100 pot when $p > 0.5$.");
+		const cut = plainText(`${"a ".repeat(60)}$150/($150 + $50) = 75% tail`, 140)!;
+		assert.ok(cut.includes("\\$150/(\\$150"), "a cut never lands on a currency dollar");
+	});
 });
 
 describe("chatProgressOf — teach", () => {

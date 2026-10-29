@@ -104,6 +104,21 @@ describe("upgraded KaTeX rendering on real question and practice surfaces", () =
 			}
 		});
 	}
+	it("bare currency stays prose on both dock surfaces", () => {
+		const raw = "You face a $50 call into a pot that will be $150 after you call.";
+		for (const element of [dock({ statement: raw }), <QuestionDock toolName="ask_user_question" toolCallId="currency" input={{ question: raw }} expanded onExpand={() => {}} onSubmit={() => {}} />]) {
+			const html = renderToStaticMarkup(element);
+			assert.deepEqual(math(html).annotations, []);
+			assert.ok(parseHTML(html).document.firstElementChild?.textContent?.includes(raw));
+		}
+	});
+
+	it("display repair never reads two currency amounts as one span", () => {
+		const raw = "Costs $5.\nThen \\\\ $10.";
+		assert.equal(restoreMathEscapes(raw), raw, "the real newline is not rewritten to \\n");
+		assert.equal(healOverescapedCommands(raw), raw, "prose backslashes are not halved");
+	});
+
 	it("preserves escaped currency and code on both dock surfaces", () => {
 		const raw = "Costs \\$5 and \\$10. `" + clean + "`\n\n```text\n" + doubled + "\n```";
 		for (const element of [dock({ statement: raw }), <QuestionDock toolName="ask_user_question" toolCallId="security_code" input={{ question: raw }} expanded onExpand={() => {}} onSubmit={() => {}} />]) {
