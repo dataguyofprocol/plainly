@@ -40,6 +40,7 @@ export function Composer({
 	autoFocus,
 	inputRef,
 	onEscape,
+	dictating = false,
 	placeholder = "Ask, answer, or steer the lesson…",
 	nextProblem = false,
 	onNext,
@@ -55,9 +56,12 @@ export function Composer({
 	/** The page's handle to the textarea — the dictation-end focus (owner,
 	 *  2026-10-01): a run ending hands the cursor to the bare composer. */
 	inputRef?: React.RefObject<HTMLTextAreaElement | null>;
-	/** Escape while a dictation runs stops it (STT wave, 2026-09-17). No-op
+	/** Escape while a dictation runs stops it, keeping the text. No-op
 	 *  when absent — Esc otherwise means nothing in the composer. */
 	onEscape?: () => void;
+	/** A dictation run is landing text here — the field outlines itself
+	 *  (owner round 4: show where the words go). */
+	dictating?: boolean;
 	/** The textarea's placeholder (owner refinement round, 2026-09-24):
 	 *  active sessions read "Ask, answer, or steer the lesson…"; the fresh
 	 *  new-session page asks the graph view's opening question instead. */
@@ -88,7 +92,7 @@ export function Composer({
 	return (
 		<form
 			data-testid="composer"
-			className="ls-composer"
+			className={dictating ? "ls-composer dictating" : "ls-composer"}
 			onSubmit={(e) => {
 				e.preventDefault();
 				act();

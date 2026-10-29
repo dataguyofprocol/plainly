@@ -20,7 +20,7 @@
 
 import { useContext, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { MessageResponse } from "@/components/ai-elements/message";
-import { finishDictation, useDictationTarget, joinDictation } from "@/components/dictation";
+import { DictationErrorLine, DictationMic, finishDictation, useDictationState, useDictationTarget, joinDictation } from "@/components/dictation";
 import { JobsContext } from "@/components/jobs-context";
 import { CONFIDENCE_LEVEL_COLORS, nearestLevel } from "@/components/confidence-colors";
 import { ConfidenceLadder } from "@/components/confidence-rail";
@@ -156,7 +156,7 @@ export function LessonPanel({
 	readingThinking,
 	onReadingThinking,
 	onSubmitAnswer,
-	dictationCancel,
+	dictationStop,
 	onOpenPlan,
 	busy,
 	turns,
@@ -172,7 +172,7 @@ export function LessonPanel({
 	readingThinking: string;
 	onReadingThinking: (v: string) => void;
 	onSubmitAnswer: (output: QuestionAnswerData) => void;
-	dictationCancel?: () => void;
+	dictationStop?: () => void;
 	onOpenPlan: () => void;
 	busy: boolean;
 	turns: TurnUsage[];
@@ -305,7 +305,7 @@ export function LessonPanel({
 									phase={phase}
 									onExpand={() => void finishDictation().then(() => setRevealed(true))}
 									onSubmit={onSubmitAnswer}
-									onEscape={dictationCancel}
+									onEscape={dictationStop}
 									dictationClaim={!revealPending}
 									compactionRunning={compactionRunning}
 								/>
@@ -313,7 +313,7 @@ export function LessonPanel({
 									<ReadingThinkingField
 										value={readingThinking}
 										onChange={onReadingThinking}
-										onEscape={dictationCancel}
+										onEscape={dictationStop}
 										onOpen={() => void finishDictation().then(() => setRevealed(true))}
 										claim={revealPending}
 									/>
@@ -711,7 +711,7 @@ export function PracticePanel({
 	practice,
 	onSubmitThinking,
 	compactionRunning,
-	dictationCancel,
+	dictationStop,
 	turns,
 	hintsUsed,
 }: {
@@ -719,7 +719,7 @@ export function PracticePanel({
 	practice: { toolCallId: string; input: unknown } | null;
 	onSubmitThinking: (text: string, hint?: HintRung) => void;
 	compactionRunning: boolean;
-	dictationCancel?: () => void;
+	dictationStop?: () => void;
 	turns: TurnUsage[];
 	hintsUsed: number;
 }) {
@@ -731,7 +731,9 @@ export function PracticePanel({
 		draftRef.current = v;
 		setDraft(v);
 	};
-	useDictationTarget((t: string) => setText(joinDictation(draftRef.current, t)), !!practice);
+	const isTarget = useDictationTarget((t: string) => setText(joinDictation(draftRef.current, t)), !!practice);
+	const dictationPhase = useDictationState().phase;
+	const dictating = isTarget && dictationPhase !== "idle";
 	// A new problem starts clean.
 	const problemId = practice?.toolCallId ?? null;
 	useEffect(() => {
@@ -778,14 +780,14 @@ export function PracticePanel({
 									<textarea
 										id="work"
 										rows={7}
-										className="ftext pwork-in"
+										className={cn("ftext pwork-in", dictating && "dictating")}
 										value={draft}
 										data-testid="practice-thinking-field"
 										onChange={(e) => setText(e.target.value)}
 										onKeyDown={(e) => {
-											if (e.key === "Escape" && dictationCancel) {
+											if (e.key === "Escape" && dictationStop) {
 												e.stopPropagation();
-												dictationCancel();
+												dictationStop();
 											} else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
 												e.preventDefault();
 												submit();
@@ -793,10 +795,9 @@ export function PracticePanel({
 										}}
 										placeholder="Think out loud. Hints read your working; Submit ends the problem."
 									/>
-									<span className="fmic" aria-hidden="true">
-										<Icon name="mic" size="sm" />
-									</span>
+									<DictationMic own={isTarget} />
 								</div>
+								<DictationErrorLine show={isTarget} />
 							</div>
 							<div className="qfield">
 								<span className="qfield-h">

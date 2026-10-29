@@ -204,6 +204,10 @@
 .v4 .wave i:nth-child(3) { animation-delay: -0.45s; }
 .v4 .wave i:nth-child(4) { animation-delay: -0.1s; }
 @keyframes v4-wv { from { transform: scaleY(0.25); } to { transform: scaleY(1); } }
+/* Dictation's live bars: heights follow the real input level (DictationWave
+   sets them each tick); flat and dimmed while connecting. */
+.v4 .wave.live i { animation: none; transition: height 80ms linear; }
+.v4 .wave.live.wait i { opacity: 0.45; }
 .v4 .skel { display: block; border-radius: 6px; background: linear-gradient(90deg, var(--hover) 0%, var(--press) 50%, var(--hover) 100%); background-size: 200% 100%; animation: v4-skel 1.4s ease-in-out infinite; }
 @keyframes v4-skel { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 
@@ -215,9 +219,13 @@
 .v4 .finput.sm { height: 32px; font-size: 13px; border-radius: 8px; padding: 0 10px; }
 .v4 .ftext { width: 100%; min-height: 88px; padding: 10px 12px; border-radius: 10px; border: 0; box-shadow: 0 0 0 1px var(--line-strong) inset; background: var(--surface); outline: none; font-size: 14px; line-height: 20px; resize: vertical; transition: box-shadow var(--dur-2); }
 .v4 .ftext:focus { box-shadow: 0 0 0 1px var(--brand) inset, var(--focus-ring); }
+/* The field a dictation run is writing into wears the focus look, focused or not. */
+.v4 .ftext.dictating { box-shadow: 0 0 0 1px var(--brand) inset, var(--focus-ring); }
 .v4 .flabel { font-size: 13px; line-height: 18px; font-weight: 600; }
 .v4 .fhint { font-size: 12px; line-height: 16px; color: var(--muted-foreground); }
 .v4 .ferror { font-size: 12px; line-height: 16px; color: var(--danger); }
+.v4 .dict-err { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.v4 .dict-err .link { font-size: 12px; }
 /* A select trigger: a secondary button with a trailing chevron. */
 .v4 .selectbtn { height: 32px; padding: 0 8px 0 10px; border: 0; border-radius: 8px; background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong) inset; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: box-shadow var(--dur-1); }
 .v4 .selectbtn:hover { box-shadow: 0 0 0 1px var(--line-hover) inset; }

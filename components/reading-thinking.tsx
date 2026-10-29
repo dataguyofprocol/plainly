@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback } from "react";
-import { joinDictation, useDictationTarget } from "@/components/dictation";
-import { Icon } from "@/components/ui/icon";
+import { useCallback, useRef } from "react";
+import { DictationErrorLine, DictationMic, joinDictation, useDictationState, useDictationTarget } from "@/components/dictation";
+import { cn } from "@/lib/utils";
 
 /**
  * The reading-thinking field (owner design 2026-10-03, "two questions per
@@ -28,7 +28,7 @@ export function ReadingThinkingField({
 }: {
 	value: string;
 	onChange: (v: string) => void;
-	/** Esc in the field stops dictation (threaded from the page's hook). */
+	/** Esc in the field stops dictation, keeping the text (threaded from the page's hook). */
 	onEscape?: () => void;
 	/** The check waits CLOSED — Enter opens it (owner, keyboard round
 	 *  2026-10-06). The caller finishes any live dictation FIRST (the
@@ -38,15 +38,23 @@ export function ReadingThinkingField({
 	/** Primary dictation claim — true while the check is behind its reveal. */
 	claim: boolean;
 }) {
-	useDictationTarget(
+	/* Ref-first (live finals, owner round 4): two finals can land before
+	 * the parent re-renders, so the join reads the mirror, not `value`. */
+	const valueRef = useRef(value);
+	valueRef.current = value;
+	const isTarget = useDictationTarget(
 		useCallback(
 			(t: string) => {
-				onChange(joinDictation(value, t));
+				const v = joinDictation(valueRef.current, t);
+				valueRef.current = v;
+				onChange(v);
 			},
-			[value, onChange],
+			[onChange],
 		),
 		claim,
 	);
+	const dictationPhase = useDictationState().phase;
+	const dictating = isTarget && dictationPhase !== "idle";
 	return (
 		<div data-testid="reading-thinking-field" className="rthink">
 			<label className="flabel" htmlFor="reading-thinking">
@@ -92,12 +100,11 @@ export function ReadingThinkingField({
 					}}
 					placeholder="Whatever comes to mind as you read."
 					rows={1}
-					className="ftext rthink-in field-sizing-content max-h-40"
+					className={cn("ftext rthink-in field-sizing-content max-h-40", dictating && "dictating")}
 				/>
-				<span className="fmic" aria-hidden="true">
-					<Icon name="mic" size="sm" />
-				</span>
+				<DictationMic own={isTarget} />
 			</div>
+			<DictationErrorLine show={isTarget} />
 			<span className="fhint">Sent along with your answer to the check.</span>
 		</div>
 	);

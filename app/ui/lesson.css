@@ -254,7 +254,8 @@
 .v4 .ls-dock { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
 .v4 .ls-setup { display: flex; justify-content: center; }
 .v4 .ls-composer { display: flex; align-items: flex-end; gap: 4px; padding: 6px 6px 6px 16px; border-radius: 16px; background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong), var(--e2); transition: box-shadow var(--dur-2) var(--ease-out); }
-.v4 .ls-composer:focus-within { box-shadow: 0 0 0 1px var(--brand), var(--focus-ring), var(--e2); }
+.v4 .ls-composer:focus-within,
+.v4 .ls-composer.dictating { box-shadow: 0 0 0 1px var(--brand), var(--focus-ring), var(--e2); }
 .v4 .ls-composer textarea { flex: 1; min-width: 0; min-height: 36px; max-height: 200px; padding: 7px 0; border: 0; background: transparent; outline: none; resize: none; color: var(--ink); font-size: 15px; line-height: 22px; field-sizing: content; }
 .v4 .ls-composer textarea::placeholder { color: var(--faint); }
 .v4 .ls-composer .ls-hint { align-self: center; flex: none; display: inline-flex; align-items: center; gap: 6px; margin-right: 4px; color: var(--faint); font-size: 12px; line-height: 16px; white-space: nowrap; }
