@@ -20,15 +20,13 @@ Tell Plainly what you want to understand. It finds out what you already know, ma
 
 https://github.com/user-attachments/assets/452b6efc-e9b2-4949-8170-63214491a049
 
-Instead of handing you an explanation, it reads your answers and your reasoning and decides what you need next. Everything you learn goes into a knowledge graph, so the next session picks up where this one ended.
-
-![A Plainly lesson: the explanation on the left, the open question in the side panel](docs/assets/lesson.png)
+Instead of handing you an explanation, it reads your answers and your reasoning and decides what you need next. Everything you learn goes into a knowledge graph, so the next session picks up where this one ended. You can import your own notes too, and the graph never scores you.
 
 ## How a lesson works
 
 1. **Measure:** before teaching anything, it asks questions to find where your understanding runs out.
-2. **Plan:** it maps the steps from there to your goal. The Path tab shows the map and where you are on it, and the plan changes when your answers surprise it.
-3. **Teach:** each step builds on something you already get. You predict, read, then check yourself, with the question in a panel right beside the text. Confusions get fixed before anything is built on top of them.
+2. **Plan:** it maps the steps from there to your goal, and the plan changes when your answers surprise it.
+3. **Teach:** each step builds on something you already get. You predict, read, then check yourself. Confusions get fixed before anything is built on top of them.
 4. **Practice:** sets of five problems where you have to recall the right idea without being told which one.
 
 The goal is for the idea to feel obviously true, not just familiar.
@@ -37,27 +35,7 @@ Every question comes with a box for your thinking and a "How sure?" switch: gues
 
 When a picture would help, the agent can draw a diagram or build an interactive demo. It can also go research a question in the background while you keep learning.
 
-## Pick up where you left off
-
-![Plainly Home: one composer, what is waiting on you, and this week's progress](docs/assets/home.png)
-
-Home is one text box. Type a topic and pick Learn or Practice, or start from a suggestion pulled from your graph. Underneath sits the question that's waiting on you and this week's minutes against your goal.
-
 Press ⌘K anywhere to start something new or find an old session or idea.
-
-## Practice
-
-![A Plainly practice problem with a nudge in the working panel](docs/assets/practice.png)
-
-Write your working in the panel. When you're stuck, ask for a nudge, then a bigger hint, then the first step. Hints read what you've written so far and answer only the next thing blocking you, so a nudge is a sentence or two. The problem card remembers which hints you used.
-
-## Knowledge that sticks around
-
-![The Plainly knowledge graph with an idea selected and its chain lit](docs/assets/knowledge.png)
-
-What you learn piles up as ideas and the reasoning that links them. Click one to light up what it rests on and what it leads to, then add it to practice or open a deeper session on it. You can import your own notes too.
-
-Future lessons read this graph instead of starting from scratch. It holds ideas and how they connect. It never scores you.
 
 ## Get started
 
