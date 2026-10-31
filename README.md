@@ -18,9 +18,16 @@
 
 Tell Plainly what you want to understand. It finds out what you already know, maps a path from there to your goal, and teaches you one step at a time.
 
+<!-- DEMO-VIDEO: to show the narrated demo inline, drag docs/assets/plainly_demo.mp4
+     into any issue on this repo, copy the https://github.com/user-attachments/assets/…
+     URL GitHub inserts, then replace this whole DEMO-VIDEO block with that URL on its
+     own line. Until then the poster below links to the video. -->
 <p align="center">
-  <video src="https://cdn.jsdelivr.net/gh/dataguyofprocol/plainly@main/docs/assets/plainly_demo.mp4" controls title="A Plainly session: typing a question on Home, answering a probe in the side panel, opening the live plan map, asking for a practice nudge, and lighting up a chain in the knowledge graph" width="880"></video>
+  <a href="https://github.com/dataguyofprocol/plainly/releases/download/demo-video/plainly_demo.mp4">
+    <img src="docs/assets/lesson.png" alt="Watch the demo: typing a question on Home, answering a probe in the side panel, opening the live plan map, asking for a practice nudge, and lighting up a chain in the knowledge graph" width="880">
+  </a>
 </p>
+<!-- /DEMO-VIDEO -->
 
 Instead of handing you an explanation, it reads your answers and your reasoning and decides what you need next. Everything you learn goes into a knowledge graph, so the next session picks up where this one ended.
 
