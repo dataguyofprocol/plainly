@@ -18,6 +18,10 @@
 
 Tell Plainly what you want to understand. It finds out what you already know, maps a path from there to your goal, and teaches you one step at a time.
 
+<p align="center">
+  <video src="https://cdn.jsdelivr.net/gh/dataguyofprocol/plainly@main/docs/assets/plainly_demo.mp4" controls title="A Plainly session: typing a question on Home, answering a probe in the side panel, opening the live plan map, asking for a practice nudge, and lighting up a chain in the knowledge graph" width="880"></video>
+</p>
+
 Instead of handing you an explanation, it reads your answers and your reasoning and decides what you need next. Everything you learn goes into a knowledge graph, so the next session picks up where this one ended.
 
 ![A Plainly lesson: the explanation on the left, the open question in the side panel](docs/assets/lesson.png)
