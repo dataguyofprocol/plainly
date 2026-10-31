@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { paletteResults, type PaletteRow } from "@/components/command-palette";
+import { AttachmentChips, AttachmentErrors, useAttachments, useCanAttach, useFileDrop, useFilePicker } from "@/components/attachments";
 import { DictationErrorLine, DictationWave, joinDictation, useDictation } from "@/components/dictation";
 import { useGraphIndex, type IndexedIdea } from "@/components/graph-index";
 import { ModelControl } from "@/components/model-picker";
@@ -247,6 +248,12 @@ function LearnField({
 		setWalk(-1);
 	}, []);
 	const dictation = useDictation({ append: (t) => setQuery(joinDictation(qRef.current, t)) });
+	// Attachments (2026-10-31): desktop-only path references for turn 1.
+	// The words still start the session — they are its title.
+	const canAttach = useCanAttach();
+	const attachments = useAttachments();
+	const picker = useFilePicker(attachments.add);
+	const drop = useFileDrop(canAttach ? attachments.add : undefined);
 
 	// Query → matching sessions and ideas (the ⌘K model). Its "Start" rows
 	// are left out: the composer itself is the start, in the chosen kind.
@@ -281,7 +288,7 @@ function LearnField({
 		if (!ready) return onNeedSetup();
 		setBusy(true);
 		try {
-			router.push(await createSession(text, as));
+			router.push(await createSession(text, as, [], attachments.current()));
 		} catch {
 			setBusy(false);
 		}
@@ -316,9 +323,10 @@ function LearnField({
 				)}
 			</h1>
 			<form
-				className={`hm-composer ${mode === "practice" ? "practice" : ""} ${dictation.active ? "dictating" : ""}`}
+				className={`hm-composer ${mode === "practice" ? "practice" : ""} ${dictation.active ? "dictating" : ""} ${drop.dropping ? "dropping" : ""}`}
 				role="search"
 				aria-label="Start a lesson or practice, or search your sessions and ideas"
+				{...drop.handlers}
 				onSubmit={(e) => {
 					e.preventDefault();
 					submit();
@@ -358,6 +366,7 @@ function LearnField({
 					}}
 					placeholder={mode === "practice" ? "What do you want to practise?" : "What do you want to understand?"}
 				/>
+				<AttachmentChips paths={attachments.paths} onRemove={attachments.remove} />
 				<div className="hm-bar">
 					{/* The kind of session: Learn or Practice. A radio group —
 					    arrows move between the two, the whole page re-tints. */}
@@ -394,6 +403,12 @@ function LearnField({
 					</div>
 					<ModelControl variant="chip" className="mini hm-model" />
 					<span className="hm-fill" aria-hidden="true" />
+					{canAttach && (
+						<button type="button" className="ib lg tipb up mid" aria-label="Attach a file" data-tip="Attach a file" onClick={picker.open}>
+							<Icon name="attach" size="md" />
+						</button>
+					)}
+					{picker.input}
 					<button
 						type="button"
 						className={`ib lg tipb up mid ${dictation.active ? "on" : ""}`}
@@ -454,6 +469,7 @@ function LearnField({
 					</div>
 				)}
 			</form>
+			<AttachmentErrors errors={attachments.errors} />
 			{/* Home has no claiming fields — the omnibar is always the target. */}
 			<DictationErrorLine show />
 			{suggestions.length > 0 && (

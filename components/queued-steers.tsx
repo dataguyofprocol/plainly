@@ -1,4 +1,5 @@
 import { Icon } from "@/components/ui/icon";
+import { attachmentName, splitAttachments } from "@/src/core";
 
 /**
  * THE QUEUED-STEER INDICATOR (owner spec 2026-10-03; chips in the
@@ -23,12 +24,17 @@ export function QueuedSteersBody({ steers }: { steers: QueuedSteerLine[] }) {
 	if (steers.length === 0) return null;
 	return (
 		<div className="ls-queued" data-testid="queued-steers" aria-label="Queued for after this step">
-			{steers.map((s) => (
-				<span key={s.id} title={s.text}>
-					<Icon name="time" size="xs" />
-					<em>{s.text}</em>
-				</span>
-			))}
+			{steers.map((s) => {
+				// Attached files show by name, not as raw marker lines.
+				const { text, paths } = splitAttachments(s.text);
+				const shown = [text, ...paths.map(attachmentName)].filter(Boolean).join(" · ");
+				return (
+					<span key={s.id} title={shown}>
+						<Icon name="time" size="xs" />
+						<em>{shown}</em>
+					</span>
+				);
+			})}
 		</div>
 	);
 }

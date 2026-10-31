@@ -22,6 +22,7 @@ import { AnsweredCard } from "@/components/answered-card";
 import { artifactRenderers } from "@/components/artifacts";
 import { SubagentSteerCard } from "@/components/artifacts/steer-card";
 import { Composer } from "@/components/composer";
+import { AttachmentChips, AttachmentErrors, useAttachments, useCanAttach, useFilePicker } from "@/components/attachments";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { QueuedSteersBody } from "@/components/queued-steers";
 import { DictationErrorLine, DictationWave, joinDictation, useDictation, useDictationState } from "@/components/dictation";
@@ -35,6 +36,8 @@ import {
 	textPartMessageId,
 	kbdEventForAction as kbdEventForChat,
 	needsContinuation,
+	splitAttachments,
+	withAttachments,
 	type ChatInput,
 	type ChatSettings,
 	type LhMessage,
@@ -545,6 +548,11 @@ export function Chat({
 	 *  Auto-continuations (probe answers) never set it — their refusal
 	 *  opens the dialog with no replay. */
 	const draftRef = useRef<string | null>(null);
+	/** Composer attachments (2026-10-31): desktop-only path references that
+	 *  ride the send as marker lines (src/core/attachments.ts). */
+	const canAttach = useCanAttach();
+	const attachments = useAttachments();
+	const picker = useFilePicker(attachments.add);
 
 	// THE BYOK REFUSAL (owner, 2026-09-22): a send that lands the server's
 	// 503 models_not_configured envelope renders as the SETUP FLOW, never
@@ -576,7 +584,9 @@ export function Chat({
 			}
 			if (cancelled) return;
 			if (draftRef.current !== null) {
-				applyText(draftRef.current);
+				const draft = splitAttachments(draftRef.current);
+				applyText(draft.text);
+				attachments.restore(draft.paths);
 				draftRef.current = null;
 			}
 			clearError();
@@ -650,7 +660,7 @@ export function Chat({
 	// affordance).
 	const [compacting, setCompacting] = useState(initiallyCompacting);
 	const canSend =
-		(text.trim().length > 0 || dictation.active) && !pending && !activeProblem && !compacting;
+		(text.trim().length > 0 || attachments.paths.length > 0 || dictation.active) && !pending && !activeProblem && !compacting;
 
 	/* THE PRACTICE PAUSE (owner round 16): between problems — practice
 	 * kind, nothing active, nothing in flight, and at least one problem
@@ -1093,10 +1103,11 @@ export function Chat({
 	};
 	const doSend = () => {
 		if (busy || pending || compacting) return;
-		const t = textRef.current.trim();
+		const t = withAttachments(textRef.current, attachments.current());
 		if (!t) return;
 		draftRef.current = t; // the refusal flow's preserve-and-replay seam
 		applyText("");
+		attachments.clear();
 		void send({ type: "text", text: t });
 	};
 
@@ -1111,10 +1122,11 @@ export function Chat({
 	 * plain send; a raced settle 409s and falls back to exactly that. */
 	const doSteerOrSend = () => {
 		if (pending || compacting) return;
-		const t = textRef.current.trim();
+		const t = withAttachments(textRef.current, attachments.current());
 		if (!t) return;
 		if (busy) {
 			applyText("");
+			attachments.clear();
 			void steer(t);
 			return;
 		}
@@ -1214,14 +1226,7 @@ export function Chat({
 										<PhaseDivider key={`teach-${m.id || `m-${mi}`}`} phase="teach" />
 									) : null}
 									{m.role === "user" ? (
-										/* The learner's own words: a right-aligned bubble in the UI
-										    voice (owner, finesse pass 2026-10-26 — the full-width
-										    quote band read as a citation). No label: the side is the
-										    authorship mark. Plain text — the model's LaTeX pipeline is
-										    not applied to learner-authored text ($ stays $). */
-										<div data-testid="user-message" className="ls-user">
-											{m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")}
-										</div>
+										<UserMessageBody text={m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")} />
 									) : (
 									<Message from="assistant" className="max-w-full">
 									<MessageContent className="ls-turn">
@@ -1593,6 +1598,7 @@ export function Chat({
 							)
 						)}
 						<QueuedSteersBody steers={visibleQueuedSteers(steerQueue, nativeMessages)} />
+						<AttachmentChips paths={attachments.paths} onRemove={attachments.remove} />
 						<Composer
 							// Stop aborts ANY in-flight turn (stream-reattach wave).
 							busy={busy}
@@ -1606,7 +1612,16 @@ export function Chat({
 							dictating={dictation.active && composerIsTarget}
 							nextProblem={nextReady}
 							onNext={sendNext}
+							onFiles={canAttach ? attachments.add : undefined}
 							trailing={
+								<>
+								{canAttach && (
+									<Hint label="Attach a file" side="top">
+										<button type="button" className="ib" aria-label="Attach a file" onClick={picker.open}>
+											<Icon name="attach" size="md" />
+										</button>
+									</Hint>
+								)}
 								<Hint label={dictation.active ? "Stop dictation" : "Dictate"} action={dictation.active ? undefined : "toggle-dictation"} side="top">
 								<button
 									type="button"
@@ -1622,6 +1637,7 @@ export function Chat({
 									)}
 								</button>
 								</Hint>
+								</>
 							}
 							placeholder={
 								nextReady
@@ -1633,6 +1649,8 @@ export function Chat({
 											: "Ask about this step, or steer the lesson"
 							}
 						/>
+						{picker.input}
+						<AttachmentErrors errors={attachments.errors} />
 						<DictationErrorLine show={composerIsTarget} />
 					</div>
 				</div>
@@ -1937,5 +1955,20 @@ function DockSlot({ children }: { children: React.ReactNode }) {
 				{children}
 			</div>
 		</>
+	);
+}
+
+/** The learner's own words: a right-aligned bubble in the UI voice (owner,
+ *  finesse pass 2026-10-26 — the full-width quote band read as a citation).
+ *  No label: the side is the authorship mark. Plain text — the model's LaTeX
+ *  pipeline is not applied to learner-authored text ($ stays $). Attached
+ *  files (2026-10-31) ride as trailing marker lines and render as chips. */
+export function UserMessageBody({ text }: { text: string }) {
+	const { text: words, paths } = splitAttachments(text);
+	return (
+		<div data-testid="user-message" className={words ? "ls-user" : "ls-user att-only"}>
+			{words}
+			<AttachmentChips paths={paths} />
+		</div>
 	);
 }
