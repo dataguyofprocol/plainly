@@ -2,6 +2,7 @@
 
 import { Icon } from "@/components/ui/icon";
 import { Hint } from "@/components/ui/hint";
+import { useFileDrop } from "@/components/attachments";
 
 /**
  * The session composer — Lesson4's steer row (see the render below).
@@ -45,6 +46,7 @@ export function Composer({
 	nextProblem = false,
 	onNext,
 	trailing,
+	onFiles,
 }: {
 	busy: boolean;
 	value: string;
@@ -75,7 +77,11 @@ export function Composer({
 	onNext?: () => void;
 	/** A control at the row's end, before the button (the session's mic). */
 	trailing?: React.ReactNode;
+	/** Files dropped on the field (attachments, 2026-10-31). Absent (browser
+	 *  builds), the field is no drop target. */
+	onFiles?: (files: File[]) => void;
 }) {
+	const drop = useFileDrop(onFiles);
 	const act = () => {
 		const action = enterAction({ busy, canSend, nextProblem });
 		if (action === "stop") onStop();
@@ -92,7 +98,8 @@ export function Composer({
 	return (
 		<form
 			data-testid="composer"
-			className={dictating ? "ls-composer dictating" : "ls-composer"}
+			className={`ls-composer${dictating ? " dictating" : ""}${drop.dropping ? " dropping" : ""}`}
+			{...drop.handlers}
 			onSubmit={(e) => {
 				e.preventDefault();
 				act();

@@ -537,8 +537,14 @@ async function pump(chatId: string): Promise<void> {
 
 			// A live run may have delivered some markers while the gates were
 			// closed — re-check: only still-missing markers ride the wake.
-			const fire = stillPending.filter((e) => !steerDelivered(fresh.messages, e.steer.id));
-			for (const entry of stillPending) {
+			// Re-read the REGISTRY too, never the pre-wait snapshot: settlement
+			// replaces the queue while we wait (resolving markers a run
+			// injected, keeping ones that arrived since — e.g. the probe
+			// handoff). Clearing it off the stale snapshot dropped those
+			// silently (the 2026-10-31 handoff that never woke the teacher).
+			const current = s.queues.get(chatId) ?? [];
+			const fire = current.filter((e) => !steerDelivered(fresh.messages, e.steer.id));
+			for (const entry of current) {
 				if (!fire.includes(entry)) {
 					finalizeSteer(entry.steer);
 					entry.resolve();

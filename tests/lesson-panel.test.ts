@@ -93,6 +93,7 @@ describe("stepFold — Lesson4's reading mode", () => {
 		const messages = [quiz("a"), answer(true), quiz("b"), answer(false), text, quiz("c")];
 		const fold = stepFold(messages, planProgress(tree, messages))!;
 		assert.equal(fold.startIndex, 3, "after the message holding the check on b");
+		assert.equal(fold.startPart, 0);
 		assert.deepEqual(fold.heading, { number: 3, title: "C" });
 		assert.equal(fold.steps, 2);
 		assert.deepEqual(fold.answers, { total: 1, firstTry: 1 }, "graded answers before the step");
@@ -103,5 +104,28 @@ describe("stepFold — Lesson4's reading mode", () => {
 		const fold = stepFold(messages, planProgress(tree, messages))!;
 		assert.equal(fold.startIndex, 0);
 		assert.equal(fold.steps, 0);
+	});
+
+	// Answers arrive as toolResults, so one teacher run holds every check
+	// until the learner types: the step can change mid-group.
+	const check = (nodeId: string, correct: boolean) => ({ type: "tool-quiz", state: "output-available", input: { nodeId }, output: { correct } });
+
+	it("the step changes inside one group: it starts at the part after the last check on another node", () => {
+		const group = {
+			parts: [{ type: "step-start" }, check("a", true), { type: "step-start" }, { type: "reasoning" }, check("b", true), check("b", false), { type: "text" }],
+		};
+		const messages = [text, group];
+		const fold = stepFold(messages, planProgress(tree, messages))!;
+		assert.equal(fold.startIndex, 1, "inside the group, not past it (the empty-page bug)");
+		assert.equal(fold.startPart, 2, "right after the check on a");
+		assert.deepEqual(fold.heading, { number: 2, title: "B" });
+		assert.deepEqual(fold.answers, { total: 1, firstTry: 1 }, "only the check before the cut counts");
+	});
+
+	it("a check that closes its group: the step starts at the next message", () => {
+		const messages = [{ parts: [{ type: "step-start" }, check("a", true)] }, text, { parts: [check("b", true)] }];
+		const fold = stepFold(messages, planProgress(tree, messages))!;
+		assert.equal(fold.startIndex, 1);
+		assert.equal(fold.startPart, 0);
 	});
 });

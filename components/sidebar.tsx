@@ -38,6 +38,8 @@ declare global {
 			/** Auto-update channel (Wave C, 2026-10-10): "lh:update-status" pushes once a staged update exists. */
 			onUpdateStatus?: (cb: (status: { status: string; version: string | null }) => void) => () => void;
 			installUpdate?: () => void;
+			/** Attachments (2026-10-31): a File's absolute disk path; "" when it has none. */
+			pathForFile?: (file: File) => string;
 		};
 	}
 }
@@ -66,6 +68,24 @@ export function ShellProvider({ children }: { children: React.ReactNode }) {
 		const off = window.lh?.onZoom?.(setZoomVar);
 		void window.lh?.getZoom?.().then(setZoomVar);
 		return () => off?.();
+	}, []);
+	useEffect(() => {
+		// THE STRAY-DROP GUARD (attachments, 2026-10-31): a file dropped
+		// where no composer claims it must not navigate the window to
+		// file:// (Electron's will-navigate would bounce it to Preview).
+		// A composer's own handler runs first and claims the drop; anything
+		// left over is refused ("none" — no copy cursor where it can't land).
+		const refuse = (e: DragEvent) => {
+			if (!e.dataTransfer?.types.includes("Files") || e.defaultPrevented) return;
+			e.preventDefault();
+			if (e.type === "dragover") e.dataTransfer.dropEffect = "none";
+		};
+		window.addEventListener("dragover", refuse);
+		window.addEventListener("drop", refuse);
+		return () => {
+			window.removeEventListener("dragover", refuse);
+			window.removeEventListener("drop", refuse);
+		};
 	}, []);
 	return <>{children}</>;
 }

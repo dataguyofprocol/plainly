@@ -22,6 +22,7 @@ import { AnsweredCard } from "@/components/answered-card";
 import { artifactRenderers } from "@/components/artifacts";
 import { SubagentSteerCard } from "@/components/artifacts/steer-card";
 import { Composer } from "@/components/composer";
+import { AttachmentChips, AttachmentErrors, useAttachments, useCanAttach, useFilePicker } from "@/components/attachments";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { QueuedSteersBody } from "@/components/queued-steers";
 import { DictationErrorLine, DictationWave, joinDictation, useDictation, useDictationState } from "@/components/dictation";
@@ -35,6 +36,8 @@ import {
 	textPartMessageId,
 	kbdEventForAction as kbdEventForChat,
 	needsContinuation,
+	splitAttachments,
+	withAttachments,
 	type ChatInput,
 	type ChatSettings,
 	type LhMessage,
@@ -545,6 +548,11 @@ export function Chat({
 	 *  Auto-continuations (probe answers) never set it — their refusal
 	 *  opens the dialog with no replay. */
 	const draftRef = useRef<string | null>(null);
+	/** Composer attachments (2026-10-31): desktop-only path references that
+	 *  ride the send as marker lines (src/core/attachments.ts). */
+	const canAttach = useCanAttach();
+	const attachments = useAttachments();
+	const picker = useFilePicker(attachments.add);
 
 	// THE BYOK REFUSAL (owner, 2026-09-22): a send that lands the server's
 	// 503 models_not_configured envelope renders as the SETUP FLOW, never
@@ -576,7 +584,9 @@ export function Chat({
 			}
 			if (cancelled) return;
 			if (draftRef.current !== null) {
-				applyText(draftRef.current);
+				const draft = splitAttachments(draftRef.current);
+				applyText(draft.text);
+				attachments.restore(draft.paths);
 				draftRef.current = null;
 			}
 			clearError();
@@ -650,7 +660,7 @@ export function Chat({
 	// affordance).
 	const [compacting, setCompacting] = useState(initiallyCompacting);
 	const canSend =
-		(text.trim().length > 0 || dictation.active) && !pending && !activeProblem && !compacting;
+		(text.trim().length > 0 || attachments.paths.length > 0 || dictation.active) && !pending && !activeProblem && !compacting;
 
 	/* THE PRACTICE PAUSE (owner round 16): between problems — practice
 	 * kind, nothing active, nothing in flight, and at least one problem
@@ -1093,10 +1103,11 @@ export function Chat({
 	};
 	const doSend = () => {
 		if (busy || pending || compacting) return;
-		const t = textRef.current.trim();
+		const t = withAttachments(textRef.current, attachments.current());
 		if (!t) return;
 		draftRef.current = t; // the refusal flow's preserve-and-replay seam
 		applyText("");
+		attachments.clear();
 		void send({ type: "text", text: t });
 	};
 
@@ -1111,10 +1122,11 @@ export function Chat({
 	 * plain send; a raced settle 409s and falls back to exactly that. */
 	const doSteerOrSend = () => {
 		if (pending || compacting) return;
-		const t = textRef.current.trim();
+		const t = withAttachments(textRef.current, attachments.current());
 		if (!t) return;
 		if (busy) {
 			applyText("");
+			attachments.clear();
 			void steer(t);
 			return;
 		}
@@ -1123,7 +1135,9 @@ export function Chat({
 
 	// One transcript message → its rendering (the reading column's unit;
 	// called for the folded earlier steps and for the current step alike).
-	const renderMessage = (m: (typeof messages)[number], mi: number) =>
+	// [from, to) is the part range drawn: the step fold can cut one teacher
+	// group in two (stepFold's startPart), each half rendered on its side.
+	const renderMessage = (m: (typeof messages)[number], mi: number, from = 0, to = m.parts.length) =>
 								// A hint reply with nothing but text and thinking: the hint
 								// lives in the practice panel, so the transcript draws nothing.
 								hintReplies.has(mi) && !m.parts.some((p) => p.type.startsWith("tool-") || p.type.startsWith("data-")) ? null : m.role === "user" && isSubagentSteer(m) ? (
@@ -1187,7 +1201,7 @@ export function Chat({
 									})}
 								</Fragment>
 							) : (
-									<Fragment key={m.id || `m-${mi}`}>
+									<Fragment key={`${m.id || `m-${mi}`}${from > 0 ? `-p${from}` : ""}`}>
 									{/* THE INFERRED TEACH SEAM (owner ruling 2026-09-26, the verdict
 									death): teaching begins where the FIRST nodeId-tagged quiz is
 									posed — the fold (phaseTimeline, the same derivation the phase chip
@@ -1207,6 +1221,7 @@ export function Chat({
 									message with content — a replacement ternary swallowed the entire
 									first lesson block (the Lacan session, 2026-09-27). */}
 									{m.role === "assistant" &&
+									from === 0 &&
 									mi > 0 &&
 									phases[mi] === "teach" &&
 									phases[mi - 1] !== "teach" &&
@@ -1214,18 +1229,12 @@ export function Chat({
 										<PhaseDivider key={`teach-${m.id || `m-${mi}`}`} phase="teach" />
 									) : null}
 									{m.role === "user" ? (
-										/* The learner's own words: a right-aligned bubble in the UI
-										    voice (owner, finesse pass 2026-10-26 — the full-width
-										    quote band read as a citation). No label: the side is the
-										    authorship mark. Plain text — the model's LaTeX pipeline is
-										    not applied to learner-authored text ($ stays $). */
-										<div data-testid="user-message" className="ls-user">
-											{m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")}
-										</div>
+										<UserMessageBody text={m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")} />
 									) : (
 									<Message from="assistant" className="max-w-full">
 									<MessageContent className="ls-turn">
 											{m.parts.map((part, pi) => {
+												if (pi < from || pi >= to) return null;
 												// A hint reply keeps only its tool and artifact parts.
 												if (hintReplies.has(mi) && (part.type === "text" || part.type === "reasoning" || part.type === "step-start")) return null;
 												const isLastPart = mi === messages.length - 1 && pi === m.parts.length - 1;
@@ -1278,7 +1287,7 @@ export function Chat({
 															return <PhaseDivider key={`teach-step-${pi}`} phase="teach" />;
 														// A step boundary: breathing room, no rule (the thinking
 														// row that follows already marks the new step).
-														return pi > 0 ? <div key={pi} className="ls-stepgap" aria-hidden="true" /> : null;
+														return pi > from ? <div key={pi} className="ls-stepgap" aria-hidden="true" /> : null;
 													case "data-plan-block":
 														// The plan in the chat (wave 4): a frozen snapshot
 														// block — rendered as carried, never re-derived.
@@ -1481,7 +1490,7 @@ export function Chat({
 							{/* Lesson4's reading mode: only the current step is on the
 							    page — earlier steps fold into the "Steps 1–k" bar above,
 							    and Review unfolds them in place. */}
-							{fold && fold.startIndex > 0 && (
+							{fold && (fold.startIndex > 0 || fold.startPart > 0) && (
 								<div className="ls-past rise" data-testid="past-steps">
 									<Icon name="status-ok" size="md" />
 									<span className="ls-past-t">
@@ -1495,13 +1504,15 @@ export function Chat({
 								</div>
 							)}
 							{(!fold || reviewOpen) && messages.slice(0, fold?.startIndex ?? 0).map((m, i) => renderMessage(m, i))}
+							{/* The group the step starts inside: its earlier half folds too. */}
+							{fold && reviewOpen && fold.startPart > 0 && renderMessage(messages[fold.startIndex]!, fold.startIndex, 0, fold.startPart)}
 							{fold?.heading && (
 								<div className="ls-step-h rise" data-testid="step-heading">
 									<span className="over">Step {fold.heading.number}</span>
 									<h2 className="t-display">{fold.heading.title}</h2>
 								</div>
 							)}
-							{messages.slice(fold?.startIndex ?? 0).map((m, i) => renderMessage(m, i + (fold?.startIndex ?? 0)))}
+							{messages.slice(fold?.startIndex ?? 0).map((m, i) => renderMessage(m, i + (fold?.startIndex ?? 0), i === 0 ? (fold?.startPart ?? 0) : 0))}
 							{/* Your turn (v4 polish): a question waits in the dock — the
 							    reading column ends with a card that points there. */}
 							{pending && !busy && (
@@ -1593,6 +1604,7 @@ export function Chat({
 							)
 						)}
 						<QueuedSteersBody steers={visibleQueuedSteers(steerQueue, nativeMessages)} />
+						<AttachmentChips paths={attachments.paths} onRemove={attachments.remove} />
 						<Composer
 							// Stop aborts ANY in-flight turn (stream-reattach wave).
 							busy={busy}
@@ -1606,7 +1618,16 @@ export function Chat({
 							dictating={dictation.active && composerIsTarget}
 							nextProblem={nextReady}
 							onNext={sendNext}
+							onFiles={canAttach ? attachments.add : undefined}
 							trailing={
+								<>
+								{canAttach && (
+									<Hint label="Attach a file" side="top">
+										<button type="button" className="ib" aria-label="Attach a file" onClick={picker.open}>
+											<Icon name="attach" size="md" />
+										</button>
+									</Hint>
+								)}
 								<Hint label={dictation.active ? "Stop dictation" : "Dictate"} action={dictation.active ? undefined : "toggle-dictation"} side="top">
 								<button
 									type="button"
@@ -1622,6 +1643,7 @@ export function Chat({
 									)}
 								</button>
 								</Hint>
+								</>
 							}
 							placeholder={
 								nextReady
@@ -1633,6 +1655,8 @@ export function Chat({
 											: "Ask about this step, or steer the lesson"
 							}
 						/>
+						{picker.input}
+						<AttachmentErrors errors={attachments.errors} />
 						<DictationErrorLine show={composerIsTarget} />
 					</div>
 				</div>
@@ -1937,5 +1961,20 @@ function DockSlot({ children }: { children: React.ReactNode }) {
 				{children}
 			</div>
 		</>
+	);
+}
+
+/** The learner's own words: a right-aligned bubble in the UI voice (owner,
+ *  finesse pass 2026-10-26 — the full-width quote band read as a citation).
+ *  No label: the side is the authorship mark. Plain text — the model's LaTeX
+ *  pipeline is not applied to learner-authored text ($ stays $). Attached
+ *  files (2026-10-31) ride as trailing marker lines and render as chips. */
+export function UserMessageBody({ text }: { text: string }) {
+	const { text: words, paths } = splitAttachments(text);
+	return (
+		<div data-testid="user-message" className={words ? "ls-user" : "ls-user att-only"}>
+			{words}
+			<AttachmentChips paths={paths} />
+		</div>
 	);
 }

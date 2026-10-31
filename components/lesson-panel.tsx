@@ -880,6 +880,10 @@ export function PracticePanel({
 export interface StepFold {
 	/** The message index where the current step begins. */
 	startIndex: number;
+	/** The part index inside messages[startIndex] where it begins: one
+	 *  teacher run can hold checks on several nodes (answers are toolResults,
+	 *  so they never break the group), and the step starts mid-group. */
+	startPart: number;
 	/** Steps folded above it (the bar reads "Steps 1–n"). */
 	steps: number;
 	/** Graded check answers before it: total, and right first time. */
@@ -888,9 +892,11 @@ export interface StepFold {
 }
 
 /** Pure: Lesson4's reading mode — only the current step stays on the page.
- *  The current step starts after the last message holding a check tagged
- *  to a DIFFERENT plan node (the teaching for the new node follows it);
- *  everything before folds into the "Steps 1–n" bar. Null before the plan
+ *  The current step starts right after the last check PART tagged to a
+ *  DIFFERENT plan node (the teaching for the new node follows it) — a part,
+ *  not a message: a message-level cut folded a whole group that moved on to
+ *  the new node mid-run, leaving the step page empty (the poker session,
+ *  2026-10-31). Everything before folds into the "Steps 1–n" bar. Null before the plan
  *  places the learner anywhere (the check-in reads in full). A question can
  *  be answered once in this app, so "right first time" is the correct count
  *  (dismissals excluded, "I don't know" counted as not right). Exported for
@@ -899,28 +905,34 @@ export function stepFold(messages: readonly PopupMessage[], progress: PlanProgre
 	if (!progress || progress.currentIndex === null) return null;
 	const current = progress.steps[progress.currentIndex - 1]!;
 	const ids = new Set(progress.steps.map((s) => s.id));
-	let lastOther = -1;
+	let startIndex = 0;
+	let startPart = 0;
 	messages.forEach((m, i) => {
-		for (const part of m.parts) {
-			if (part.type !== "tool-quiz" && part.type !== "tool-explain") continue;
+		m.parts.forEach((part, p) => {
+			if (part.type !== "tool-quiz" && part.type !== "tool-explain") return;
 			const node = (part.input as { nodeId?: unknown } | undefined)?.nodeId;
-			if (typeof node === "string" && ids.has(node) && node !== current.id) lastOther = i;
-		}
+			if (typeof node !== "string" || !ids.has(node) || node === current.id) return;
+			// The step starts at the next part, or the next message when this
+			// check closes its group.
+			[startIndex, startPart] = p + 1 < m.parts.length ? [i, p + 1] : [i + 1, 0];
+		});
 	});
-	const startIndex = lastOther + 1;
 	let total = 0;
 	let firstTry = 0;
-	for (const m of messages.slice(0, startIndex)) {
-		for (const part of m.parts) {
-			if ((part.type !== "tool-quiz" && part.type !== "tool-probe") || part.state !== "output-available") continue;
+	messages.forEach((m, i) => {
+		if (i > startIndex) return;
+		m.parts.forEach((part, p) => {
+			if (i === startIndex && p >= startPart) return;
+			if ((part.type !== "tool-quiz" && part.type !== "tool-probe") || part.state !== "output-available") return;
 			const out = part.output as { correct?: boolean; dismissed?: boolean } | undefined;
-			if (!out || out.dismissed) continue;
+			if (!out || out.dismissed) return;
 			total += 1;
 			if (out.correct === true) firstTry += 1;
-		}
-	}
+		});
+	});
 	return {
 		startIndex,
+		startPart,
 		steps: Math.max(0, progress.currentIndex - 1),
 		answers: { total, firstTry },
 		heading: { number: progress.currentIndex, title: current.title },

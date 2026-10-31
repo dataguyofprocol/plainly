@@ -23,9 +23,13 @@
  *   asks main to kill the server and quit-and-install. Browser builds:
  *   both absent, the banner never renders.
  *
+ *   window.lh.pathForFile(file) — the absolute disk path of a picked or
+ *   dropped File (attachments, 2026-10-31): the composer attaches by path
+ *   reference, never by upload. "" for a File with no disk backing.
+ *
  * Channel names are mirrored in electron/main.cjs — keep them in sync.
  */
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 contextBridge.exposeInMainWorld("lh", {
 	platform: process.platform,
@@ -71,4 +75,5 @@ contextBridge.exposeInMainWorld("lh", {
 	},
 	installUpdate: () => ipcRenderer.send("lh:update-install"),
 	setTheme: (mode) => ipcRenderer.send("lh:theme", mode),
+	pathForFile: (file) => webUtils.getPathForFile(file),
 });
