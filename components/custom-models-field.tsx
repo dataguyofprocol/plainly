@@ -10,8 +10,8 @@
  *
  * "Find models" asks the server's /models; a model it lists joins with
  * whatever capabilities the server described (OpenRouter-style fields,
- * Ollama, LM Studio). Nothing is assumed beyond that — an undescribed
- * model starts text-only, no thinking, 128k, 8192, and the user sets it.
+ * Ollama, LM Studio). An undescribed model starts at the defaults —
+ * vision, thinking, 128k, 8192 — and the user turns off what it lacks.
  */
 
 import { useState } from "react";
@@ -48,8 +48,8 @@ export function parseModelIds(text: string): string[] {
 /** Pure: a new model row with what the server described applied over the
  *  defaults (max output never above the context window). */
 export function modelWithDetected(id: string, detected: CustomModelDetected | undefined): CustomModelEntry {
-	const m = { ...defaultCustomModel(id), ...detected };
-	return { ...m, maxTokens: Math.min(m.maxTokens, m.contextWindow), ...(m.thinking ? { thinkingFormat: "openai" as const } : {}) };
+	const { thinkingFormat, ...m } = { ...defaultCustomModel(id), ...detected };
+	return { ...m, maxTokens: Math.min(m.maxTokens, m.contextWindow), ...(m.thinking ? { thinkingFormat } : {}) };
 }
 
 export function CustomModelsField({
@@ -170,7 +170,7 @@ export function CustomModelsField({
 			)}
 			{models.length > 0 && (
 				<span className="fhint">
-					Turn on Vision only for models that read images, and Thinking only for models that reason. A model with Vision on can fill the vision slot.
+					Vision and Thinking start on. Turn off Vision for models that can't read images, and Thinking for models that don't reason. A model with Vision on can fill the vision slot.
 				</span>
 			)}
 		</div>

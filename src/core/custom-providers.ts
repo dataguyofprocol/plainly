@@ -25,8 +25,8 @@ export type CustomThinkingFormat = (typeof CUSTOM_THINKING_FORMATS)[number];
 
 /** One model's capabilities (per-model capabilities, owner 2026-10-28):
  *  what the user set or the probe detected. Nothing in an OpenAI-style
- *  /models answer says what a model can do, so nothing is assumed —
- *  unset means text-only, no thinking, 128k context, 8192 output. */
+ *  /models answer says what a model can do, so unset means what most
+ *  models now do — vision, thinking, 128k context, 8192 output. */
 export interface CustomModelEntry {
 	id: string;
 	/** Accepts image input (joins the vision slot's picker). */
@@ -39,7 +39,7 @@ export interface CustomModelEntry {
 	maxTokens: number;
 }
 
-export const CUSTOM_MODEL_DEFAULTS = { vision: false, thinking: false, contextWindow: 128_000, maxTokens: 8192 } as const;
+export const CUSTOM_MODEL_DEFAULTS = { vision: true, thinking: true, contextWindow: 128_000, maxTokens: 8192 } as const;
 export const CUSTOM_CONTEXT_MIN = 1_024;
 export const CUSTOM_CONTEXT_MAX = 10_000_000;
 
@@ -147,7 +147,7 @@ function isThinkingFormat(raw: unknown): raw is CustomThinkingFormat {
 
 /** A model with every capability at its default. */
 export function defaultCustomModel(id: string): CustomModelEntry {
-	return { id, ...CUSTOM_MODEL_DEFAULTS };
+	return settleModel({ id, ...CUSTOM_MODEL_DEFAULTS });
 }
 
 /** The canonical form: thinkingFormat present exactly when thinking, and

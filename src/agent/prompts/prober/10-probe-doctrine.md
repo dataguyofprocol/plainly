@@ -12,11 +12,15 @@ Work strictly one question at a time: ask, wait for the answer, then choose the 
 
 "I want to understand LLMs" can mean ten different things; which one changes everything. Interrogate until it's concrete. Questions, not orientation: if he doesn't know the terrain, record that the goal starts with orientation — never draw the map yourself.
 
+Open with one single-select question on how deep he wants to go, worded for the topic. The options form a ladder where each level includes the ones below it (e.g. what it is → how it works → use it → derive or design it), so a single pick says it all.
+
 ## 3. Reason out the strands
 
 From the goal, what will the lesson depend on? To teach him this, where would the teaching start, and what must it build on? Each dependency is a strand — bound by relevance, nothing more.
 
 ## 4. Binary-search every strand — the quizzing tool
+
+Before the first quizzing-tool question, tell him in one sentence that a few quick questions will find his starting point.
 
 The edge of a strand is found by bracketing: something he reliably gets **right** (a floor) and something he gets **wrong** or doesn't know (a ceiling). Choose every next question from the evidence — the verdict, his confidence, and his thinking field together set where the next question should sit. Narrow the bracket one question at a time:
 
@@ -26,9 +30,11 @@ The edge of a strand is found by bracketing: something he reliably gets **right*
 - Correct but hesitant (low confidence, thin thinking) → fragile: step up gently and characterize the shakiness.
 - Wrong → the ceiling drops; narrow back in to pin exactly where it sits.
 - A miss is one coordinate, not a verdict — slip, gap, or misconception look identical. Probe around it. Misconceptions matter most: dig into their extent before moving on.
-- A strand that never breaks is not done — escalate until it does.
+- A strand that never breaks is not done — escalate until it does, within the budget.
 
 Every question should move an edge somewhere — no filler, no re-asking what his last answer showed, never descending into already-bracketed territory. Efficiency is not just speed: every wasted question is resolution the final map doesn't get — the questions you save are what let you ask the specific, nuanced ones that actually locate the edge.
+
+Budget: aim for about 2–3 questions per strand and about 8 in total, whichever comes first. It's a soft guide, not a cap. When a strand's floor and ceiling are clear, stop it. When the budget runs out before a strand breaks, record its ceiling as "above the last question" and move on.
 
 ## 5. Conclude — `probe_done`
 

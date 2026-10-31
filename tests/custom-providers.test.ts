@@ -22,13 +22,13 @@ import {
 import { sanitizeUserSettings } from "../src/core/settings.ts";
 
 const valid = { id: "custom-vllm", name: "vLLM", baseUrl: "http://localhost:8000/v1", models: ["qwen"] };
-const text = (id: string) => ({ id, vision: false, thinking: false, contextWindow: 128_000, maxTokens: 8192 });
+const bare = (id: string) => ({ id, vision: true, thinking: true, thinkingFormat: "openai", contextWindow: 128_000, maxTokens: 8192 });
 
 describe("sanitizeCustomProviders", () => {
 	it("keeps a valid entry and normalizes its fields", () => {
 		assert.deepEqual(
 			sanitizeCustomProviders([{ ...valid, name: "  vLLM ", baseUrl: "http://localhost:8000/v1//", models: [" qwen ", "qwen", "", "llama"] }]),
-			[{ id: "custom-vllm", name: "vLLM", baseUrl: "http://localhost:8000/v1", models: [text("qwen"), text("llama")] }],
+			[{ id: "custom-vllm", name: "vLLM", baseUrl: "http://localhost:8000/v1", models: [bare("qwen"), bare("llama")] }],
 		);
 	});
 
@@ -61,15 +61,15 @@ describe("sanitizeCustomProviders", () => {
 
 	it("rides inside the settings record's providers section, unknown keys preserved", () => {
 		const record = sanitizeUserSettings({ version: 1, providers: { custom: [valid, { id: "bad" }], future: 1 } });
-		assert.deepEqual(record!.providers, { custom: [{ ...valid, models: [text("qwen")] }], future: 1 });
+		assert.deepEqual(record!.providers, { custom: [{ ...valid, models: [bare("qwen")] }], future: 1 });
 		const empty = sanitizeUserSettings({ version: 1, providers: { custom: [{ id: "bad" }] } });
 		assert.deepEqual(empty!.providers, {});
 	});
 });
 
 describe("per-model capabilities", () => {
-	it("reads bare ids (records before capabilities) as text-only defaults", () => {
-		assert.deepEqual(sanitizeCustomProviders([valid])[0]!.models, [text("qwen")]);
+	it("reads bare ids (records before capabilities) at the defaults", () => {
+		assert.deepEqual(sanitizeCustomProviders([valid])[0]!.models, [bare("qwen")]);
 	});
 
 	it("keeps set capabilities and settles the thinking format", () => {
@@ -86,8 +86,8 @@ describe("per-model capabilities", () => {
 		]);
 		assert.deepEqual(entry!.models, [
 			{ id: "vl", vision: true, thinking: true, thinkingFormat: "openai", contextWindow: 32_768, maxTokens: 4096 },
-			{ id: "qwq", vision: false, thinking: true, thinkingFormat: "qwen", contextWindow: 128_000, maxTokens: 8192 },
-			text("plain"),
+			{ id: "qwq", vision: true, thinking: true, thinkingFormat: "qwen", contextWindow: 128_000, maxTokens: 8192 },
+			{ id: "plain", vision: true, thinking: false, contextWindow: 128_000, maxTokens: 8192 },
 		]);
 	});
 
@@ -95,7 +95,7 @@ describe("per-model capabilities", () => {
 		const [entry] = sanitizeCustomProviders([
 			{ ...valid, models: [{ id: "m", vision: "yes", thinkingFormat: "nope", contextWindow: 10, maxTokens: -1 }, { id: "small", contextWindow: 4096 }] },
 		]);
-		assert.deepEqual(entry!.models, [text("m"), { ...text("small"), contextWindow: 4096, maxTokens: 4096 }]);
+		assert.deepEqual(entry!.models, [bare("m"), { ...bare("small"), contextWindow: 4096, maxTokens: 4096 }]);
 	});
 
 	it("parses model objects strictly, absent fields at their defaults", () => {
@@ -105,7 +105,7 @@ describe("per-model capabilities", () => {
 			value: {
 				name: "x",
 				baseUrl: "http://x/v1",
-				models: [text("a"), { ...text("b"), vision: true, contextWindow: 4096, maxTokens: 4096 }, { ...text("c"), thinking: true, thinkingFormat: "deepseek" }],
+				models: [bare("a"), { ...bare("b"), vision: true, contextWindow: 4096, maxTokens: 4096 }, { ...bare("c"), thinking: true, thinkingFormat: "deepseek" }],
 			},
 		});
 		for (const model of [
@@ -156,7 +156,7 @@ describe("the key env var", () => {
 describe("the write-side parsers", () => {
 	it("accepts a create body, a blank key meaning keyless", () => {
 		const ok = parseCustomProviderCreate({ name: " Ollama ", baseUrl: "http://localhost:11434/v1/", models: ["llama3"], apiKey: "" });
-		assert.deepEqual(ok, { ok: true, value: { name: "Ollama", baseUrl: "http://localhost:11434/v1", models: [text("llama3")] } });
+		assert.deepEqual(ok, { ok: true, value: { name: "Ollama", baseUrl: "http://localhost:11434/v1", models: [bare("llama3")] } });
 		const keyed = parseCustomProviderCreate({ name: "Gw", baseUrl: "https://gw.example/v1", models: ["m"], apiKey: " short " });
 		assert.ok(keyed.ok && keyed.value.apiKey === "short", "no length floor for custom keys");
 	});

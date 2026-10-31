@@ -31,7 +31,7 @@ after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
 const json = (body: unknown) => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
-const text = (id: string) => ({ id, vision: false, thinking: false, contextWindow: 128_000, maxTokens: 8192 });
+const bare = (id: string) => ({ id, vision: true, thinking: true, thinkingFormat: "openai", contextWindow: 128_000, maxTokens: 8192 });
 const create = (body: unknown) => listRoute.POST(new Request("http://localhost/api/providers/custom", json(body)));
 const update = (id: string, body: unknown) =>
 	idRoute.PUT(new Request(`http://localhost/api/providers/custom/${id}`, { ...json(body), method: "PUT" }), params(id));
@@ -45,7 +45,7 @@ describe("the custom provider routes", () => {
 			id: "custom-local-ollama",
 			name: "Local Ollama",
 			baseUrl: "http://localhost:11434/v1",
-			models: [text("llama3"), text("qwen")],
+			models: [bare("llama3"), bare("qwen")],
 			keyPresent: false,
 		});
 		const list = await (await listRoute.GET()).json();
@@ -69,7 +69,7 @@ describe("the custom provider routes", () => {
 
 	it("updates fields partially, null removing the key; 404 on unknown id", async () => {
 		const renamed = await (await update("custom-local-ollama-2", { name: "Gateway", models: ["m", "n"] })).json();
-		assert.deepEqual(renamed.provider, { id: "custom-local-ollama-2", name: "Gateway", baseUrl: "https://gw.example/v1", models: [text("m"), text("n")], keyPresent: true });
+		assert.deepEqual(renamed.provider, { id: "custom-local-ollama-2", name: "Gateway", baseUrl: "https://gw.example/v1", models: [bare("m"), bare("n")], keyPresent: true });
 		const keyless = await (await update("custom-local-ollama-2", { apiKey: null })).json();
 		assert.equal(keyless.provider.keyPresent, false);
 		assert.equal(authStore.authVars().LH_CUSTOM_LOCAL_OLLAMA_2_API_KEY, undefined);
@@ -85,8 +85,8 @@ describe("the custom provider routes", () => {
 		assert.ok(model, "an update re-syncs the registry");
 		assert.equal(model.api, "openai-completions");
 		assert.equal(model.baseUrl, "https://gw.example/v1");
-		assert.deepEqual(model.input, ["text"]);
-		assert.equal(model.reasoning, false);
+		assert.deepEqual(model.input, ["text", "image"]);
+		assert.equal(model.reasoning, true);
 		assert.equal(model.contextWindow, 128000);
 		assert.equal(model.maxTokens, 8192);
 		assert.equal(piModels().getProvider("custom-local-ollama-2")?.name, "Gateway");
@@ -108,9 +108,9 @@ describe("the custom provider routes", () => {
 	it("carries each model's capabilities into the engine and the vision picker", async () => {
 		const res = await update("custom-local-ollama", {
 			models: [
-				"llama3",
-				{ id: "llava", vision: true, contextWindow: 32_768, maxTokens: 4096 },
-				{ id: "qwq", thinking: true, thinkingFormat: "qwen" },
+				{ id: "llama3", vision: false, thinking: false },
+				{ id: "llava", vision: true, thinking: false, contextWindow: 32_768, maxTokens: 4096 },
+				{ id: "qwq", vision: false, thinking: true, thinkingFormat: "qwen" },
 			],
 		});
 		assert.equal(res.status, 200);
