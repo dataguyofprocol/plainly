@@ -80,13 +80,16 @@ describe("desktop window chrome", () => {
 					},
 				},
 				ipcRenderer: {},
+				webUtils: { getPathForFile: (file: { name: string }) => `/disk/${file.name}` },
 			}),
 		};
 		runInNewContext(readFileSync(new URL("../electron/preload.cjs", import.meta.url), "utf8"), context);
 		assert.equal(bridge.platform, "win32");
 		assert.deepEqual(Object.keys(bridge).sort(), [
-			"chatgpt", "getZoom", "installUpdate", "onUpdateStatus", "onZoom", "platform", "setTheme", "subscriptions",
+			"chatgpt", "getZoom", "installUpdate", "onUpdateStatus", "onZoom", "pathForFile", "platform", "setTheme", "subscriptions",
 		]);
+		// Attachments: the File → disk path seam forwards to webUtils, nothing more.
+		assert.equal((bridge.pathForFile as (f: { name: string }) => string)({ name: "lec7.pdf" }), "/disk/lec7.pdf");
 		assert.deepEqual(Object.keys(bridge.subscriptions as object).sort(), ["cancel", "consent", "disconnect", "login", "onChange", "open", "respond", "retry", "status"]);
 	});
 });
