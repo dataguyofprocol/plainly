@@ -1169,6 +1169,78 @@ describe("Wave C: live steering handoff + settlement reconciliation", () => {
 		assert.equal(jobStore.getJob(jobId)!.status, "done");
 	});
 
+	it("a probe handoff queued while a parked pump waits is NOT dropped when the parked marker lands in-run", async () => {
+		// The dogfood bug (2026-10-31): a pdf job finished behind a probe
+		// quiz, so the pump parked in waitForIdle holding a snapshot of the
+		// queue. An answer run took the pdf marker and ended at the next
+		// quiz (settlement emptied the registry); a later answer run called
+		// probe_done into a FRESH registry. When the gates finally opened,
+		// the parked pump saw its snapshot fully delivered and cleared the
+		// WHOLE registry — the handoff with it. The teacher never woke until
+		// the learner typed.
+		const { chatId, jobId, steer } = setup();
+		const { handed, agent } = fakeAgent();
+		const fired: SteerMessage[][] = [];
+		setTurnRunner(async (_cid, input) => {
+			fired.push((input as SteerInput).steers as SteerMessage[]);
+			return 200;
+		});
+
+		const quiz = (n: number) => ({
+			id: `a-q${n}`,
+			role: "assistant",
+			content: [{ type: "toolCall", id: `quiz-${n}`, name: "quiz", arguments: { question: "q", choices: ["a", "b"] } as never }],
+			api: "openai-completions",
+			provider: "openrouter",
+			model: "test",
+			usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			stopReason: "toolUse",
+			timestamp: 1,
+		}) as never;
+		const answer = (n: number) =>
+			({ id: `r-q${n}`, role: "toolResult", toolCallId: `quiz-${n}`, toolName: "quiz", content: [{ type: "text", text: "a" }], isError: false, timestamp: 1 }) as never;
+		const opening = { id: "u1", role: "user", content: "teach me", timestamp: 1 } as never;
+		chatStore.saveMessages(chatId, [opening, quiz(1)]);
+		const delivery = deliverJobResult(steer);
+		await delay(300); // the pump parks behind the dangling quiz
+
+		// Answer run 1: takes the parked marker at registration, injects it,
+		// and ends at the NEXT quiz — the gates stay closed.
+		assert.ok(beginTurn(chatId));
+		registerLiveAgent(chatId, agent as never);
+		assert.equal(handed.length, 1);
+		chatStore.saveMessages(chatId, [opening, quiz(1), answer(1), steer as never, quiz(2)]);
+		unregisterLiveAgent(chatId);
+		settleSteers(chatId, [steer as never]);
+		endTurn(chatId);
+		await delivery;
+		assert.equal(jobStore.getJob(jobId)!.status, "done");
+
+		// Answer run 2: concludes the probe — the handoff queues while the
+		// run is live, and the run settles without it (it never rides live).
+		assert.ok(beginTurn(chatId));
+		registerLiveAgent(chatId, agent as never);
+		const handoff = buildProbeHandoffSteer(chatId);
+		const handoffDelivery = deliverJobResult(handoff);
+		chatStore.saveMessages(chatId, [
+			opening,
+			quiz(1),
+			answer(1),
+			steer as never,
+			quiz(2),
+			answer(2),
+			...nativeToolMessages("teach me", "probe_done", "call-pd", { ok: true }).slice(1),
+		]);
+		unregisterLiveAgent(chatId);
+		settleSteers(chatId, []);
+		endTurn(chatId);
+
+		await waitFor(() => fired.length > 0, 8000, "the handoff wake");
+		await handoffDelivery;
+		assert.equal(fired.length, 1);
+		assert.deepEqual(fired[0]!.map((s) => s.id), [handoff.id], "the handoff rode its own wake");
+	});
+
 	it("noteSteerVisible flips the job at the visibility seam — before any settle (owner ruling 2026-09-26)", async () => {
 		// The dock fix: the marker reaching the learner's view (wire
 		// message_end / write-ahead persist) flips the job NOW — the
