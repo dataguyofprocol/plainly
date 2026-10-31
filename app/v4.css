@@ -178,6 +178,15 @@
 .v4 .pill.brand, .v4 .pill.help { background: var(--brand-soft); color: var(--brand); }
 .v4 .pill.practice { background: var(--practice-soft); color: var(--practice); }
 .v4 .pill.muted, .v4 .pill.miss { background: var(--hover); color: var(--muted-foreground); }
+/* .att-chips — attached files (composers and the learner's bubbles). */
+.v4 .att-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.v4 .att-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 260px; height: 28px; padding: 0 6px 0 10px; border-radius: 8px; background: var(--field); box-shadow: 0 0 0 1px var(--line-strong) inset; color: var(--ink); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.v4 .att-chip .ic { flex: none; color: var(--muted-foreground); }
+.v4 .att-chip .att-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; padding-right: 4px; }
+.v4 .att-x { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 20px; height: 20px; margin-left: -4px; border: 0; border-radius: 6px; background: transparent; color: var(--faint); cursor: pointer; }
+.v4 .att-x:hover { background: var(--hover); color: var(--ink); }
+.v4 .ls-user .att-chips { justify-content: flex-end; margin-top: 8px; white-space: normal; }
+.v4 .ls-user.att-only .att-chips { margin-top: 0; }
 .v4 .kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 5px; background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong) inset, 0 1px 0 var(--line-strong); color: var(--muted-foreground); font-family: var(--font-jetbrains), monospace; font-size: 11px; line-height: 1; font-weight: 500; }
 .v4 .dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--faint); }
 .v4 .dot.warn { background: var(--warn); }

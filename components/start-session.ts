@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useStrongKeyless, useZeroKeys } from "@/components/setup-cta";
 import { useSettingsSaved } from "@/components/settings-signal";
-import { slotsConfigured, type ModelsSettings } from "@/src/core";
+import { slotsConfigured, withAttachments, type ModelsSettings } from "@/src/core";
 
 export type StartMode = "teach" | "practice";
 export type StartPick = { id: string; name: string; statement: string };
@@ -53,8 +53,14 @@ export function useStartReadiness(initialConfigured?: boolean) {
 }
 
 /** Create the session and return the push target. Throws on a refused
- *  create (the caller resets its busy state). */
-export async function createSession(text: string, mode: StartMode, picks: readonly StartPick[] = []): Promise<string> {
+ *  create (the caller resets its busy state). Attached paths ride turn 1
+ *  as marker lines; the title stays the learner's words. */
+export async function createSession(
+	text: string,
+	mode: StartMode,
+	picks: readonly StartPick[] = [],
+	attachments: readonly string[] = [],
+): Promise<string> {
 	const t = text.trim();
 	const res = await fetch("/api/chats", {
 		method: "POST",
@@ -67,5 +73,5 @@ export async function createSession(text: string, mode: StartMode, picks: readon
 	});
 	if (!res.ok) throw new Error(`create failed: ${res.status}`);
 	const { id } = (await res.json()) as { id: string };
-	return `/chat/${id}?prompt=${encodeURIComponent(t)}`;
+	return `/chat/${id}?prompt=${encodeURIComponent(withAttachments(t, attachments))}`;
 }
