@@ -2,7 +2,7 @@
  * PUT /api/settings/[section] — section-scoped record writes
  * (settings-storage wave, 2026-09-19). One PUT replaces ONE section
  * replace-whole (absent fields = absent overrides — the house settings
- * discipline, same as the per-chat and defaults routes); sections are
+ * discipline, same as the per-chat route); sections are
  * independent, so partial writes can never clobber each other.
  *
  *   section ∈ general | chat | agent | appearance | graph | compaction
@@ -13,8 +13,7 @@
  *   validateModelsSettings — unknown provider/model = 400). Thinking
  *   levels never reject a write (owner, interlude 2026-09-22): a pinned
  *   level CLAMPS to the named model's nearest supported level and the
- *   clamped value is stored — model swaps just work, same as the
- *   defaults route. The agent section additionally validates prompt
+ *   clamped value is stored — model swaps just work. The agent section additionally validates prompt
  *   switches — under the orphan-heal contract (interlude 2026-09-26): an
  *   ON switch with its override file present is valid as-is; an ON whose
  *   file is gone (deleted outside the app, a disk wipe, or a record from
@@ -24,7 +23,7 @@
  *   state never contradicts file reality for long (the delete route
  *   clears the switch by construction; this is the backstop).
  *
- * The static siblings (defaults, prompts) take precedence over this
+ * The static sibling (prompts) takes precedence over this
  * dynamic segment — Next resolves static routes first, so "prompts" never
  * lands here.
  */

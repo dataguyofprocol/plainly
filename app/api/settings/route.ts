@@ -8,8 +8,7 @@
  *         "factory default", never guessed server-side) or 200
  *         {settings: null} on first boot.
  *
- * Section writes go through PUT /api/settings/[section]; the chat defaults
- * also remain writable via the legacy /api/settings/defaults alias.
+ * Section writes go through PUT /api/settings/[section].
  * Resolution to concrete values is the client's/core's job
  * (core/settings-resolution.ts resolveSettings — browser-safe).
  */

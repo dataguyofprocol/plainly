@@ -20,3 +20,6 @@ auth.json
 .fresh-data/
 .demo/
 recordings/
+
+# local release-notes drafts
+release-notes-*.md

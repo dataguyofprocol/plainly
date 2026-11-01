@@ -37,9 +37,6 @@ export * from "./pending.ts";
 export * from "./prompt-segments.ts";
 export * from "./math-delims.ts";
 export * from "./attachments.ts";
-// Wave B (owner-approved 2026-09-26): the native record (LhMessage), the
-// and the input-events contract — all
-// pure logic, browser-safe.
 export * from "./native-messages.ts";
 export * from "./compaction.ts";
 export * from "./input-events.ts";

@@ -76,9 +76,7 @@ import { pathToFileURL } from "node:url";
 const require = createRequire(import.meta.url);
 const yaml = require("js-yaml") as { load(source: string): unknown };
 
-// ---------------------------------------------------------------------------
 // Types
-// ---------------------------------------------------------------------------
 
 export type ReleaseAsset = { id: number; name: string; size: number; state: string };
 export type ReleaseRecord = { id: number; tag_name: string; draft: boolean; assets: ReleaseAsset[] };
@@ -101,9 +99,7 @@ export type ExpectedAssets = {
 type Issue = string;
 type Issues = Issue[];
 
-// ---------------------------------------------------------------------------
 // Version + expected assets
-// ---------------------------------------------------------------------------
 
 /** Verified product name spelled into every artifact (electron-builder.yml productName). */
 const PRODUCT_NAME = "Plainly";
@@ -145,9 +141,7 @@ export function expectedAssets(version: string): ExpectedAssets {
 	};
 }
 
-// ---------------------------------------------------------------------------
 // Release-list parsing (fail closed on any malformed entry)
-// ---------------------------------------------------------------------------
 
 /**
  * `gh api --paginate --slurp` emits an array of pages ([[...], [...]]); a
@@ -213,9 +207,7 @@ export function parseReleases(entries: unknown[]): { ok: true; releases: Release
 	return { ok: true, releases };
 }
 
-// ---------------------------------------------------------------------------
 // Draft selection (replicates the draft job's + builder's matching, fail-closed)
-// ---------------------------------------------------------------------------
 
 export function selectDraft(releases: ReleaseRecord[], tag: string, version: string): DraftSelection {
 	const matches = releases.filter((release) => release.tag_name === tag || release.tag_name === version);
@@ -249,9 +241,7 @@ export function selectDraft(releases: ReleaseRecord[], tag: string, version: str
 	return { ok: true, release: match, warnings };
 }
 
-// ---------------------------------------------------------------------------
 // Packaging-config drift guard
-// ---------------------------------------------------------------------------
 
 /** Names below were derived from these exact config shapes; drift means the
  *  expectations in this file must be re-derived against the new builder
@@ -304,9 +294,7 @@ export function verifyConfigAssumptions(config: unknown, pkg: unknown): { ok: tr
 	return { ok: true };
 }
 
-// ---------------------------------------------------------------------------
 // Asset inventory
-// ---------------------------------------------------------------------------
 
 export function verifyAssets(release: ReleaseRecord, expected: ExpectedAssets): { ok: true } | { ok: false; errors: Issues } {
 	const errors: Issues = [];
@@ -328,9 +316,7 @@ export function verifyAssets(release: ReleaseRecord, expected: ExpectedAssets): 
 	return { ok: true };
 }
 
-// ---------------------------------------------------------------------------
 // Update-feed (latest*.yml) verification
-// ---------------------------------------------------------------------------
 
 type FeedExpectation = {
 	file: string;
@@ -453,9 +439,7 @@ export function verifyMetadataFiles(
 	return { ok: true };
 }
 
-// ---------------------------------------------------------------------------
 // CLI (thin: parse args, read files, run the pure core, print, exit)
-// ---------------------------------------------------------------------------
 
 function usage(): string {
 	return [
