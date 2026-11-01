@@ -383,12 +383,6 @@ body {
 	line-height: 1.45;
 }
 
-/* Session-name weight: v4 sets its serif titles in Literata 500 — the
-   variable font takes any weight, so one explicit value covers both the
-   serif and (toggle off) the Manrope rendering. */
-.font-title {
-	font-weight: 500;
-}
 
 .lh-prose :where(strong, b) {
 	color: var(--lh-ink-strong);
@@ -419,18 +413,6 @@ body {
 	font-weight: var(--lh-heading-weight, 900);
 }
 
-/* lh-input (owner, typography round 2): lh-prose's 1.5 READING leading
-   makes typing carets tower over the glyphs — the caret fills the line
-   box (24px at 16px text, ~2× the glyph height). Inputs are not
-   paragraphs: a tighter 1.25 leading brings the caret to the font-metric
-   floor (~20px, as close to the glyphs as Chromium will draw it) while
-   wrapped lines in growing textareas still read fine. Rendered prose keeps
-   1.5 — the two share family and size, they differ only in leading. */
-.lh-input {
-	font-family: var(--font-prose);
-	font-size: var(--lh-prose-size);
-	line-height: 1.25;
-}
 
 /* Thin native scrollbar (app-wide): hairline thumb, transparent track. */
 * {
@@ -620,38 +602,7 @@ body {
 	}
 }
 
-/* THE SCRIM (v4 redesign, 2026-10-26): every modal's backdrop — a soft
-   ink tint with a light blur, so the app recedes without washing out. One
-   class, so dialogs never disagree about it again. */
-.lh-scrim {
-	background: var(--scrim);
-	-webkit-backdrop-filter: blur(4px);
-	backdrop-filter: blur(4px);
-}
 
-/* Settings dialog pop (settings-app wave, 2026-09-20): a short fade +
-   2% settle-scale — understated by design, the app's motion taste
-   (200ms sidebar, 150ms here); honors reduced-motion by appearing. */
-@keyframes settings-pop {
-	from {
-		opacity: 0;
-		scale: 0.98;
-	}
-	to {
-		opacity: 1;
-		scale: 1;
-	}
-}
-
-.settings-dialog-pop {
-	animation: settings-pop 150ms ease-out;
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.settings-dialog-pop {
-		animation: none;
-	}
-}
 
 /* Graph chrome fade-in (empty-graph chrome wave, owner 2026-09-25): the
    search + settings controls appear ONCE, as the first nodes land —
