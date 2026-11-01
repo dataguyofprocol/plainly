@@ -11,26 +11,8 @@ import { grepTool } from "../src/agent/tools/grep.ts";
 import { lsTool } from "../src/agent/tools/ls.ts";
 import { readTool } from "../src/agent/tools/read.ts";
 
-/**
- * The learner-filesystem tools (sources v1, 2026-09-19): ls/find/grep as
- * pure-Node pi ports, read re-anchored to the home directory. All calls go
- * through absolute paths — the tools' relative resolution targets the real
- * home, which tests must not touch.
- *
- * Fixture tree (tmpdir):
- *   notes/calculus.md         "The derivative measures force…"
- *   notes/linear.txt          eigenvector content
- *   notes/sub/hidden.md
- *   code/main.ts
- *   node_modules/skipme.txt   (excluded from walks)
- *   Library/alsoskip.txt      (excluded from walks)
- *   binary.bin                NUL byte — grep skips
- */
-
 let FIXTURE: string;
 
-/** Drive one tool's native execute and return the model-facing text
- *  (pi signature: execute(toolCallId, params, signal) → AgentToolResult). */
 async function runText(tool: AgentTool<any>, params: unknown, signal?: AbortSignal): Promise<string> {
 	const result = await tool.execute!("c", params, signal);
 	const first = result.content[0];
@@ -62,7 +44,7 @@ describe("glob helpers (fs-shared)", () => {
 	});
 
 	it("star does not cross slashes; double-star does", () => {
-		assert.equal(matchGlob("a/b/c.txt", "*.txt"), true); // basename mode
+		assert.equal(matchGlob("a/b/c.txt", "*.txt"), true);
 		assert.equal(matchGlob("src/x/a.spec.ts", "src/**/*.spec.ts"), true);
 		assert.equal(matchGlob("other/x/a.spec.ts", "src/**/*.spec.ts"), false);
 		assert.equal(matchGlob("src/a.spec.ts", "src/**/*.spec.ts"), true, "** covers zero dirs");
@@ -93,7 +75,6 @@ describe("ls (pi port)", () => {
 		assert.ok(out.includes("code/"));
 		assert.ok(out.includes("notes/"));
 		assert.ok(out.includes("binary.bin"));
-		// sorted alphabetically, case-insensitive
 		const lines = out.split("\n").filter((l) => !l.startsWith("["));
 		const sorted = [...lines].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 		assert.deepEqual(lines, sorted);
@@ -147,8 +128,6 @@ describe("find (pi port)", () => {
 
 describe("grep (pi port)", () => {
 	it("formats matches pi-style: rel:line: text", async () => {
-		// case-sensitive: the lowercase "eigenvector" hits main.ts but NOT
-		// linear.txt's capital-E "Eigenvectors" (that case lives below).
 		const out = await runText(grepTool, { pattern: "eigenvector", path: FIXTURE });
 		assert.equal(out, "code/main.ts:2: const eigenvector = 'here';");
 		assert.ok(!out.includes("node_modules"), "excluded dirs are not searched");
@@ -207,7 +186,7 @@ describe("abort plumbing (the 2026-09-19 cascade fix)", () => {
 			root,
 			() => {
 				visited++;
-				if (visited === 3) ac.abort(); // deterministic: abort from inside the walk
+				if (visited === 3) ac.abort();
 				return false;
 			},
 			ac.signal,
@@ -233,10 +212,6 @@ describe("abort plumbing (the 2026-09-19 cascade fix)", () => {
 	});
 
 	it("grep aborts mid-run with partial results, not a hang", async () => {
-		// The exact shape of the 2.7-minute lesson: a tree big enough that
-		// the walk+scan outlast an abort mid-flight. Whichever phase the
-		// abort lands in, the tool returns promptly with an abort notice —
-		// never "No matches found", never a hang.
 		const root = await fs.mkdtemp(path.join(os.tmpdir(), "lh-fs-midabort-"));
 		await fs.mkdir(path.join(root, "deep"), { recursive: true });
 		for (let i = 0; i < 200; i++) {

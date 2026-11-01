@@ -1,10 +1,3 @@
-/** Golden outputs from the verified published pi-coding-agent 1.4.0
- * findCutPoint + estimateTokens helpers, executed in isolation on synthetic
- * message/metadata entries. No coding-agent dependency or private data.
- * Source compaction.js SHA256:
- * f51e78ef1da66b5803fc91e185f07b968f8f989ab9326b7744958416aad3f6f6
- * Update deliberately alongside the documented local port, not automatically.
- */
 import assert from "node:assert/strict";
 import test from "node:test";
 import { compactionCutIndex, estimateMessageTokens, newCompactionMarker, KEEP_RECENT_TOKENS, type LhMessage } from "../src/core/index.ts";

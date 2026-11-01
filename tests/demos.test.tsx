@@ -1,26 +1,3 @@
-
-/**
- * Demo + visual artifact tests (W6) — deterministic, zero network, no real
- * Chrome:
- *
- *   1. bridge-script injection (buildDemoSrcDoc) + the pure bridge-message
- *      reducer (reduceDemoBridgeState)
- *   2. card rendering (static markup): sandboxed iframe attrs, error chip,
- *      failure notes, inline sanitized svg
- *   3. the demo-builder loop with a FAKE model + FAKE headless (success with
- *      a fix iteration, untested-final verification, never-clean failure,
- *      no-Chrome failure)
- *   4. the visual-maker loop (fake model + fake headless): render-and-look
- *      success, forced look on premature finish, never-writes failure
- *   5. job runners + dispatch (demo part → demo job → steer via a fake
- *      deliver; visual failure path; end-to-end dispatch through
- *      handleChatRequest with the ack protocol)
- *   6. tool registry wiring (server-executed dispatch tools, schemas)
- *
- * Cleanup follows tests/jobs.test.ts idioms (created chat/job files removed
- * in the after() hook; overrides reset in finally blocks).
- */
-
 import React from "react";
 (globalThis as Record<string, unknown>).React = React; // tsx classic-JSX shim (see render-cards.test.tsx)
 
@@ -64,11 +41,6 @@ import { createTeacherAgent } from "../src/agent/teacher-agent.ts";
 import { projectView as projectNative } from "../src/core/view.ts";
 import type { PiEngine } from "../src/agent/models.ts";
 
-/**
- * A fake deliver seam + a runner wired like the chat-handler's, per test:
- * capture the steer and mimic the pipeline's final status flip so the job
- * record reads exactly as production does after the wake turn completes.
- */
 function testRunner() {
 	const steers: SteerMessage[] = [];
 	const runner = createJobRunner({
@@ -88,9 +60,6 @@ function testRunner() {
 }
 import { artifactRenderers } from "../components/artifacts/index.ts";
 
-// The key-presence turn gate (provider-key interlude, 2026-09-25): scripted
-// turns pin openrouter per chat — the gate reads env-first truth, so the
-// key must be present in the test process like any real setup.
 process.env.OPENROUTER_API_KEY ??= "test-key-presence-gate";
 
 
@@ -104,14 +73,12 @@ after(() => {
 		try {
 			fs.unlinkSync(path.join(PATHS.chats, `${id}.json`));
 		} catch {
-			/* already gone */
 		}
 	}
 	for (const id of createdJobs) {
 		try {
 			fs.unlinkSync(path.join(JOBS_DIR, `${id}.json`));
 		} catch {
-			/* already gone */
 		}
 	}
 	headlessOverride.current = undefined;
@@ -119,9 +86,6 @@ after(() => {
 	visualModelOverride.current = undefined;
 });
 
-/** A scripted pi engine (faux provider): the response queue replaces the old
- *  doGenerate turn counter — one queued response per model call (tool-call
- *  turn or final text), consumed in order. */
 function scriptedModel(turns: Array<{ toolCalls?: Array<{ toolCallId: string; toolName: string; input: unknown }>; text?: string }>): PiEngine {
 	const steps: FauxResponseStep[] = turns.map((step) => {
 		if (step.toolCalls) {
@@ -137,8 +101,6 @@ function scriptedModel(turns: Array<{ toolCalls?: Array<{ toolCallId: string; to
 	return { model: faux.getModel(), streamFn: faux.streamSimple };
 }
 
-// ─── fake headless ───────────────────────────────────────────────────────────
-
 const CLEAN_RUN: DemoRunResult = { consoleErrors: [], pageErrors: [], failedRequests: [], ok: true };
 const BROKEN_RUN: DemoRunResult = {
 	consoleErrors: ["Uncaught ReferenceError: foo is not defined"],
@@ -148,9 +110,7 @@ const BROKEN_RUN: DemoRunResult = {
 };
 
 function fakeHeadless(opts: {
-	/** Return BROKEN_RUN for html matching this substring, else CLEAN_RUN. */
 	brokenWhenIncludes?: string;
-	/** Throw for the first N renderSvg calls (then succeed). */
 	renderFailures?: number;
 } = {}): HeadlessApi & { demoRuns: string[]; svgRenders: string[] } {
 	const api = {
@@ -171,7 +131,7 @@ function fakeHeadless(opts: {
 			if (opts.renderFailures && api.svgRenders.length <= opts.renderFailures) {
 				throw new Error("XML parse error");
 			}
-			return Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); // PNG magic
+			return Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 		},
 	};
 	return api as HeadlessApi & { demoRuns: string[]; svgRenders: string[] };
@@ -193,8 +153,6 @@ function noChromeHeadless(): HeadlessApi {
 	};
 }
 
-// ─── 1. bridge injection + reducer ───────────────────────────────────────────
-
 describe("demo bridge", () => {
 	it("injects the resize + error hooks before </body>", () => {
 		const srcDoc = buildDemoSrcDoc("<!doctype html><html><body><canvas id=\"c\"></canvas></body></html>");
@@ -202,7 +160,6 @@ describe("demo bridge", () => {
 		assert.match(srcDoc, /demo-error/);
 		assert.match(srcDoc, /ResizeObserver/);
 		assert.match(srcDoc, /window\.addEventListener\("error"/);
-		// the bridge lands inside the document, and the original content survives
 		assert.ok(srcDoc.indexOf("ResizeObserver") < srcDoc.indexOf("</body>"));
 		assert.match(srcDoc, /<canvas id="c">/);
 	});
@@ -219,28 +176,22 @@ describe("demo bridge", () => {
 		state = reduceDemoBridgeState(state, { type: "demo-resize", height: 421.7 });
 		assert.equal(state.height, 422);
 		assert.equal(state.error, null);
-		// clamped
 		state = reduceDemoBridgeState(state, { type: "demo-resize", height: 99999 });
 		assert.equal(state.height, 2400);
 		state = reduceDemoBridgeState(state, { type: "demo-resize", height: 5 });
 		assert.equal(state.height, 80);
-		// invalid payloads ignored
 		assert.equal(reduceDemoBridgeState(state, { type: "demo-resize", height: "tall" }).height, 80);
 		assert.equal(reduceDemoBridgeState(state, { type: "demo-resize" }).height, 80);
-		// errors recorded, with a fallback message
 		state = reduceDemoBridgeState(state, { type: "demo-error", message: "x is not defined" });
 		assert.equal(state.error, "x is not defined");
 		assert.equal(state.height, 80, "error does not clobber height");
 		state = reduceDemoBridgeState(state, { type: "demo-error" });
 		assert.equal(state.error, "unknown error");
-		// unknown types and non-objects ignored
 		assert.deepEqual(reduceDemoBridgeState(state, { type: "something-else" }), state);
 		assert.deepEqual(reduceDemoBridgeState(state, "demo-resize"), state);
 		assert.deepEqual(reduceDemoBridgeState(state, null), state);
 	});
 });
-
-// ─── 2. card rendering ───────────────────────────────────────────────────────
 
 const DEMO_HTML = "<!doctype html><html><body><h1>oscillator</h1><script>let t=0;</script></body></html>";
 
@@ -303,8 +254,6 @@ describe("dispatch card rendering (the tool-call ack box)", () => {
 		assert.equal(html, "");
 	});
 
-	// sources v0 — the live browser smoke (2026-09-19) caught the pdf dispatch
-	// part rendering nothing: PdfJobCard is the fix.
 	it("pdf dispatch renders the live PDF-reader card while the job runs", () => {
 		const pdfJob: JobRecord = ({
 			id: "jp1",
@@ -359,7 +308,6 @@ describe("steer card rendering (the delivered artifact)", () => {
 		assert.match(html, /demo-error/);
 		assert.match(html, /Damped oscillator/);
 		assert.match(html, /interactive demo/i);
-		// the model-facing protocol text never renders for the learner
 		assert.ok(!html.includes("do NOT wait"), "no protocol glue in the bubble");
 	});
 
@@ -382,8 +330,6 @@ describe("steer card rendering (the delivered artifact)", () => {
 		const html = renderToStaticMarkup(<SubagentSteerCard message={projectNative([steer])[0] as never} />);
 		assert.ok(html.includes("circle"), "svg content rendered inline");
 		assert.match(html, /Figure/);
-		// Natural sizing (owner, 2026-10-07): a DECLARED width (200) means the
-		// holder hugs + centers rather than stretching full-width.
 		assert.match(html, /w-fit/, "holder hugs the declared size");
 		assert.match(html, /svg\]:max-w-full/, "svg shrinks to fit only when oversized");
 		assert.ok(!html.includes("Looking at the render"), "model-facing notes never render");
@@ -391,8 +337,6 @@ describe("steer card rendering (the delivered artifact)", () => {
 
 	it("renders the abort chip for an aborted job's steer (2026-09 dock semantics; the message type is the marker PART)", () => {
 		const steer = buildAbortSteer({ id: "jc", kind: "research", toolCallId: "cc" });
-		// Wave B: the steer is a native marker — the card renders its
-		// PROJECTION (the same view the transcript renderer hands it).
 		const view = projectNative([steer])[0]!;
 		assert.equal((steer.details as { aborted: boolean }).aborted, true);
 		assert.equal(view.parts.length, 2, "text (teacher-facing) + the data-subagent-aborted marker part");
@@ -401,9 +345,7 @@ describe("steer card rendering (the delivered artifact)", () => {
 		assert.match(html, /data-kind="research"/, "the job's kind rides the row");
 		assert.match(html, /Research agent/, "named in the learner's words (finesse pass)");
 		assert.match(html, /stopped by you/, "second person (finesse pass copy)");
-		// the teacher-facing protocol text never renders for the learner
 		assert.ok(!html.includes("no brief is coming"), "no protocol glue in the chip");
-		// the badge renders off the PART, not metadata (the custom-message scheme)
 		const noMeta = { ...view, metadata: {} };
 		const htmlNoMeta = renderToStaticMarkup(<SubagentSteerCard message={noMeta as never} />);
 		assert.match(htmlNoMeta, /job-aborted-badge/, "metadata is pump mechanics, never the render seam");
@@ -425,9 +367,6 @@ describe("steer card rendering (the delivered artifact)", () => {
 		assert.match(html, /complete/);
 		assert.match(html, /2 sources/);
 		assert.match(html, /<summary/, "the expansion affordance is offered (finesse pass: a chevron row)");
-		// the one-liner is a native <details> — collapsed by default, so the
-		// brief + sources ride in the DOM but never clutter the transcript
-		// until the learner opens them (the wave-1 "view full research" ask)
 		assert.match(html, /<details[^>]*data-testid="research-complete-badge"/, "a real disclosure");
 		assert.ok(!/<details[^>]*open/.test(html), "collapsed by default — no `open` attribute");
 		assert.ok(html.includes("founded the Academy"), "the persisted brief rides inside the details");
@@ -452,7 +391,6 @@ describe("steer card rendering (the delivered artifact)", () => {
 		assert.match(html, /<details[^>]*data-testid="pdf-complete-badge"/, "a real disclosure like the research badge");
 		assert.ok(!/<details[^>]*open/.test(html), "collapsed by default");
 		assert.ok(html.includes("power rule"), "the brief rides inside the details");
-		// the path/question are sub-agent context — never learner-facing chrome
 		assert.ok(!html.includes("/Users/x/course/chapter-3.pdf"), "the file path never renders");
 	});
 
@@ -472,7 +410,6 @@ describe("steer card rendering (the delivered artifact)", () => {
 		const steer = buildSubagentSteer({ id: "jv", kind: "visual", toolCallId: "cv" }, { svg: "", notes: "FAILED: iteration limit" });
 		const html = renderToStaticMarkup(<SubagentSteerCard message={projectNative([steer])[0] as never} />);
 		assert.match(html, /FAILED: iteration limit/);
-		// (finesse pass: the failed card carries its kind icon — the FIGURE svg is what must be absent)
 		assert.ok(!html.includes('data-testid="visual-svg"') && !html.includes('cx="50"'), "no svg for a failed build");
 	});
 
@@ -511,20 +448,15 @@ describe("artifact chrome — scrollbar, invert toggles, downloads (release poli
 	it("figure card: NO card chrome, image first, caption row BELOW (owner round, 2026-10-07)", () => {
 		const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><circle cx="50" cy="50" r="20"/></svg>';
 		const html = renderToStaticMarkup(<VisualOutputCard output={{ svg }} />);
-		// Document material: the outer box carries no card styling.
 		const rootAt = html.indexOf('data-testid="visual-card"');
 		const root = html.slice(rootAt - 200, rootAt);
 		assert.ok(!root.includes("rounded-xl border"), "no card container");
-		// Image BEFORE the caption row; the caption label and the controls follow it.
 		const svgAt = html.indexOf('data-testid="visual-svg"');
 		const captionAt = html.indexOf(">Figure<");
 		assert.ok(svgAt !== -1 && captionAt !== -1 && svgAt < captionAt, "the caption row sits below the image");
 		assert.ok(captionAt < html.indexOf("visual-download"), "the controls ride the caption row");
-		// The invert affordance: the contrast-circle disc + the tooltip.
 		assert.ok(html.includes("size-3"), "the icon disc");
 		assert.ok(html.includes('title="Invert colors"'), "the tooltip names the toggle");
-		// The half-moon is ACTUALLY filled (owner catch: lucide's Contrast
-		// renders it hollow — fill="none" default; ours fills currentColor).
 		assert.ok(
 			html.includes('fill="currentColor" stroke="none"'),
 			"the filled half of the invert disc",
@@ -557,9 +489,6 @@ describe("artifact chrome — scrollbar, invert toggles, downloads (release poli
 
 describe("bridge height: the body-based measure (ratchet fix, 2026-10-07)", () => {
 	it("DEMO_BRIDGE_SCRIPT measures the BODY (scrollHeight + rect + margins), not the viewport-clamped documentElement", () => {
-		// documentElement.scrollHeight = max(content, viewport) latches at
-		// the parent's own height — a demo could grow but never shrink on
-		// window resize (owner-reported). The body metrics are pure content.
 		assert.ok(DEMO_BRIDGE_SCRIPT.includes("Math.max(b.scrollHeight,b.getBoundingClientRect().height)"));
 		assert.ok(DEMO_BRIDGE_SCRIPT.includes("getComputedStyle(b)"));
 		assert.ok(!/post=function\(\)\{send\(\{type:"demo-resize",height:document\.documentElement\.scrollHeight\}\)\};/.test(DEMO_BRIDGE_SCRIPT));
@@ -603,8 +532,6 @@ describe("sanitizeSvg", () => {
 		assert.ok(clean.includes("circle") && clean.includes("rect"), "geometry preserved");
 	});
 });
-
-// ─── 3. the demo-builder loop ────────────────────────────────────────────────
 
 const BROKEN_HTML = "<!doctype html><html><body>BROKEN<script>foo();</script></body></html>";
 const GOOD_HTML = "<!doctype html><html><body><canvas id=\"c\"></canvas><script>requestAnimationFrame(function step(){});</script></body></html>";
@@ -675,8 +602,6 @@ describe("demo builder (fake model + fake headless)", () => {
 	});
 });
 
-// ─── 4. the visual-maker loop ────────────────────────────────────────────────
-
 const SVG_1 = '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="100"><line x1="10" y1="50" x2="290" y2="50"/></svg>';
 
 describe("visual maker (fake model + fake headless)", () => {
@@ -700,8 +625,8 @@ describe("visual maker (fake model + fake headless)", () => {
 		const headless = fakeHeadless();
 		const model = scriptedModel([
 			{ toolCalls: [{ toolCallId: "w1", toolName: "write_svg", input: { svg: SVG_1 } }] },
-			{ text: "Done." }, // premature finish — no render yet
-			{ text: "Looked at it — correct." }, // after the forced look
+			{ text: "Done." },
+			{ text: "Looked at it — correct." },
 		]);
 		const result = await runVisualMaker({ brief: "b" }, { engine: model, headless });
 		assert.equal(result.svg, SVG_1, "delivered after the forced look");
@@ -714,9 +639,7 @@ describe("visual maker (fake model + fake headless)", () => {
 		const model = scriptedModel([
 			{ toolCalls: [{ toolCallId: "w1", toolName: "write_svg", input: { svg: SVG_1 } }] },
 			{ toolCalls: [{ toolCallId: "r1", toolName: "render_svg", input: {} }] },
-			// A miss: old_text not in the document (error fed back, nothing changed)
 			{ toolCalls: [{ toolCallId: "e1", toolName: "edit_svg", input: { old_text: "NOT-PRESENT", new_text: "x" } }] },
-			// A hit: exactly one occurrence — applied
 			{ toolCalls: [{ toolCallId: "e2", toolName: "edit_svg", input: { old_text: '<line x1="10"', new_text: '<line x1="20"' } }] },
 			{ toolCalls: [{ toolCallId: "r2", toolName: "render_svg", input: {} }] },
 			{ text: "Moved the start of the line." },
@@ -731,7 +654,6 @@ describe("visual maker (fake model + fake headless)", () => {
 	it("edit_svg before write_svg errors and never edits nothing into a deliverable", async () => {
 		const headless = fakeHeadless();
 		const model = scriptedModel([
-			// Nothing written yet — the edit must error, not crash the loop
 			{ toolCalls: [{ toolCallId: "e0", toolName: "edit_svg", input: { old_text: "svg", new_text: "x" } }] },
 			{ text: "Cannot proceed." },
 		]);
@@ -768,8 +690,6 @@ describe("visual maker (fake model + fake headless)", () => {
 	});
 });
 
-// ─── 5. job runners + dispatch ───────────────────────────────────────────────
-
 const DEMO_INPUT = { title: "Compound interest", brief: "Slider for rate, curve of growth over 30 years." };
 
 function waitFor(cond: () => boolean, timeoutMs = 5000, what = "condition"): Promise<void> {
@@ -789,12 +709,9 @@ async function drain(res: Response): Promise<string> {
 	return res.text();
 }
 
-/** CONNECTION DIET B (owner, 2026-10-10): the POST acks and closes; drain
- *  the turn's wire through the reattach stream instead (settle-tolerant:
- *  a short turn may finish inside the handler). */
 async function drainRunning(chatId: string): Promise<string> {
 	const handle = runningTurn(chatId);
-	if (!handle) return ""; // the turn already settled — completion happened
+	if (!handle) return "";
 	return new Response(handle.subscribe()).text();
 }
 
@@ -803,8 +720,6 @@ describe("demo/visual job runners", () => {
 	it("runJob completes a demo: result on the job, steer via deliver, ack stays on the part", async () => {
 		const chat = chatStore.createChat("Test: demo runner");
 		createdChats.push(chat.id);
-		// Wave B: a NATIVE fixture (the record holds agent history) — the
-		// runner's transcript scan reads it through the projection.
 		chatStore.saveMessages(chat.id, [
 			{ id: "u1", role: "user", content: "show me compounding", timestamp: 1 } as never,
 			{
@@ -833,7 +748,6 @@ describe("demo/visual job runners", () => {
 		const job = jobStore.createJob({ kind: "demo", chatId: chat.id, toolCallId: "call-d1" });
 		createdJobs.push(job.id);
 
-		// runJob has no headless injection point — the module override is the seam.
 		headlessOverride.current = fakeHeadless();
 		demoModelOverride.current = scriptedModel([
 			{ toolCalls: [{ toolCallId: "w1", toolName: "write_demo", input: { html: GOOD_HTML } }] },
@@ -856,14 +770,11 @@ describe("demo/visual job runners", () => {
 		assert.equal(result.html, GOOD_HTML);
 		assert.equal(result.tested, true);
 
-		// The steer carries the artifact for the renderer.
 		assert.equal(steers.length, 1, "exactly one steer");
 		const data = steers[0]!.details as { kind: string; result: unknown };
 		assert.equal(data.kind, "demo");
 		assert.deepEqual(data.result, result);
 
-		// The tool part keeps the DISPATCH ACK forever — the result never
-		// rewrites it (the teacher gets the result once, via the steer).
 		const saved = projectNative(chatStore.getChat(chat.id)!.messages);
 		const part = saved[1]!.parts.find((p) => p.type === "tool-demo");
 		assert.ok(part && part.type === "tool-demo", "demo tool part persisted");
@@ -922,18 +833,13 @@ describe("demo/visual job runners", () => {
 	it("dispatch through a teacher turn: the call acks mid-turn and the runner completes in the background", async () => {
 		const chat = chatStore.createChat("Test: demo spawn dispatch");
 		createdChats.push(chat.id);
-		// BYOK turn gate (owner, 2026-09-22): the scripted chat needs a
-		// conversation model — the per-chat pin, exactly like the setup flow.
 		chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
 
-		// A teacher that calls demo on turn 1, then continues in the SAME turn.
 		const teacher = scriptedModel([
 			{ toolCalls: [{ toolCallId: "call-d2", toolName: "demo", input: DEMO_INPUT }] },
 			{ text: "Here it is." },
 		]);
 
-		// The overrides must be live BEFORE the request — dispatch fires the
-		// runner mid-stream, inside the tool execute.
 		demoModelOverride.current = scriptedModel([
 			{ toolCalls: [{ toolCallId: "w1", toolName: "write_demo", input: { html: GOOD_HTML } }] },
 			{ toolCalls: [{ toolCallId: "r1", toolName: "run_demo", input: {} }] },
@@ -949,14 +855,9 @@ describe("demo/visual job runners", () => {
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({
 						chatId: chat.id,
-						// Wave B: the input-events contract — one event,
-						// never a client transcript.
 						input: { type: "text", text: "teach me compounding" },
 					}),
 				}),
-				// The handler hands the factory the native build options
-				// (messages are the merged record; the record IS the agent
-				// state — no adapter conversion).
 				(opts) =>
 					createTeacherAgent(undefined, {
 						engine: teacher,
@@ -977,7 +878,6 @@ describe("demo/visual job runners", () => {
 			assert.equal(job!.kind, "demo");
 			createdJobs.push(job!.id);
 
-			// The background runner (fire-and-forget) completes with the overrides.
 			await waitFor(() => jobStore.getJob(job!.id)!.status !== "running", 8000, "demo job completion");
 			const done = jobStore.getJob(job!.id)!;
 			assert.equal(done.status, "done");
@@ -991,7 +891,6 @@ describe("demo/visual job runners", () => {
 			assert.equal(steers.length, 1, "one job, one steer");
 			assert.equal((steers[0]!.details as { jobId: string }).jobId, job!.id);
 
-			// Idempotency: dispatch dedupes by toolCallId — no second job.
 			assert.equal(jobStore.listJobs(chat.id).length, 1, "no duplicate job for the same tool part");
 		} finally {
 			demoModelOverride.current = undefined;
@@ -999,8 +898,6 @@ describe("demo/visual job runners", () => {
 		}
 	});
 });
-
-// ─── 6. registry wiring ──────────────────────────────────────────────────────
 
 describe("tool + renderer registry wiring", () => {
 	it("demo and visual are SERVER-EXECUTED dispatch tools with the contract schemas", () => {
@@ -1022,21 +919,16 @@ describe("tool + renderer registry wiring", () => {
 	it("the artifact renderer registry maps demo/visual to the W6 cards", () => {
 		assert.equal(artifactRenderers.demo, DemoCard);
 		assert.equal(artifactRenderers.visual, VisualCard);
-		// sources v0 — pdf maps to its dispatch card (the live-smoke gap)
 		assert.equal(artifactRenderers.pdf, PdfJobCard);
-		// sources v1 — the learner-filesystem set maps to the generic tool-call card
 		for (const t of ["read", "ls", "find", "grep"]) {
 			assert.equal(artifactRenderers[t], ToolCallCard, `${t} renders the tool-call card`);
 		}
-		// wave 7 — the prober's graph tools join the SAME discipline (they
-		// rendered like nothing happened before this interlude)
 		for (const t of ["list_sessions", "list_propositions"]) {
 			assert.equal(artifactRenderers[t], ToolCallCard, `${t} renders the tool-call card`);
 		}
 	});
 
 	it("the tool-call card: the prober's graph tools — collapsed headline + their compact row output", () => {
-		// list_propositions: the session id is the call's subject
 		const propPart = {
 			type: "tool-list_propositions",
 			state: "output-available",
@@ -1046,12 +938,10 @@ describe("tool + renderer registry wiring", () => {
 		};
 		const html = renderToStaticMarkup(<ToolCallCard part={propPart as never} />);
 		assert.match(html, /list_propositions/);
-		assert.match(html, /chat_mtiudjao_776beada/); // the collapsed headline
-		assert.match(html, /Kepler&#x27;s laws/); // the row output, verbatim (apostrophe HTML-escaped)
+		assert.match(html, /chat_mtiudjao_776beada/);
+		assert.match(html, /Kepler&#x27;s laws/);
 		assert.ok(html.includes("<details"), "collapsed by default");
 
-		// list_sessions: no headline arg (empty input) — the tool name alone,
-		// exactly the ls-with-no-path discipline
 		const sessPart = {
 			type: "tool-list_sessions",
 			state: "output-available",
@@ -1075,10 +965,8 @@ describe("tool + renderer registry wiring", () => {
 			output: "Calculus notes\nThe derivative measures force.",
 		};
 		const html = renderToStaticMarkup(<ToolCallCard part={part as never} />);
-		// collapsed headline: tool name + path as given
 		assert.match(html, /read/);
 		assert.match(html, /notes\/calculus\.md/);
-		// expandable payload: input JSON + output text
 		assert.match(html, /Input/);
 		assert.match(html, /Output/);
 		assert.match(html, /The derivative measures force\./);

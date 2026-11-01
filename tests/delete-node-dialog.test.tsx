@@ -3,26 +3,8 @@ import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 
-/**
- * The node-deletion confirm dialog (node interlude, Platform's 50bfcba
- * engine; multi-node extension + MINIMAL REWRITE, owner 2026-09-30):
- * render pins for the copy — the copy is design, not implementation.
- * The delete path itself is live-verified against the real API
- * (dev-verification notes); SSR here pins what static rendering CAN
- * pin.
- *
- * The minimal contract (owner ruling, 2026-09-30): NO pre-flight
- * impact read — what full death takes is obvious, the fetch
- * flickered, and richer facts would only confuse as deletion
- * semantics evolve (rewiring talk is on the table). Title + names +
- * one permanence line + Cancel/Delete. The UI word for graph objects is
- * "idea"/"ideas" (owner, 2026-10-26 — it was "node" under the 2026-09-30
- * ruling).
- */
-
 import { DeleteNodeBody, DeleteNodeDialog, EXTRACTION_RETRY_LINE } from "../components/delete-node-dialog.tsx";
 
-/** The body — pure, so SSR pins everything the live dialog shows. */
 function bodyAt(nodes: { id: string; name: string }[], extra?: { failure?: { code: string; error: string } | null; busy?: boolean }) {
 	return renderToStaticMarkup(
 		createElement(DeleteNodeBody, {
@@ -56,10 +38,6 @@ describe("DeleteNodeBody — the minimal screen (owner, 2026-09-30)", () => {
 	it("single: 'Delete idea?' title, the name alone in mono, the one permanence line", () => {
 		const html = bodyAt([{ id: "kepler", name: "Kepler's three laws" }]);
 		assert.match(html, /data-testid="delete-node-dialog"/);
-		// (owner, 2026-10-13 polish) a plain sans title, NO font-title
-		// serif; the NAME rides below in JetBrains Mono, NO code-block
-		// chrome. (v4 finesse pass: the red moved from the title to the
-		// icon well and the Delete button — app/ui/knowledge.css .kdlg.)
 		assert.match(html, /Delete idea\?/);
 		const title = html.match(/<h2[^>]*>/)?.[0] ?? "";
 		assert.ok(!title.includes("font-title"), "no serif display title (owner, 2026-10-13)");
@@ -71,7 +49,6 @@ describe("DeleteNodeBody — the minimal screen (owner, 2026-09-30)", () => {
 		assert.match(html, /data-testid="node-permanence-line"[^>]*>This permanently deletes the idea — this cannot be undone\./);
 		assert.match(html, /data-testid="node-delete-cancel"/);
 		assert.match(html, /data-testid="node-delete-confirm"/);
-		// the Delete button carries the destructive red (owner, polish round)
 		assert.match(html, /data-testid="node-delete-confirm"[^>]*class="btn danger"/);
 	});
 
@@ -90,18 +67,17 @@ describe("DeleteNodeBody — the minimal screen (owner, 2026-09-30)", () => {
 			{ id: "newton", name: "Newton's second law" },
 			{ id: "hook", name: "Hooke's law" },
 		]);
-		assert.match(three, /Delete 3 ideas\?/); // plural title, IDEAS
+		assert.match(three, /Delete 3 ideas\?/);
 		assert.match(three, /data-testid="node-names-code"/);
 		assert.match(three, /Kepler&#x27;s three laws, Newton&#x27;s second law, Hooke&#x27;s law/);
 		assert.ok(!three.includes('data-testid="node-name-code"'), "the single-name testid is gone in multi");
 		assert.match(three, /This permanently deletes all 3 ideas — this cannot be undone\./);
 		assert.ok(!three.includes("proposition"), "the old word is gone from the dialog");
 
-		// the cap: 10 names render 8 + ", and 2 more"
 		const ten = bodyAt(Array.from({ length: 10 }, (_, i) => ({ id: `n${i}`, name: `Prop ${i}` })));
 		assert.match(ten, /Delete 10 ideas\?/);
-		assert.match(ten, /Prop 7/); // the 8th name still listed
-		assert.doesNotMatch(ten, /Prop 8</); // the 9th is not
+		assert.match(ten, /Prop 7/);
+		assert.doesNotMatch(ten, /Prop 8</);
 		assert.match(ten, /, and 2 more/);
 	});
 
@@ -111,13 +87,13 @@ describe("DeleteNodeBody — the minimal screen (owner, 2026-09-30)", () => {
 		});
 		assert.match(conflict, /data-testid="node-delete-failure"/);
 		assert.match(conflict, new RegExp(EXTRACTION_RETRY_LINE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-		assert.doesNotMatch(conflict, /server line/); // the dock phrasing REPLACES the raw line for the known code
+		assert.doesNotMatch(conflict, /server line/);
 		assert.match(conflict, /data-testid="node-delete-retry"/);
 
 		const plain = bodyAt([{ id: "kepler", name: "Kepler's three laws" }], {
 			failure: { code: "not_found", error: "No such node" },
 		});
-		assert.match(plain, /No such node/); // honest raw line otherwise
+		assert.match(plain, /No such node/);
 	});
 
 	it("busy: the confirm reads 'Deleting…' and both buttons disable", () => {

@@ -1,9 +1,3 @@
-/**
- * pdf-ops (sources v0) — the pdfjs text layer against a committed fixture
- * (tests/fixtures/sample-3page.pdf: 3 pages, distinct subjects, "force" on
- * page 2 only). The render path (headless Chrome) is covered by the
- * pdf-reader loop tests via the headlessOverride fake.
- */
 import assert from "node:assert/strict";
 import * as path from "node:path";
 import { describe, it } from "node:test";
@@ -19,7 +13,6 @@ describe("pdf-ops — the pdfjs text layer", () => {
 		assert.equal(info.pages[0]!.page, 1);
 		assert.ok(info.pages.every((p) => p.text_length > 0));
 		assert.ok(info.mean_text_length > 0);
-		// fixture has no images
 		assert.ok(info.pages.every((p) => p.image_count === 0));
 	});
 
@@ -40,19 +33,16 @@ describe("pdf-ops — the pdfjs text layer", () => {
 		assert.equal(lit.hits.length, 1);
 		assert.equal(lit.hits[0]!.page, 2);
 		assert.match(lit.hits[0]!.context, />>> /);
-		// regex with case-insensitivity
 		const re = await pdfSearch(FIXTURE, "H2O|water");
 		assert.equal(re.hits.length, 1);
 		assert.equal(re.hits[0]!.page, 3);
-		// no-hit silence
 		const none = await pdfSearch(FIXTURE, "zymurgy", { literal: true });
 		assert.equal(none.hits.length, 0);
-		// invalid regex throws the skill's error shape
 		await assert.rejects(() => pdfSearch(FIXTURE, "([unclosed"), /Invalid regex/);
 	});
 
 	it("pdfProbe accepts the fixture and rejects garbage", async () => {
-		await pdfProbe(FIXTURE); // resolves
+		await pdfProbe(FIXTURE);
 		const garbage = path.join(import.meta.dirname, "fixtures", "not-a-pdf.txt");
 		await assert.rejects(() => pdfProbe(garbage));
 	});

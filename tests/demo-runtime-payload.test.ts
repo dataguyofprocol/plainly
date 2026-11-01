@@ -1,4 +1,3 @@
-/** No display, real browser, installed app, or production dependency tree needed. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
@@ -58,7 +57,6 @@ describe("demo standalone dependency gate", () => {
 
 	it("rejects imports outside the payload even when they resolve successfully", () => {
 		withPayload(({ write, run }) => {
-			// A sibling file, not just a missing file: resolution succeeds but confinement must fail.
 			const sibling = fs.mkdtempSync(path.join(os.tmpdir(), "lh-demo-outside-"));
 			try {
 				const external = path.join(sibling, "dependency.mjs");

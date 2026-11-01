@@ -1,8 +1,3 @@
-/**
- * The queued-steer indicator's pins (composer steering, owner arc
- * 2026-10-03): the quiet one-liners above the composer shell, and the
- * visibleQueuedSteers fold that decides which queued steers still show.
- */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -21,8 +16,6 @@ describe("QueuedSteersBody (the quiet queue above the composer)", () => {
 		);
 		assert.match(html, /data-testid="queued-steers"/);
 		assert.equal(html.match(/<span/g)?.length, 2, "one span per steer");
-		// Finesse pass (2026-10-26): tidy right-aligned chips (app/ui/lesson.css
-		// .ls-queued — truncation, right alignment and the quiet tone live there).
 		assert.match(html, /class="ls-queued"/, "the chip stack");
 		assert.match(html, /title="also cover Venus/, "the full text on hover");
 		assert.match(html, /also cover Venus/, "the text rides the line");

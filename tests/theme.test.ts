@@ -1,9 +1,3 @@
-/**
- * The theme's pure half (dark mode wave, owner 2026-10-27): the mode →
- * palette resolution, and the pre-paint boot script run against a stub
- * page — the script is a string the server inlines, so it is exercised
- * exactly as shipped.
- */
 import assert from "node:assert/strict";
 import { runInNewContext } from "node:vm";
 import { describe, it } from "node:test";
@@ -19,8 +13,6 @@ describe("resolveTheme", () => {
 });
 
 describe("THEME_BOOT_SCRIPT", () => {
-	/** Run the script on a stub page; `stored` undefined = nothing saved,
-	 *  "throw" = storage blocked. Returns the data-theme it set. */
 	function boot(stored: string | undefined | "throw", systemDark: boolean): string | undefined {
 		const dataset: Record<string, string> = {};
 		const localStorage = {

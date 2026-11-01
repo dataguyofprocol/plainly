@@ -1,5 +1,5 @@
 #!/bin/sh
-# Plainly installer for macOS on Apple Silicon (owner ruling, 2026-10-27).
+# Plainly installer for macOS on Apple Silicon.
 #
 #   curl -fsSL https://github.com/dataguyofprocol/plainly/releases/latest/download/install.sh | sh
 #
@@ -8,10 +8,6 @@
 # and Gatekeeper calls it malware; curl sets no quarantine flag, so an app
 # installed this way opens normally. After this, the app updates itself
 # (electron/mac-updater.cjs).
-#
-# Steps: read latest-mac.yml, download its zip, check size and sha512,
-# unpack, check bundle id, version and signature, then move Plainly.app into
-# /Applications, or ~/Applications when /Applications isn't writable.
 #
 # LH_UPDATE_FEED overrides the feed URL (same seam as the app's updater),
 # for testing against a local server.
@@ -41,7 +37,6 @@ main() {
 
 	curl -fsSL "$FEED/latest-mac.yml" -o "$tmp/latest-mac.yml" || fail "couldn't download $FEED/latest-mac.yml"
 	version="$(awk '$1 == "version:" { gsub(/["'\'']/, "", $2); print $2; exit }' "$tmp/latest-mac.yml")"
-	# The first .zip entry under files: and its sha512/size lines (split on purpose).
 	# shellcheck disable=SC2046
 	set -- $(awk '
 		/^[[:space:]]*- url:/ { inzip = !done && $3 ~ /\.zip$/; if (inzip) url = $3; next }
@@ -67,7 +62,6 @@ main() {
 	codesign --verify --deep --strict "$new" 2>/dev/null || fail "the app's code signature doesn't verify"
 	xattr -dr com.apple.quarantine "$new" 2>/dev/null || true
 
-	# Reuse an existing ~/Applications install so there's never two copies.
 	if [ -d "$HOME/Applications/$APP" ] && [ ! -d "/Applications/$APP" ]; then
 		dest="$HOME/Applications"
 	elif [ -w /Applications ]; then

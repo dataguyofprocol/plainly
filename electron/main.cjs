@@ -1,5 +1,5 @@
 /**
- * LearnHarness — the Electron shell (wrapper milestone, 2026-09-17).
+ * The Electron shell.
  *
  * What this process is and is not:
  *   IS:  a thin launcher + security guard around the app's real server —
@@ -8,8 +8,7 @@
  *   NOT: a host for any app logic. Everything — teacher turns, extraction,
  *        the graph — runs in the Next server, unchanged.
  *
- * Pattern (fact-checked 2026-09-17 against current Electron 44 / Next 16
- * docs — see .memory release-strategy + electron-wrapper notes):
+ * Pattern:
  *   - spawn via process.execPath + ELECTRON_RUN_AS_NODE=1 (Electron's
  *     bundled Node 24; the runAsNode fuse must stay enabled);
  *   - the server dir ships UNPACKED via extraResources (asar archives are
@@ -17,11 +16,10 @@
  *   - all mutable state under userData (never inside the .app bundle —
  *     translocated apps are read-only);
  *   - keys ride the child's ENV, never argv; auth.json (BYOK) is a flat
- *     {VAR: value} JSON map, plaintext, mode 0600 — server-managed since
- *     the auth-keys wave (2026-09-19): the child reads/writes it DIRECTLY
- *     (LH_AUTH_FILE below) and reflects values into its own env. The old
- *     spawn-time env injection retired with that wave — a copy made here
- *     would shadow every settings-page key change until restart.
+ *     {VAR: value} JSON map, plaintext, mode 0600, server-managed: the
+ *     child reads/writes it DIRECTLY (LH_AUTH_FILE) and reflects values
+ *     into its own env. A copy injected here would shadow every
+ *     settings-page key change until restart.
  */
 
 const { app, BrowserWindow, Menu, ipcMain, nativeTheme, net: electronNet, session, shell, dialog } = require("electron");
@@ -41,7 +39,7 @@ const path = require("node:path");
 
 const PRODUCT_NAME = "Plainly";
 
-// APP NAME → userData (owner, 2026-10-10; renamed 2026-10-27): the
+// APP NAME → userData: the
 // Application Support dir is exactly "Plainly" in dev AND packaged.
 // Packaged Electron would otherwise derive it from package.json "name"
 // (lowercase "plainly"), and productName metadata alone doesn't reach
@@ -51,30 +49,12 @@ app.setName(PRODUCT_NAME);
 const AUTH_FILE = () => path.join(app.getPath("userData"), "auth.json");
 const DATA_DIR = () => path.join(app.getPath("userData"), "data");
 
-/** The packaged standalone server (extraResources → Resources/server).
- *  In dev LH_DEV_URL short-circuits everything: no spawn, no packaging —
- *  the window points at the running `next dev` server (full HMR). */
 function serverEntry() {
-	// extraResources ships the whole .next payload under server/standalone/
-	// (copied from .next with an explicit filter — see electron-builder.yml).
 	return path.join(process.resourcesPath, "server", "standalone", "server.js");
 }
 
-// ─── Single instance: two instances would fight over the data dir ─────────
-// ─── Browser-service helper (Wave E stage 3, owner 2026-10-10) ────────
-// The render engines for agent jobs: PDFs and SVGs rasterize natively
-// (pdfjs+Skia, resvg — no browser); DEMOS execute JS and need one. The
-// app's own Chromium serves that via this helper — the server spawns
-//   <this binary> --browser-service
-// and connects over CDP (system Chrome stays the fallback). Handshake:
-// the helper prints "BROWSER_SERVICE_CDP <port>" on stdout once the CDP
-// endpoint listens. Lifetime: parent IPC disconnect/death = quit.
-// MUST run before the single-instance lock — a helper is a second
-// instance of this very binary, and before the LH_DEV_URL redirect — the
-// helper owns no user data at all.
 if (process.argv.includes("--browser-service")) {
 	const { waitForBrowserService } = require("./browser-service-readiness.cjs");
-	// Own the helper's entire startup lifetime, including the readiness wait.
 	const lifetime = new AbortController();
 	const parentClosed = () => {
 		lifetime.abort(new Error("browser-service parent IPC disconnected"));
@@ -91,8 +71,6 @@ if (process.argv.includes("--browser-service")) {
 			// Must land before app-ready for Chromium to pick it up.
 			app.commandLine.appendSwitch("remote-debugging-port", String(port));
 			await app.whenReady();
-			// A hidden window keeps the app lifecycle ordinary on every
-			// platform (no window-all-closed handler is installed here).
 			const win = new BrowserWindow({ show: false });
 			await win.loadURL("about:blank");
 			// Window load is not a DevTools HTTP readiness barrier. Confirm the
@@ -100,23 +78,16 @@ if (process.argv.includes("--browser-service")) {
 			await waitForBrowserService(port, { signal: lifetime.signal });
 			if (!lifetime.signal.aborted) console.log(`BROWSER_SERVICE_CDP ${port}`);
 		} catch (err) {
-			if (lifetime.signal.aborted) return; // Parent disconnect is normal.
+			if (lifetime.signal.aborted) return;
 			console.error("browser-service failed:", err);
 			app.exit(1);
 		}
 	})();
 } else {
-	// Dev shell (LH_DEV_URL) runs BESIDE the packaged app, not instead of it:
-	// its own userData so (a) the single-instance lock — checked below — doesn't
-	// silently kill it, and (b) it never reads/writes the real app's
-	// localStorage, auth.json, or logs. Must run before the lock check.
 	if (process.env.LH_DEV_URL) {
 		app.setPath("userData", `${app.getPath("userData")}-dev`);
 	}
 
-	// The whole normal boot — lock included — lives in this else: a helper is
-	// a SECOND instance of this very binary on purpose (the running app owns
-	// the lock), so it must never reach this check.
 	if (!app.requestSingleInstanceLock()) {
 		app.quit();
 	} else {
@@ -127,9 +98,6 @@ if (process.argv.includes("--browser-service")) {
 				win.focus();
 			}
 		});
-		// After the lock, so only one instance ever copies; before main(), so
-		// nothing has read userData yet. Failure is logged and the app starts
-		// with an empty folder — the LearnHarness copy stays where it was.
 		try {
 			const result = migrateUserData(app.getPath("userData"));
 			if (result === "copied") log("data migration: copied LearnHarness userData into Plainly");
@@ -145,25 +113,15 @@ let chatgpt = null;
 let chatgptChild = null;
 let subscriptions = null;
 let subscriptionChild = null;
-// Per-launch request capability, never OAuth tokens and never renderer state.
 let desktopAPISecret = null;
 const trustedAppWindows = new Set();
 
-// THE THEME (dark mode wave, owner 2026-10-27): the renderer owns the
-// choice (settings.json appearance.mode, mirrored to localStorage —
-// components/theme.ts). The shell mirrors it into nativeTheme so the
-// native window ground (resize gaps, first frame) and the window controls
-// match the page. Grounds/inks = app/globals.css --background/--foreground.
 const THEME_CHROME = {
 	light: { background: "#f4f5f2", symbol: "#191c1a" },
 	dark: { background: "#121513", symbol: "#e4e7e3" },
 };
 const THEME_MODES = new Set(["system", "light", "dark"]);
 
-/** The stored mode, read once before the first window so its ground is
- *  right from frame zero; anything unreadable = "system". In dev
- *  (LH_DEV_URL) the server reads the repo's data dir, not this one — the
- *  renderer's first "lh:theme" corrects it. */
 function storedThemeMode() {
 	try {
 		const mode = JSON.parse(fs.readFileSync(path.join(DATA_DIR(), "settings.json"), "utf8"))?.appearance?.mode;
@@ -186,26 +144,18 @@ function repaintWindowChrome() {
 			try {
 				win.setTitleBarOverlay({ color: chrome.background, symbolColor: chrome.symbol });
 			} catch {
-				/* no overlay on this platform build */
 			}
 		}
 	}
 }
 
-// A GUI shell must never die to a stray exception (EPIPE dialogs, a race
-// in an event handler): the window + child server are the product, and
-// anything main-side is recoverable by logging it. Log-and-continue.
 process.on("uncaughtException", (err) => {
 	try {
 		log(`uncaught: ${err?.stack ?? err}`);
 	} catch {
-		/* nothing left to write to */
 	}
 });
 
-/** A free TCP port (listen(0) → the kernel assigns one). The close→spawn
- *  race is theoretical; localhost ports are rarely contended, and a failed
- *  spawn surfaces in the health check with the child's stderr in the log. */
 function freePort() {
 	return new Promise((resolve, reject) => {
 		const srv = net.createServer();
@@ -217,32 +167,17 @@ function freePort() {
 	});
 }
 
-/** BYOK keys: auth.json in userData, flat {VAR: value} map, 0600 —
- *  SERVER-MANAGED since the auth-keys wave (2026-09-19). This shell no
- *  longer reads or injects it: the child gets LH_AUTH_FILE below and does
- *  its own read/reflect/write, so a key saved in the settings page takes
- *  effect on the next model call — no restart. Real environment variables
- *  still win over the file inside the child (its documented rule). */
-
 function log(line) {
 	const stamp = new Date().toISOString();
-	// The stdout write is guarded (EPIPE hardening, 2026-10-10): a packaged
-	// app launched with a consumer-owned pipe (a launcher that exits, a
-	// piped run) must not die on its next log line when the pipe breaks.
-	// The file below stays the durable channel.
 	try {
 		console.log(`[lh ${stamp}] ${line}`);
 	} catch {
-		/* stdout gone — userData/logs/main.log still carries it */
 	}
-	// Belt and braces: also append to userData/logs so a misbehaving child
-	// can be diagnosed after the window is gone. Best effort only.
 	try {
 		const dir = path.join(app.getPath("userData"), "logs");
 		fs.mkdirSync(dir, { recursive: true });
 		fs.appendFileSync(path.join(dir, "main.log"), `[${stamp}] ${line}\n`);
 	} catch {
-		/* best effort */
 	}
 }
 
@@ -264,9 +199,6 @@ function startServer(port) {
 					PORT: String(port),
 					HOSTNAME: "127.0.0.1", // the server defaults to 0.0.0.0 — never
 					LH_DATA_DIR: DATA_DIR(),
-					// The auth/keys store — the child reads AND writes this file itself
-					// (no env injection anymore: a spawn-time copy would shadow every
-					// settings-page key change until restart; env wins over file).
 					LH_AUTH_FILE: AUTH_FILE(),
 					LH_DESKTOP_SERVER: "1",
 					LH_DESKTOP_API_SECRET: desktopAPISecret,
@@ -322,16 +254,14 @@ function killServer() {
 		try {
 			child.kill("SIGKILL");
 		} catch {
-			/* already gone */
 		}
 	}, 3000);
 }
 
-/** Security posture (all defaults asserted explicitly; the guards are the
- *  checklist's own recommendations for localhost-app shells):
+/** Security posture (all defaults asserted explicitly; the guards are
+ *  Electron's security checklist recommendations for localhost-app shells):
  *  - deny-by-default permission handler allowing only our loopback origin
- *    (groundwork for the mic/STT milestone — Electron auto-approves by
- *    default, we do not);
+ *    (Electron auto-approves by default);
  *  - will-navigate pinned to the app origin; window.open always denied —
  *    external links go to the real browser via shell.openExternal. */
 function createWindow(url) {
@@ -339,25 +269,15 @@ function createWindow(url) {
 		width: 1440,
 		height: 900,
 		title: PRODUCT_NAME,
-		// Merged chrome (owner, 2026-09-17): the system title bar is gone.
-		// macOS title bar (owner, 2026-10-27): the renderer reserves a
-		// full-width 52pt bar (--lh-bar, app/globals.css) above the sidebar
-		// card, the rail and the dock; the page title (Lesson/Practice,
-		// Knowledge) sits in it past the lights, Home's is empty. The lights
-		// never move — same spot on every screen and at every zoom — and are
-		// centered on the bar: macOS centers each circle at y+6.75, so
-		// y 19.25 lands them at 26, half of 52.
-		// Dragging comes from the renderer's .lh-drag bands (app/globals.css).
+		// macOS centers each traffic light at y+6.75, so y 19.25 lands them
+		// at 26, half of the renderer's 52pt bar.
 		...(process.platform === "darwin"
 			? { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 16, y: 19.25 } }
 			: {
 				titleBarStyle: "hidden",
-				// Native min/max/close on the right, at the OS's compact default
-				// height. Do not force the zoom-invariant native overlay to match
+				// Do not force the zoom-invariant native overlay to match
 				// the renderer's 60 CSS px bar: zooming out would cover its border.
-				// The renderer reserves the actual width via env(titlebar-area-*).
 				titleBarOverlay: { color: themeChrome().background, symbolColor: themeChrome().symbol },
-				// Keep the custom bar alone; Alt reveals the native menu.
 				autoHideMenuBar: true,
 			}),
 		webPreferences: {
@@ -366,7 +286,7 @@ function createWindow(url) {
 			nodeIntegration: false,
 			preload: path.join(__dirname, "preload.cjs"),
 		},
-		// Live-resize + first-paint flash (owner, 2026-09-17): during a resize
+		// Live-resize + first-paint flash: during a resize
 		// the native window surface changes size before Chromium's compositor
 		// has a frame at the new size, and the gap shows the window's NATIVE
 		// background, which flashes against the app. The app background
@@ -375,10 +295,6 @@ function createWindow(url) {
 		// appears only once the page has actually rendered.
 		backgroundColor: themeChrome().background,
 		show: false,
-		// Narrow-window behavior (owner, 2026-09-17; v4 rail 2026-10-26): the
-		// window floor is 712. The renderer swaps the sidebar card for the
-		// rail below 1100 CSS px and lays the rail flat along the top below
-		// 800 (app/ui/shell.css) — CSS alone, no window resizing.
 		minWidth: 712,
 		minHeight: 600,
 	});
@@ -386,14 +302,9 @@ function createWindow(url) {
 	trustedAppWindows.add(win);
 	win.once("closed", () => trustedAppWindows.delete(win));
 	const allowedOrigin = () => new URL(url).origin;
-	// Deny-by-default; the ONLY grants are media (mic/STT groundwork) and
-	// clipboard-sanitized-write — the copy affordances in the transcript
-	// (md-blocks copy corners) call navigator.clipboard.writeText(), which
-	// Chromium only honors with that permission (chrome-melt tweaks wave,
-	// 2026-09-19; before this grant every copy silently rejected). Still
-	// loopback-origin only — Electron's default is auto-approve-everything,
-	// and we do not ship that.
-	// "local-fonts": the appearance section's reading-font picker (2026-09-26).
+	// Deny-by-default, loopback-origin only: Electron's default is
+	// auto-approve-everything. Chromium honors navigator.clipboard.writeText()
+	// only with clipboard-sanitized-write.
 	const allowedPermissions = new Set(["media", "clipboard-sanitized-write", "local-fonts"]);
 	const fromOwnOrigin = (origin, permission) =>
 		origin === allowedOrigin() && allowedPermissions.has(permission);
@@ -417,11 +328,8 @@ function createWindow(url) {
 	});
 
 	void win.loadURL(url);
-	// Zoom truth reaches the renderer for EVERY load (reload, nav): the
-	// renderer's --lh-zoom must never go stale. The fallback catcher below
-	// covers ⌘= / layout variants the menu's ⌘Plus may not claim — menu-
-	// claimed keys never reach before-input-event, so exactly one of the
-	// two applies any given zoom keypress.
+	// Menu-claimed keys never reach before-input-event, so the fallback
+	// catcher below and the menu's ⌘Plus never both apply one keypress.
 	win.webContents.on("did-finish-load", () => {
 		win.webContents.send("lh:zoom", win.webContents.getZoomFactor());
 	});
@@ -438,62 +346,35 @@ function createWindow(url) {
 	return win;
 }
 
-/* ── Zoom (owner round 7, 2026-10-05): ⌘±/⌘0 as an OWNED ladder ──────────
- * The stock zoomIn/zoomOut roles change zoomLevel silently — the renderer
- * never learns the factor, and the native traffic lights (physical-fixed,
- * hiddenInset) drift out of relation to the scaled chrome: the graph
- * button rides away from them zoomed in, content slides under them
- * zoomed out. Here zoom is explicit: a factor ladder, applied through
- * setZoomFactor, and broadcast to the renderer ("lh:zoom" — it publishes
- * --lh-zoom so gutter lengths can divide by it and stay PHYSICAL-
- * constant). The traffic lights themselves stay at their construction
- * position ({x:16, y:19.25}), which is HIG-correct: native lights hug
- * the window corner while the web chrome compensates around them (the
- * title bar's height divides by the factor). Electron does have
- * setWindowButtonPosition; the owner chose fixed lights (2026-10-27).
- * Vertical note: zoomed past ~1.4 the bar stops shrinking (it must fit
- * its content), so its content centers drift below the lights — accepted. */
+/* The stock zoomIn/zoomOut roles change zoomLevel silently, so the renderer
+ * never learns the factor and the native traffic lights (physical-fixed)
+ * drift out of relation to the scaled chrome. */
 const ZOOM_LADDER = [0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 
-/* ── Auto-update (Wave C, owner 2026-10-10: silent download + restart ─────
- * banner; checks at startup + every 24h) ─────────────────────────────────
+/* Auto-update. Feed: GitHub Releases (app-update.yml baked into the bundle).
+ * macOS: the app is ad-hoc signed, which Squirrel.Mac rejects, so
+ * electron/mac-updater.cjs swaps the .app after quit. Linux deb installs can
+ * request administrator permission via the package manager.
  *
- * Feed: GitHub Releases (electron-builder.yml publish → app-update.yml,
- * baked into the bundle). macOS (Plainly fork, owner 2026-10-27): the app
- * is ad-hoc signed, which Squirrel.Mac rejects, so electron/mac-updater.cjs
- * downloads the zip, verifies it, and swaps the .app after quit. Windows
- * uses NSIS; Linux uses AppImage or DebUpdater (6.8.9 supports deb;
- * installation can request administrator permission via the package
- * manager — owner 2026-10-11).
- *
- * Hard rules:
- *  - DEV NEVER UPDATES: !app.isPackaged skips the updater entirely — the
- *    dev world runs `next dev` and has no signed bundle.
- *  - THE UPDATER CAN NEVER TAKE THE APP DOWN: every event and check is
- *    caught and logged (feed down, disk full, bad signature — all just
- *    log lines; the app keeps working, update or no update).
- *  - LH_UPDATE_FEED (env): overrides the baked GitHub feed with a generic
- *    local server — the pre-release verification drill (serve
- *    latest-mac.yml + zip + blockmap from any localhost HTTP dir and
- *    watch a real installed copy find/download/restart). Test-only seam.
- *
- * Install path: the downloaded update applies on quit (autoInstallOnAppQuit;
- * on macOS the will-quit hook hands the staged bundle to the swap helper).
- * The renderer banner asks for an immediate restart via "lh:update-install";
- * we kill the child server FIRST — deterministic ordering: the server lives
- * inside the .app bundle about to be replaced (extraResources), and
- * before-quit alone would race the swap. */
+ * Shell contract:
+ *  - !app.isPackaged skips the updater entirely.
+ *  - Every updater event and check is caught and logged; the updater can
+ *    never take the app down.
+ *  - LH_UPDATE_FEED (env) overrides the baked GitHub feed with a generic
+ *    local server. Test-only seam.
+ *  - On "lh:update-install" the child server is killed FIRST: it lives inside
+ *    the .app bundle about to be replaced, and before-quit alone would race
+ *    the swap. */
 const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
-let autoUpdater = null; // electron-updater's (Windows/Linux), packaged builds only
-let macUpdater = null; // mac-updater.cjs (macOS), packaged builds only
-let relaunchAfterUpdate = false; // set by the banner's Restart, read at will-quit
+let autoUpdater = null;
+let macUpdater = null;
+let relaunchAfterUpdate = false;
 
 function broadcastUpdateStatus(status) {
 	for (const win of BrowserWindow.getAllWindows()) {
 		try {
 			win.webContents.send("lh:update-status", status);
 		} catch {
-			/* window mid-teardown — the next push retries */
 		}
 	}
 }
@@ -503,7 +384,6 @@ function checkForUpdates({ manual = false } = {}) {
 		macUpdater
 			.check()
 			.then((version) => {
-				// Same contract as below: the banner fires once the download is staged.
 				if (manual && !version) dialog.showMessageBox({ type: "info", message: "You're up to date.", detail: `Plainly ${app.getVersion()} is the latest version.` });
 			})
 			.catch((err) => {
@@ -516,8 +396,6 @@ function checkForUpdates({ manual = false } = {}) {
 	autoUpdater
 		.checkForUpdates()
 		.then((result) => {
-			// The download itself is silent (autoDownload); the banner fires on
-			// update-downloaded. Manual checks additionally answer directly.
 			if (!manual) return;
 			const version = result?.updateInfo?.version;
 			if (!version) dialog.showMessageBox({ type: "info", message: "You're up to date.", detail: `Plainly ${app.getVersion()} is the latest version.` });
@@ -529,11 +407,9 @@ function checkForUpdates({ manual = false } = {}) {
 }
 
 function installUpdateNow() {
-	// Kill the server BEFORE the quit-and-install (see block comment).
 	try {
 		killServer();
 	} catch {
-		/* already dead */
 	}
 	if (macUpdater) {
 		relaunchAfterUpdate = true;
@@ -564,7 +440,7 @@ function setupMacUpdater() {
 	if (feed) log(`auto-update: LH_UPDATE_FEED override → ${feedBase}`);
 	macUpdater = createMacUpdater({
 		currentVersion: app.getVersion(),
-		bundleId: "app.plainly.Plainly", // electron-builder.yml appId
+		bundleId: "app.plainly.Plainly",
 		appBundle,
 		feedBase,
 		workDir: path.join(app.getPath("userData"), "updates"),
@@ -611,12 +487,10 @@ function setupAutoUpdater() {
 	}
 	autoUpdater.autoDownload = true;
 	autoUpdater.autoInstallOnAppQuit = true;
-	// Route every updater log line through the shell's own log (userData/
-	// logs/main.log) — feed failures must be diagnosable after the fact.
 	autoUpdater.logger = {
 		info: (m) => log(`updater: ${m}`),
 		warn: (m) => log(`updater warn: ${m}`),
-		debug: (m) => {}, // too chatty for the persistent log
+		debug: (m) => {},
 		error: (m) => log(`updater error: ${m}`),
 	};
 	autoUpdater.on("update-downloaded", (info) => {
@@ -636,7 +510,7 @@ function zoomStep(win, dir) {
 }
 
 function applyZoom(win, factor) {
-	factor = Math.min(2, Math.max(0.75, factor)); // ladder clamps; ⌘0 = 1
+	factor = Math.min(2, Math.max(0.75, factor));
 	win.webContents.setZoomFactor(factor);
 	win.webContents.send("lh:zoom", factor);
 }
@@ -644,7 +518,7 @@ function applyZoom(win, factor) {
 /** macOS needs an application menu with the Edit roles — without one,
  *  Cmd+C/V/A do nothing in the renderer. Everything else stays minimal. */
 function installMenu() {
-	// AGPL attribution (owner, 2026-10-27): the About panel credits upstream.
+	// AGPL attribution: the About panel credits upstream.
 	app.setAboutPanelOptions({
 		applicationName: PRODUCT_NAME,
 		applicationVersion: app.getVersion(),
@@ -655,8 +529,6 @@ function installMenu() {
 			label: app.name,
 			submenu: [
 				{ role: "about" },
-				// Manual check (Wave C): answers via native dialog — no renderer
-				// round-trip. The 24h automatic checks stay silent.
 				{ label: "Check for Updates…", click: () => checkForUpdates({ manual: true }) },
 				{ type: "separator" },
 				{ role: "hide" },
@@ -672,10 +544,6 @@ function installMenu() {
 				{ role: "reload" },
 				{ role: "toggleDevTools" },
 				{ type: "separator" },
-				// OWNED zoom (see applyZoom): the roles change zoomLevel
-				// silently; these broadcast the factor and re-seat the
-				// traffic lights. The renderer's --lh-zoom depends on
-				// hearing every change.
 				{
 					label: "Actual Size",
 					accelerator: "CommandOrControl+0",
@@ -704,20 +572,15 @@ async function main() {
 	app.on("window-all-closed", () => {
 		chatgpt?.pause();
 		subscriptions?.pause();
-		// macOS convention: the app stays resident, reactivated from the Dock.
 		if (process.platform !== "darwin") app.quit();
 	});
 
-	// The child must not outlive us — cover every quit path.
 	app.on("before-quit", killServer);
 	process.on("exit", killServer);
 	process.on("SIGHUP", killServer);
 
 	await app.whenReady();
 
-	// Dev mode: point at a running `next dev` server (LH_DEV_URL) — no
-	// spawn, no packaging, full HMR. The rest of this shell still applies
-	// (guards, menu, single instance).
 	const devUrl = process.env.LH_DEV_URL;
 	const url = devUrl ?? `http://127.0.0.1:${await freePort()}`;
 	if (!devUrl) {
@@ -754,8 +617,6 @@ async function main() {
 		log(`dev mode: ${devUrl}`);
 	}
 
-	// Renderer controls contain no token/URL/code operation. The separate server
-	// child is the only recipient of credential leases over inherited IPC.
 	ipcMain.handle("lh:chatgpt:control", async (event, command) => {
 		if (!trustedAppWindows.has(BrowserWindow.fromWebContents(event.sender)) || !trustedSender(event, new URL(url).origin, BrowserWindow)) return { error: "Untrusted desktop request." };
 		if (!chatgpt || !serverProcess?.connected) return { available: false, pending: false, activeId: null, accounts: [], error: "ChatGPT sign-in requires the desktop app's private server connection. Browser-only and externally launched development servers keep API-key connections." };
@@ -771,8 +632,6 @@ async function main() {
 		return subscriptionControl(command, subscriptions);
 	});
 
-	// The theme: stored mode before the first window; the renderer keeps it
-	// current ("lh:theme" on every load and switch); OS flips repaint.
 	nativeTheme.themeSource = storedThemeMode();
 	nativeTheme.on("updated", repaintWindowChrome);
 	ipcMain.on("lh:theme", (event, mode) => {
@@ -784,23 +643,15 @@ async function main() {
 
 	installMenu();
 
-	// Auto-update (Wave C): wire the updater before the window so the
-	// banner channel is live from first paint; the first check and the 24h
-	// interval fire after it below. setupAutoUpdater's contract: failures
-	// are log lines — this can never block boot.
 	setupAutoUpdater();
 	ipcMain.on("lh:update-install", () => installUpdateNow());
 
-	// The renderer's first paint can race did-finish-load — it asks for
-	// the current factor itself (mirrors "lh:zoom" pushes).
 	ipcMain.handle("lh:zoom:get", (event) => BrowserWindow.fromWebContents(event.sender)?.webContents.getZoomFactor() ?? 1);
 	app.on("activate", () => {
 		if (BrowserWindow.getAllWindows().length === 0) { chatgpt?.resume(); subscriptions?.resume(); createWindow(url); }
 	});
 	createWindow(url);
 	log(`window open: ${url}`);
-	// First update check AFTER the window exists (the downloaded-banner
-	// push needs a listener); dev builds no-op (no updater).
 	if (autoUpdater || macUpdater) {
 		checkForUpdates();
 		setInterval(() => checkForUpdates(), UPDATE_CHECK_INTERVAL_MS);

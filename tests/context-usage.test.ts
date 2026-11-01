@@ -21,8 +21,6 @@ test("newest marker invalidates retained pre-cut usage; summarizer money log can
 	assert.equal(measuredContextTokens([old, marker()]), null);
 	assert.equal(measuredContextTokens([old, marker(), assistant("fresh")]), 83_000);
 	assert.equal(measuredContextTokens([old, marker(), assistant("fresh"), marker()]), null);
-	// The summarizer is logged as a money-channel turn, never an assistant
-	// in the native conversation list. No money-channel input exists here.
 });
 
 test("errors, aborts, all-zero/invalid usage and unfinished slots preserve the previous valid reading", () => {

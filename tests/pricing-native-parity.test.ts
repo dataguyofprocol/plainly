@@ -1,4 +1,3 @@
-/** Catalog/calculator parity replaces the old generated-table drift test. */
 import assert from "node:assert/strict";
 import test from "node:test";
 import { calculateCost, type Usage } from "@earendil-works/pi-ai";

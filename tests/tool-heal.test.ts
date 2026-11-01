@@ -1,25 +1,3 @@
-/**
- * THE WHITEHEAD INCIDENT PINS (owner, 2026-10-09): glm-5.3 (z-ai via
- * OpenRouter) emitted two argument-wobble shapes in one real session —
- * quiz `type: "\"predict\""` (the literal with quotes baked in; the
- * schema's own description displayed the values quoted+colon) rejected
- * TEN times with byte-identical retries while the lesson never started,
- * and `correctAnswer: [":parmenides"]` (the option value with the JSON
- * key-value colon glued on) rejected four times.
- *
- * The fixes these pins hold:
- *  1. THE STANDARD HEAL EVERYWHERE — healToolRecord wraps every registry
- *     (bareQuestionTools carried NO prepareArguments at all), and the
- *     quote-encoded literal heals before TypeBox validation.
- *  2. THE DEBRIS STRIP AT MEMBERSHIP SEAMS — stripModelValueDebris in
- *     coerceCorrectAnswer (boundary check + grading), normalizeQuizType,
- *     and resolveTargetId.
- *  3. THE DISPLAY MIRROR — the record keeps RAW arguments, so
- *     parseQuizInput heals the same wobble on read (the tool-parts law:
- *     a healed-at-boundary quiz whose display parse rejects is an
- *     invisible pending quiz and a learner lockout).
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { validateToolArguments } from "@earendil-works/pi-ai";
@@ -36,13 +14,10 @@ import { resolveTargetId } from "../src/core/chains.ts";
 import { bareQuestionTools } from "../src/agent/teacher-agent.ts";
 import { probeQuizTool } from "../src/agent/tools.ts";
 
-/** The incident's exact encoding: the value wrapped in literal quotes. */
 function QUOTED(value: string): string {
 	return `"${value}"`;
 }
 
-// A complete, well-formed teach-quiz input — the incident's call with
-// every field valid BUT the wobbled one.
 function whiteheadQuiz(type: unknown, correctAnswer: unknown) {
 	return {
 		question: "What was Parmenides' claim?",
@@ -101,9 +76,6 @@ describe("the death-loop shape — quiz type with quotes baked in", () => {
 	});
 
 	it("WIRING: the 2026-09-26 string-options shape heals through the bare quiz too", () => {
-		// The universal heal covers the ORIGINAL incident's shape as well:
-		// options serialized as a JSON string (then healed only on the
-		// plan-tree quiz path; the bare registries had nothing).
 		const quiz = bareQuestionTools().quiz;
 		assert.ok(quiz?.prepareArguments, "the bare quiz must carry the standard heal");
 		const input = whiteheadQuiz("predict", ["parmenides"]);
@@ -123,8 +95,8 @@ describe("the colon shape — correctAnswer with copy-syntax debris", () => {
 		assert.equal(stripModelValueDebris(QUOTED("predict")), "predict");
 		assert.equal(stripModelValueDebris(`: "primary-external" `), "primary-external");
 		assert.equal(stripModelValueDebris("`value`"), "value");
-		assert.equal(stripModelValueDebris("a:b"), "a:b"); // interior colon is content
-		assert.equal(stripModelValueDebris('["x"]'), '["x"]'); // interior quotes are content (JSON-array strings)
+		assert.equal(stripModelValueDebris("a:b"), "a:b");
+		assert.equal(stripModelValueDebris('["x"]'), '["x"]');
 	});
 
 	it("coerceCorrectAnswer cleans non-matching entries (boundary check + grading seam)", () => {
@@ -180,11 +152,7 @@ describe("the display mirror — raw records heal on read", () => {
 		const raw = whiteheadQuiz(QUOTED("predict"), [":parmenides"]);
 		const parsed = parseQuizInput(raw);
 		assert.ok(parsed, "the wobbled record must parse — else the quiz is invisible");
-		// The display schema's type is DELIBERATELY a lenient string (old
-		// and probe records carry none); the read seam is normalizeQuizType —
-		// which strips the recorded wobble to the intended role.
 		assert.equal(normalizeQuizType(parsed?.type), "predict");
-		// The graded answer resolves to the option despite the recorded colon.
 		assert.deepEqual(parsed ? coerceCorrectAnswer(parsed.correctAnswer, parsed.options.map((o) => o.value ?? o.label)) : [], ["parmenides"]);
 	});
 });

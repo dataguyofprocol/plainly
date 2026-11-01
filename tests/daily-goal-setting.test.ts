@@ -1,7 +1,3 @@
-/**
- * The daily goal setting (v4 redesign, 2026-10-26): general.dailyGoalMinutes
- * — integer 5..240, factory 30; the sanitizer clamps, the PUT rejects.
- */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { DAILY_GOAL_MAX, DAILY_GOAL_MIN, FACTORY_SETTINGS, resolveSettings, sanitizeUserSettings } from "../src/core/index.ts";

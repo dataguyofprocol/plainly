@@ -1,7 +1,3 @@
-/**
- * Attachments — the marker-line wire format and the readable-types gate
- * (owner, 2026-10-31: attach = a path reference in the message text).
- */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {

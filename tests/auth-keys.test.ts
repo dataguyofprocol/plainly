@@ -1,12 +1,3 @@
-/**
- * The curated auth-key catalog + shape rules (auth-keys wave, 2026-09-19;
- * search wave 2026-09-20: the Google CSE pair retired, Tavily + Brave in)
- * — PURE module, so this file owns no fs. Owner decisions being pinned:
- *  - the catalog is exactly the three known keys, ids = env-var names;
- *  - validation is SHAPE-ONLY (no live pings) and bad pastes are 400s;
- *  - masking is last-4 + length — plaintext never leaves the store.
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { AUTH_KEYS, genericProviderKeyGuard, isKnownAuthKey, maskKey, validateKeyShape } from "../src/core/auth-keys.ts";
@@ -22,9 +13,6 @@ describe("the catalog", () => {
 			assert.ok(k.description.length > 0, `${k.id} has a description`);
 			assert.ok(k.docsUrl.startsWith("https://"), `${k.id} has a docs link`);
 		}
-		// OPENROUTER_API_KEY graduated to the provider table (owner decision,
-		// provider-keys interlude) — not curated anymore. The Google CSE
-		// pair retired with its engine (search wave, 2026-09-20).
 		assert.ok(!isKnownAuthKey("OPENROUTER_API_KEY"));
 		assert.ok(!isKnownAuthKey("GOOGLE_SEARCH_API_KEY"), "the CSE pair is retired");
 		assert.ok(!isKnownAuthKey("GOOGLE_CSE_ID"));

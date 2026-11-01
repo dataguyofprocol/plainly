@@ -19,7 +19,7 @@ function desktopAPIHeaders(details, origin, secret, windows) {
 		if (new URL(contents.mainFrame.url).origin !== origin) return headers;
 		if (details.initiatorOrigin !== undefined && details.initiatorOrigin !== origin) return headers;
 		headers[HEADER] = secret;
-	} catch { /* Missing/destroyed/navigated frames fail closed. */ }
+	} catch { }
 	return headers;
 }
 module.exports = { desktopAPIHeaders, HEADER };

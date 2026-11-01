@@ -1,10 +1,3 @@
-/**
- * streamingToolActivity (2026-09-19, the "Writing a question…" fix): a
- * tool part stays input-streaming for its WHOLE execution (the bridge
- * defers input-available to tool_execution_end), so the transcript
- * activity line must name the ACTUAL running tool — the old code shimmered
- * "Writing a question…" over minutes-long greps.
- */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { LhViewMessage } from "../src/core/view.ts";
@@ -43,16 +36,12 @@ describe("streamingToolActivity (the turn-activity label)", () => {
 	});
 
 	it("no activity once the call settles or the turn ends", () => {
-		// output-available = done executing → no shimmer (the transcript
-		// shows the settled card instead).
 		assert.equal(streamingToolActivity([msg("assistant", [toolPart("grep", "output-available")])]), null);
-		// the last message being the user's = nothing running.
 		assert.equal(streamingToolActivity([msg("user", [{ type: "text", text: "hi" }])]), null);
 		assert.equal(streamingToolActivity([]), null);
 	});
 
 	it("the SECOND streaming part wins only if the first settles — parts scan forward", () => {
-		// A settled call followed by a live one: the live one is the activity.
 		const parts = [toolPart("read", "output-available"), toolPart("grep", "input-streaming")];
 		assert.equal(streamingToolActivity([msg("assistant", parts)]), "Searching file contents…");
 	});

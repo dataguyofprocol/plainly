@@ -1,13 +1,3 @@
-/**
- * Unit tests — the UI parse seam (src/core/tool-parts.ts).
- *
- * The rule born of the 2026-09-12 live crashes: model-authored tool input
- * is consumed only through these parsers, each running the SAME zod schema
- * the model faced at the boundary. These pins hold the two exact live
- * crash shapes (the model's double-encoding habit) and the boundary-parity
- * property: anything a boundary schema accepts, the display parse accepts.
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { quizInputProblems } from "../src/core/question-core.ts";
@@ -30,8 +20,8 @@ const TEACHER_QUIZ = {
 	],
 	correctAnswer: "truth",
 	explanation: "Convention-T schematizes truth for the object language.",
-	type: "check", // teach-only role field — the display parse KEEPS it (the dock gates by it)
-	nodeId: "convention-t", // teacher-only field — the display parse must accept and strip it
+	type: "check",
+	nodeId: "convention-t",
 };
 
 const PROBER_QUIZ = {
@@ -75,13 +65,6 @@ describe("parseQuizInput", () => {
 	});
 
 	it("boundary parity: the 2026-09-26 string-options shape heals on read (universal-heal mirror, 2026-10-09)", () => {
-		// The boundary now heals a JSON-encoded options string at EVERY
-		// registry (healToolRecord, owner 2026-10-09 — the bare-quiz sets
-		// carried no prepareArguments at all), and the record keeps the RAW
-		// args — so the display parse heals the same shape, per this file's
-		// own parity law: anything the boundary accepts, the display parse
-		// accepts, or the posed quiz renders nowhere while the turn has
-		// ended = learner lockout.
 		const stringified = { ...PROBER_QUIZ, options: JSON.stringify(PROBER_QUIZ.options) };
 		const parsed = parseQuizInput(stringified);
 		assert.ok(parsed, "the healed-at-boundary record must parse on read");
@@ -89,14 +72,6 @@ describe("parseQuizInput", () => {
 	});
 
 	it("boundary parity under Value.Convert: a NUMERIC correctAnswer parses (live-smoke lockout fix, 2026-09-26)", () => {
-		// The live smoke's model emitted correctAnswer: 17 (number). pi's
-		// boundary runs Value.Convert before Value.Check, so the quiz posed
-		// — but the record keeps the RAW args. A parse seam without Convert
-		// would reject exactly what the boundary accepted: the pending quiz
-		// renders nowhere while the turn has ended = learner lockout.
-		// Dock-visible parity case: the smoke's real emission — options whose
-		// values ARE the numbers, correctAnswer numeric. Convert → "17",
-		// refinement passes (it matches an option), the quiz parses.
 		const numeric = {
 			question: "What is 5 + 3 × 4?",
 			options: [
@@ -114,10 +89,7 @@ describe("parseQuizInput", () => {
 		const parsedArray = parseQuizInput(numericArray);
 		assert.ok(parsedArray);
 		assert.deepEqual(parsedArray.correctAnswer, ["17", "27"]);
-		// Non-convertible garbage still never parses (structure owns it)…
 		assert.equal(parseQuizInput({ ...PROBER_QUIZ, correctAnswer: { bad: true } }), undefined);
-		// …and Convert's widening (undefined → "") is caught by the refinement
-		// chain the boundary itself uses — garbage renders as a quiet fallback.
 		const widened = { ...PROBER_QUIZ, correctAnswer: undefined };
 		assert.equal(parseQuizInput(widened), undefined, "the refinement owns the reject");
 	});
@@ -154,8 +126,6 @@ describe("parseProbeDoneInput", () => {
 	});
 
 	it("the live crash shape — assessment STRINGIFIED — does not parse", () => {
-		// The exact double-encoding from the modal-realism run: strands died
-		// on `.map` because the card cast the shape. The parse kills the class.
 		const stringified = { assessment: JSON.stringify(VALID_ASSESSMENT.assessment) };
 		assert.equal(parseProbeDoneInput(stringified), undefined);
 		const garbage = JSON.stringify(VALID_ASSESSMENT.assessment).slice(0, 30);
@@ -167,9 +137,6 @@ describe("parseProbeDoneInput", () => {
 	});
 });
 describe("LaTeX-escape restoration (the JSON-debris fix, owner ruling 2026-09-26)", () => {
-	// The exact live shapes from the modal-logic session: single-backslash
-	// LaTeX inside JSON args — JSON escape resolution ate the command's
-	// first letter (\f → FF ate 'f' of \forall, \v → VT ate 'v' of \varphi).
 	it("parseQuizInput restores escape debris inside math spans (question + options + explanation)", () => {
 		const parsed = parseQuizInput({
 			question: "What does \\(\\forall x\\, \\varphi(x)\\) mean?",
@@ -231,7 +198,6 @@ describe("LaTeX-escape restoration (the JSON-debris fix, owner ruling 2026-09-26
 });
 
 describe("display-math newline rule (Option A, owner ruling 2026-09-27)", () => {
-	// TS literal below: \\[ is \[, \\forall is intact \forall, \n is a REAL newline, \\\\ is the LaTeX \\ line break.
 	const MULTILINE = "Compare:\n\\[\n\\forall x, & f(x) = x^2 \\\\\n& g(x) = x^3\n\\]";
 
 	it("real newlines inside display math are kept — multi-line equations pass through untouched", () => {
@@ -363,13 +329,11 @@ describe("dollar-delimiter recognition — existing escape restoration rules", (
 	});
 });
 
-// ─── parseExplainInput (free-recall display parse, owner 2026-09-27) ───────
-
 describe("parseExplainInput: the dock's display seam for explain calls", () => {
 	const good = {
 		question: "Explain why Mercury is hard to observe.",
 		correctAnswer: "Its small angular separation from the Sun — it never strays far from the Sun in our sky.",
-		nodeId: "planet-order", // the teacher's field — STRIPPED by Clean, like quiz
+		nodeId: "planet-order",
 		details: "Think about where it appears at dusk.",
 	};
 
@@ -386,7 +350,6 @@ describe("parseExplainInput: the dock's display seam for explain calls", () => {
 	});
 
 	it("restores LaTeX escape debris inside math spans (the pi-ai streaming wobble)", () => {
-		// \f of \forall was eaten by the lenient args parse: U+000C + "orall".
 		const dirty = "Because \(orall x\) holds.";
 		const parsed = parseExplainInput({ ...good, correctAnswer: dirty })!;
 		assert.equal(parsed.correctAnswer, "Because \(\forall x\) holds.");
@@ -396,18 +359,11 @@ describe("parseExplainInput: the dock's display seam for explain calls", () => {
 		assert.equal(parseExplainInput("just a string"), undefined);
 		assert.equal(parseExplainInput({ explanation: "e", correctAnswer: "a" }), undefined, "missing question");
 		assert.equal(parseExplainInput({ question: "q", explanation: "e", correctAnswer: { nested: true } }), undefined);
-		// 42 → "42": the same numeric coercion the quiz seam pins.
 		assert.equal(parseExplainInput({ question: "q", explanation: "e", correctAnswer: 42 })?.correctAnswer, "42");
 	});
 });
 
 describe("over-escaped command heal at the parse seam (owner ruling 2026-10-15)", () => {
-	// xiaomi/mimo-v2.6-pro and deepseek-v4.1-flash stochastically DOUBLE
-	// LaTeX command backslashes inside JSON tool arguments — per-call and
-	// per-field (gradient-descent msg 3: question doubled, explanation and
-	// options in the SAME call clean). restoreMathEscapesDeep now rides
-	// healOverescapedCommands after the debris restore, so doubled spans
-	// heal at every display parse: live dock, settled cards, old records.
 	const CLEAN =
 		"Let $f : \\mathbb{R}^n \\to \\mathbb{R}$ be differentiable at $x$, with $\\nabla f(x) \\neq 0$. Among all unit directions $\\|u\\|_2 = 1$, which makes $D_u f(x)$ most negative?";
 	const DOUBLE = (s: string): string => s.replace(/\\/g, "\\\\");
@@ -424,7 +380,6 @@ describe("over-escaped command heal at the parse seam (owner ruling 2026-10-15)"
 		const parsed = parseQuizInput({ ...BASE, question: DOUBLE(CLEAN) });
 		assert.ok(parsed, "parses");
 		assert.equal(parsed.question, CLEAN);
-		// The CLEAN sibling fields of the same call stay byte-identical.
 		assert.equal(parsed.options[0]!.label, BASE.options[0]!.label);
 		assert.equal(parsed.explanation, BASE.explanation);
 	});

@@ -1,4 +1,3 @@
-/** Shipping helper readiness, with real loopback HTTP but no Electron/display. */
 import assert from "node:assert/strict";
 import * as http from "node:http";
 import type { AddressInfo, Socket } from "node:net";

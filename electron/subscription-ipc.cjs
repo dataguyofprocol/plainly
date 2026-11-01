@@ -3,7 +3,7 @@ const { PROVIDERS } = require("./subscription-store.cjs");
 const { publicError } = require("./subscriptions.cjs");
 function attachSubscriptionChild(child, controller) {
 	let disposed = false;
-	const send = (packet) => { if (!disposed && child.connected) { try { child.send(packet, () => {}); } catch { /* child exited */ } } };
+	const send = (packet) => { if (!disposed && child.connected) { try { child.send(packet, () => {}); } catch { } } };
 	const listener = async (message) => {
 		if (disposed || !child.connected || message?.channel !== "lh:subscriptions" || typeof message.id !== "string") return;
 		const { id, op } = message;
@@ -23,7 +23,6 @@ function attachSubscriptionChild(child, controller) {
 function validScope(scope) {
 	return scope && PROVIDERS.includes(scope.providerId) && typeof scope.connectionId === "string" && !!scope.connectionId && typeof scope.selectedModelId === "string" && !!scope.selectedModelId && [scope.epoch, scope.authorityRevision].every((n) => Number.isSafeInteger(n) && n >= 0);
 }
-/** Caller authenticates the exact trusted main-frame origin before dispatch. */
 async function subscriptionControl(command, controller) {
 	try {
 		if (!controller || !command || typeof command !== "object") throw new Error();

@@ -1,8 +1,3 @@
-/**
- * "Next from your graph" suggestions (v4 redesign, 2026-10-26): the pure
- * rule/prompt/parser (core/suggestions.ts) and the never-block service
- * with an INJECTED generator (server/suggestions.ts) — no network.
- */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
@@ -166,7 +161,7 @@ describe("the suggestion service (injected generator)", () => {
 		await h.service.pending();
 		const first = h.cache!;
 		h.setReply("sorry, no JSON");
-		h.tick(24 * 3_600_000); // tomorrow — stale again
+		h.tick(24 * 3_600_000);
 		h.service.get();
 		await h.service.pending();
 		assert.deepEqual(h.cache!.suggestions, first.suggestions, "previous suggestions kept");

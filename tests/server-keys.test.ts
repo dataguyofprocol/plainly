@@ -1,26 +1,9 @@
-/**
- * The keys composition (auth-keys wave, 2026-09-19): env-reflecting store +
- * env-wins precedence + the masked status view. Owner decisions pinned:
- *  - real env always wins; a PUT to an env-owned var persists to the file
- *    but never overwrites the env copy (status reports shadowedByEnv);
- *  - saves/deletes take effect immediately (file + process.env together);
- *  - unknown file vars are preserved and surfaced, never editable.
- *
- * LH_AUTH_FILE redirects to a fresh tmp dir BEFORE the imports (the seam is
- * module-load bound); the \"real env\" var is set before src/server/keys.ts
- * first loads so the boot snapshot treats it as real environment. All
- * values here are throwaway test strings — never real secrets.
- */
-
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { after, describe, it } from "node:test";
 
-// THIS PROCESS'S ENV IS THE TEST SUBJECT — strip any inherited catalog vars
-// (a developer shell may export REAL keys; tests use throwaway values only,
-// never real secrets). The strip affects only this disposable child process.
 for (const varName of [
 	"OPENROUTER_API_KEY",
 	"DEEPGRAM_API_KEY",
@@ -38,8 +21,6 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lh-server-keys-"));
 const AUTH = path.join(TMP, "auth.json");
 process.env.LH_AUTH_FILE = AUTH;
 
-// The file BEFORE first boot: a shadowed OpenRouter (env will differ) + an
-// unknown var that must survive every write and surface as a generic row.
 fs.writeFileSync(
 	AUTH,
 	JSON.stringify({
@@ -47,10 +28,8 @@ fs.writeFileSync(
 		FUTURE_PLANS_TOKEN: "opaque-plans-token",
 	}),
 );
-// Real env (set BEFORE the module's first import → boot snapshots it):
 process.env.OPENROUTER_API_KEY = "sk-or-v1-envvalue99";
 
-// Import AFTER env setup — module init runs the boot fill-gap + snapshot.
 const { deleteKey, initAuthEnv, keyStatuses, keyValue, resolveKeyStatuses, saveKey, isWritableAuthKey } = await import(
 	"../src/server/keys.ts"
 );
@@ -99,7 +78,7 @@ describe("boot fill-gap + precedence", () => {
 
 describe("saveKey / deleteKey (immediate effect, no restart)", () => {
 	it("save reflects into env + file (fill-gap set)", () => {
-		const value = "d".repeat(40); // throwaway, ≥ Deepgram floor
+		const value = "d".repeat(40);
 		const r = saveKey("DEEPGRAM_API_KEY", value);
 		assert.ok(r.ok);
 		assert.equal(process.env.DEEPGRAM_API_KEY, value, "env updated immediately");
@@ -159,7 +138,7 @@ describe("saveKey / deleteKey (immediate effect, no restart)", () => {
 		});
 
 		it("save via provider env var: generic guard, reflected immediately", () => {
-			const value = "sk-throwaway-openai-0123456789"; // never a real secret
+			const value = "sk-throwaway-openai-0123456789";
 			const r = saveKey("OPENAI_API_KEY", value);
 			assert.ok(r.ok);
 			assert.equal(process.env.OPENAI_API_KEY, value, "env updated immediately");
@@ -172,7 +151,6 @@ describe("saveKey / deleteKey (immediate effect, no restart)", () => {
 		it("provider truncations/whitespace are 400s (paste hygiene only)", () => {
 			assert.ok(!saveKey("OPENAI_API_KEY", "short").ok);
 			assert.ok(!saveKey("OPENAI_API_KEY", "has whitespace now").ok);
-			// no family check anymore — any ≥12-char token passes
 			assert.ok(saveKey("OPENROUTER_API_KEY", "not-sk-or-but-12chars").ok);
 		});
 
@@ -188,7 +166,6 @@ describe("saveKey / deleteKey (immediate effect, no restart)", () => {
 			deleteKey("OPENAI_API_KEY");
 			assert.equal(process.env.OPENAI_API_KEY, undefined);
 			assert.ok(!("OPENAI_API_KEY" in authStore.authVars()));
-			// cleanup the openrouter save from the guard test too
 			deleteKey("OPENROUTER_API_KEY");
 			assert.ok(!("OPENROUTER_API_KEY" in authStore.authVars()));
 		});

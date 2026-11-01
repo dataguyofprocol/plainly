@@ -1,9 +1,3 @@
-/**
- * Raw-stream credential regression: the Sept 26 Agent getApiKey-hook tests
- * do not exercise these two hand-rolled loops. All credentials here are
- * synthetic; fetch is CLOSED (never delegates), including Google's global
- * fetch-only adapter. The transport cases test SDK serialization, not accounts.
- */
 import assert from "node:assert/strict";
 import path from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -45,9 +39,6 @@ const TRANSPORTS: Transport[] = [
 	{ provider: "google", id: "gemini-2.5-flash", envVar: "GEMINI_API_KEY", api: "google-generative-ai", origin: "https://generativelanguage.googleapis.com", path: "/v1beta/models/gemini-2.5-flash:streamGenerateContent", authHeader: "x-goog-api-key" },
 ];
 
-// Replacing rather than extending env also isolates secondary tokens (including
-// ANTHROPIC_AUTH_TOKEN/OAUTH_TOKEN and CLAUDE_CODE_OAUTH_TOKEN), SDK base-URL
-// overrides, cloud credentials, profiles, and LH_IGNORE_ENV_KEYS. No .env loads.
 async function isolated<T>(env: Record<string, string>, run: () => Promise<T>): Promise<T> {
 	const previous = process.env;
 	const fetch = globalThis.fetch;
@@ -104,7 +95,6 @@ async function runLoop(loop: Loop, engine: PiEngine, signal = new AbortControlle
 		engine, headless: fakeHeadless(renders), abortSignal: signal,
 		onActivity: (line: string) => activities.push(line),
 		onUsage: (usage: Usage) => usages.push(usage),
-		// Direct recording cases enable the observer into an isolated temp dir.
 		chatId: "provider-neutral-offline",
 	};
 	const result = loop === "visual"
@@ -129,7 +119,6 @@ function assertSuccess(loop: Loop, run: Awaited<ReturnType<typeof runLoop>>) {
 	assert.ok(run.activities.some((line) => line.startsWith(loop === "visual" ? "render_svg:" : "pdf_render:")));
 }
 
-// All global/env cases in this file are deliberately serial.
 describe("provider-neutral raw agent loops", { concurrency: false }, () => {
 	for (const loop of LOOPS) {
 		it(`${loop}: every actual stream request has NO credential override (recording faux engine)`, async () => {
@@ -239,8 +228,6 @@ describe("provider-neutral raw agent loops", { concurrency: false }, () => {
 	}
 
 	it("all AUTH_PROVIDER_KEYS resolve their own plain-key env values in a fresh in-memory Models collection", async () => {
-		// No production singleton, credential files, process.env, OAuth refresh,
-		// or model refresh: this is a broad resolver contract, not wire coverage.
 		await isolated({}, async () => {
 			const env = Object.fromEntries(AUTH_PROVIDER_KEYS.map(({ envVar }) => [envVar, `dummy-resolver-${envVar}`]));
 			const models = createModels({ authContext: { env: async (name) => env[name], fileExists: async () => false } });
@@ -251,7 +238,6 @@ describe("provider-neutral raw agent loops", { concurrency: false }, () => {
 				assert.equal(resolved.source, envVar, id);
 				assert.equal(resolved.auth.apiKey, env[envVar], id);
 			}
-			// In particular, intentionally shared variables must serve BOTH rows.
 			for (const envVar of new Set(AUTH_PROVIDER_KEYS.map((p) => p.envVar))) {
 				const siblings = AUTH_PROVIDER_KEYS.filter((p) => p.envVar === envVar);
 				if (siblings.length < 2) continue;
@@ -273,7 +259,6 @@ function closedFetch(transport: Transport, loop: Loop, requests: RecordedRequest
 	return async (input, init) => {
 		const request = new Request(input, init);
 		const round = requests.length;
-		// Unexpected destinations/rounds fail closed; never call original fetch.
 		assert.equal(new URL(request.url).origin, transport.origin);
 		assert.ok(round < 3, "unexpected extra provider request");
 		requests.push({ url: request.url, method: request.method, headers: request.headers, body: JSON.parse(await request.text()) });
@@ -284,8 +269,6 @@ function closedFetch(transport: Transport, loop: Loop, requests: RecordedRequest
 
 function assertPayload(transport: Transport, loop: Loop, round: number, body: Record<string, unknown>) {
 	if (transport.api !== "google-generative-ai") assert.equal(body.model, transport.id);
-	// Native Responses models may declare tools in additional_tools input
-	// items rather than top-level tools; assert the SDK's complete payload.
 	const tools = JSON.stringify(body);
 	assert.match(tools, new RegExp(loop === "visual" ? "write_svg" : "pdf_extract"));
 	assert.match(tools, new RegExp(loop === "visual" ? "render_svg" : "pdf_render"));

@@ -1,11 +1,3 @@
-/**
- * Session Find — the pure matcher plus the DOM seam (owner, 2026-10-13).
- * The DOM seam runs under linkedom (styles resolve to defaults: display
- * block/inline behave; the hidden/overlay paths are exercised through the
- * selectors and inline styles linkedom DOES evaluate). The highlight/
- * scroll lifecycle itself is browser-verified (SessionFind on the live
- * page), not re-implemented here.
- */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
 
@@ -19,7 +11,6 @@ import { clearSessionFindHighlights, injectFindStyles, sessionFindHasForegroundL
 const dom = parseHTML("<html><head><style></style></head><body></body></html>");
 (globalThis as Record<string, unknown>).window = dom.window;
 (globalThis as Record<string, unknown>).document = dom.document;
-// linkedom ships no Highlight registry — stub the one field the clearer reads.
 (globalThis as Record<string, unknown>).CSS = dom.window.CSS ?? { highlights: new Map() };
 
 describe("findSessionTextMatches — literal, case-insensitive, regex-inert", () => {
@@ -174,7 +165,6 @@ describe("clearSessionFindHighlights — browser-API shaped, linkedom-safe", () 
 	it("clears registered highlights without touching the DOM", () => {
 		mount(`<div data-session-find-root=""><p>needle</p></div>`);
 		const [range] = sessionFindRanges(document.body as unknown as HTMLElement, "needle");
-		// linkedom ships no Highlight constructor — the publisher guards on it.
 		(CSS as { highlights?: Map<string, unknown> }).highlights = new Map([["lh-session-find", {}]]);
 		clearSessionFindHighlights();
 		assert.equal((CSS as { highlights?: Map<string, unknown> }).highlights!.size, 0);

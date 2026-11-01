@@ -1,7 +1,3 @@
-/**
- * v4 redesign (2026-10-26): practice hint rungs on the thinking lane, and
- * the four labelled confidence levels (with the legacy stops still valid).
- */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
@@ -21,7 +17,6 @@ import {
 	type LhMessage,
 } from "../src/core/index.ts";
 
-/** A practice record with one cleanly-posed, active problem. */
 function posed(callId = "call_p1"): LhMessage[] {
 	return [
 		{

@@ -1,12 +1,3 @@
-/**
- * PRACTICE RECORD MECHANICS (practice sessions, owner 2026-10-04): the
- * native shapes beneath the two practice tools — the active-problem fold
- * (conclude-before-next-problem), the thinking marker (label registers),
- * the ask-style dismissal (UI-only marker; the conclude pair rides the
- * NEXT input), and the model-facing flattening (markers labeled, the
- * dismissal filtered, the synthesized pair native).
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
@@ -30,8 +21,6 @@ import { CONCLUDE_ACK_TEXT } from "../src/core/contracts/chat.ts";
 import { dismissAppends, inputAppends, parseChatInput, parseDismissInput } from "../src/core/input-events.ts";
 import { modelSolutionForConclude } from "../src/core/native-messages.ts";
 import { projectView } from "../src/core/index.ts";
-
-// ── builders (native-shaped test fixtures) ───────────────────────────────────
 
 const STAMPS = {
 	api: "faux",
@@ -72,8 +61,6 @@ function problemPose(callId = "call_p1", statement = "Show that…"): LhMessage[
 }
 
 function concludeCall(outcome: string): LhMessage[] {
-	// Honest folds: the conclude call rides WITH its clean ack — a
-	// dangling or errored conclude never freed anything.
 	return [
 		{
 			id: `msg_c_${outcome}`,
@@ -102,8 +89,6 @@ function concludeCall(outcome: string): LhMessage[] {
 	];
 }
 
-// ── the active-problem fold ──────────────────────────────────────────────────
-
 describe("activeProblemOf (the conclude-before-next-problem gate's fold)", () => {
 	it("no messages → nothing active", () => {
 		assert.equal(activeProblemOf([]), null);
@@ -130,8 +115,6 @@ describe("activeProblemOf (the conclude-before-next-problem gate's fold)", () =>
 	});
 
 	it("an ERRORED pose never activates (the BKT phantom — honest activation)", () => {
-		// The gate refused the pose ("a problem is already active" in the
-		// BKT incident); the composer must not mount from its arguments.
 		const rejected = problemPose("call_bad", "A different student…");
 		(rejected[1]! as unknown as { isError: boolean }).isError = true;
 		assert.equal(activeProblemOf(rejected), null, "a lone refused pose is nothing");
@@ -173,8 +156,6 @@ describe("activeProblemOf (the conclude-before-next-problem gate's fold)", () =>
 	});
 });
 
-// ── the dismissal's deferred conclude ────────────────────────────────────────
-
 describe("pendingProblemDismissalOf (the marker waiting for its synthesis)", () => {
 	it("a trailing dismissal marker pends", () => {
 		const messages = [...problemPose(), newProblemDismissedMarker("call_p1")];
@@ -190,8 +171,6 @@ describe("pendingProblemDismissalOf (the marker waiting for its synthesis)", () 
 		assert.equal(pendingProblemDismissalOf(problemPose()), null);
 	});
 });
-
-// ── the input channel ────────────────────────────────────────────────────────
 
 describe("the thinking input", () => {
 	it("parses and appends the marker against the active problem (ONE lane)", () => {
@@ -209,8 +188,6 @@ describe("the thinking input", () => {
 		assert.equal(appends.length, 1);
 		const marker = appends[0] as { customType: string; content: string; details: unknown };
 		assert.equal(marker.customType, "practice-thinking");
-		// The single label (owner round 2, 2026-10-05): the register is read
-		// from the text by the agent, never declared by a button.
 		assert.match(marker.content, /Your thinking:\n/);
 		assert.deepEqual(marker.details, {
 			problemCallId: "call_p1",
@@ -234,8 +211,6 @@ describe("the thinking input", () => {
 	});
 });
 
-// ── the move-on signal (owner round 16, 2026-10-06) ─────────────────────────
-
 describe("the next input", () => {
 	it("parses bare and appends the practice-next marker in an idle practice session", () => {
 		const input = parseChatInput({ type: "next" });
@@ -244,7 +219,6 @@ describe("the next input", () => {
 		assert.equal(appends.length, 1);
 		const marker = appends[0] as { customType: string; content: string };
 		assert.equal(marker.customType, "practice-next");
-		// The model's unambiguous go-ahead, single-sourced in contracts.
 		assert.match(marker.content, /\[NEXT PROBLEM\]/);
 	});
 
@@ -260,7 +234,7 @@ describe("the next input", () => {
 	it("rides AFTER a pending dismissal conclusion, exactly like text", () => {
 		const dismissed = [...problemPose(), newProblemDismissedMarker("call_p1")];
 		const appends = inputAppends({ messages: dismissed, kind: "practice" }, { type: "next" });
-		assert.equal(appends.length, 3); // conclude pair + the next marker
+		assert.equal(appends.length, 3);
 		assert.equal((appends[2] as { customType: string }).customType, "practice-next");
 	});
 });
@@ -308,8 +282,6 @@ describe("the dismiss-problem input (ask-style discard)", () => {
 	});
 });
 
-// ── the model-facing seam ────────────────────────────────────────────────────
-
 describe("toLlmMessages (practice shapes)", () => {
 	it("the thinking marker flattens to a labeled user message", () => {
 		const out = toLlmMessages(asAgentMessages([newThinkingMessage("call_p1", "It is 42")]));
@@ -332,14 +304,8 @@ describe("toLlmMessages (practice shapes)", () => {
 	});
 });
 
-// ── the continuation fold's practice carve-out ──────────────────────────────
-
 describe("needsContinuation (a persisted pose ack owes nothing)", () => {
 	it("a record ending on a problem-pose ack does NOT wake a continuation", () => {
-		// The pose's terminate:true ended that turn deliberately; the
-		// ack persists (unlike a question's placeholder). Without the
-		// carve-out, a reload after a posed problem would wake a
-		// phantom turn (owner design, 2026-10-04).
 		assert.equal(needsContinuation(problemPose()), false);
 	});
 
@@ -372,8 +338,6 @@ describe("needsContinuation (a persisted pose ack owes nothing)", () => {
 });
 
 
-// ── the reveal join (owner round, 2026-10-05) ───────────────────────────────
-
 describe("modelSolutionForConclude (the conclusion's hero is the pose's commitment)", () => {
 	it("returns the cleanly-posed problem's modelSolution before the conclude", () => {
 		const messages = [...problemPose(), ...concludeCall("solved")];
@@ -404,8 +368,6 @@ describe("modelSolutionForConclude (the conclusion's hero is the pose's commitme
 		const conclude = view.flatMap((m) => m.parts).find((p) => p.type === "tool-conclude");
 		assert.ok(conclude, "the conclude part projects");
 		assert.equal(conclude!.reveal, "Show that…", "the view-seam join carries the committed solution");
-		// THE FULL POSE FOLD (owner round 17): the whole problem-call input
-		// rides the conclude part — the observability drawer's data.
 		assert.deepEqual(conclude!.problemInput, {
 			statement: "Show that…",
 			mode: "recall",
@@ -413,8 +375,6 @@ describe("modelSolutionForConclude (the conclusion's hero is the pose's commitme
 		}, "mode + statement + the commitment; no targets posed here");
 	});
 });
-
-// ── the transcript face of the signal ───────────────────────────────────────
 
 describe("projectView renders the move-on signal", () => {
 	it("the practice-next marker projects the compact part (the centered NEXT PROBLEM line)", () => {

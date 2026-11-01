@@ -52,11 +52,8 @@ test("bundleOf walks from the executable to the .app", () => {
 	assert.equal(bundleOf("/Applications/Plainly.app/Contents/MacOS/Plainly"), "/Applications/Plainly.app");
 });
 
-// ─── macOS end to end: real ditto/plutil/codesign, real swap helper ────────
-
 const mac = { skip: process.platform !== "darwin" };
 
-/** An ad-hoc signed stand-in bundle: /usr/bin/true as its executable. */
 function fakeApp(dir: string, version: string, id = "app.plainly.Plainly") {
 	const app = path.join(dir, "Plainly.app");
 	fs.mkdirSync(path.join(app, "Contents", "MacOS"), { recursive: true });
@@ -76,7 +73,6 @@ function fakeApp(dir: string, version: string, id = "app.plainly.Plainly") {
 	return app;
 }
 
-/** Serves a feed for `version` (built from a fake bundle) from a local port. */
 async function feedServer(root: string, version: string, opts: { id?: string; corrupt?: boolean } = {}) {
 	const build = path.join(root, `build-${version}`);
 	fs.mkdirSync(build, { recursive: true });

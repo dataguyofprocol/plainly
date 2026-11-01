@@ -1,4 +1,3 @@
-/** Execute the real helper entry with fake Electron; no display or user profile. */
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { readFileSync } from "node:fs";

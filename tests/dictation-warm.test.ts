@@ -1,13 +1,3 @@
-/**
- * Unit tests — the dictation warm-token cache (mitigation D, owner
- * 2026-09-27: components/dictation.tsx createWarmMinter).
- *
- * The click path takes the cached promise instead of a remote mint, so
- * the cache's behavior IS the felt start latency: one mint per warm
- * window, honest re-mint on failure, TTL so a stale token is never
- * served, and refresh() warming the next run in the background.
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { createWarmMinter } from "../components/dictation.tsx";
@@ -24,10 +14,10 @@ describe("warm-token cache (mitigation D, owner 2026-09-27)", () => {
 			60_000,
 		);
 		const a = m.mint();
-		const b = m.mint(); // concurrent — must NOT mint again
-		assert.equal(a, b); // same promise instance
+		const b = m.mint();
+		assert.equal(a, b);
 		assert.equal(await a, "t1");
-		assert.equal(await m.mint(), "t1"); // repeat — still no second mint
+		assert.equal(await m.mint(), "t1");
 		assert.equal(mints, 1);
 	});
 
@@ -44,7 +34,7 @@ describe("warm-token cache (mitigation D, owner 2026-09-27)", () => {
 			60_000,
 		);
 		await assert.rejects(m.mint(), /Deepgram key/);
-		keyless = false; // the key arrives
+		keyless = false;
 		assert.equal(await m.mint(), "t2");
 		assert.equal(mints, 2);
 	});
@@ -61,10 +51,10 @@ describe("warm-token cache (mitigation D, owner 2026-09-27)", () => {
 			1000,
 		);
 		assert.equal(await m.mint(), "t1");
-		t = 1500; // past the TTL
+		t = 1500;
 		assert.equal(await m.mint(), "t2");
 		assert.equal(mints, 2);
-		t = 1600; // still within t2's window
+		t = 1600;
 		assert.equal(await m.mint(), "t2");
 		assert.equal(mints, 2);
 	});
@@ -80,10 +70,10 @@ describe("warm-token cache (mitigation D, owner 2026-09-27)", () => {
 			60_000,
 		);
 		assert.equal(await m.mint(), "t1");
-		m.refresh(); // the run-end background warm
+		m.refresh();
 		assert.equal(mints, 2);
-		assert.equal(await m.mint(), "t2"); // served from the refresh cache
-		assert.equal(mints, 2); // no third mint
+		assert.equal(await m.mint(), "t2");
+		assert.equal(mints, 2);
 	});
 
 	it("refresh() swallows failure — a keyless page just doesn't warm", async () => {
@@ -96,8 +86,8 @@ describe("warm-token cache (mitigation D, owner 2026-09-27)", () => {
 			() => 1000,
 			60_000,
 		);
-		m.refresh(); // must not reject (unhandled rejection would be a bug)
-		await new Promise((r) => setTimeout(r, 0)); // let the background mint settle
+		m.refresh();
+		await new Promise((r) => setTimeout(r, 0));
 		assert.equal(mints, 1);
 	});
 });

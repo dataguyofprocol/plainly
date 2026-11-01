@@ -1,28 +1,8 @@
 /**
- * smoke-server.mjs — boot the packaged standalone server and prove it serves.
- *
- * The payload gate that pays for itself (2026-10-08): `next build` success
- * and a completed electron-builder run say NOTHING about whether the
- * packaged server actually starts. On its first day this smoke caught two
- * real defects nothing else saw: (1) a trace-exclude regression that
- * stripped the pi engine packages to bare package.jsons — the server
- * answered 500 on every route with ERR_MODULE_NOT_FOUND; (2) before that,
- * the dev auth.json (BYOK keys) shipping inside the bundle. It runs
- * between build-server.mjs and electron-builder so a broken payload fails
- * in seconds, not after a full packaging pass.
- *
- * What it does: spawns .next/standalone/server.js exactly the way the
- * Electron shell does (electron/main.cjs) — with --electron it uses
- * Electron's bundled Node via ELECTRON_RUN_AS_NODE, otherwise host Node —
- * 127.0.0.1 on a kernel-assigned
- * free port, NODE_ENV=production, a THROWAWAY LH_DATA_DIR and an EMPTY
- * LH_AUTH_FILE under os.tmpdir() (no real keys or data ever touch it) —
- * polls GET / until 200, then probes the GET-only API surface (graph /
- * models / settings — no side effects). Any non-200, an early server
- * exit, or a 30s boot timeout fails the gate and prints the server's own
- * log tail for diagnosis. The child is ALWAYS killed before exit — a
- * leaked server holds its port against the next run (learned the hard
- * way, same day).
+ * `next build` success and a completed electron-builder run say nothing
+ * about whether the packaged server starts. Boots .next/standalone/server.js
+ * the way electron/main.cjs does (--electron: Electron's bundled Node via
+ * ELECTRON_RUN_AS_NODE) and probes the GET-only API surface.
  */
 import { spawn } from "node:child_process";
 import { probeEnv, verifyDemoRuntime } from "./smoke-demo-runtime.mjs";
@@ -42,7 +22,6 @@ const RUNTIME = ELECTRON_MODE ? createRequire(import.meta.url)("electron") : pro
 
 const POLL_MS = 500;
 const BOOT_TIMEOUT_MS = 30_000;
-/** GET-only probes — the routes that exercised today's failure class. */
 const PROBES = ["/api/graph", "/api/models", "/api/settings"];
 
 if (!fs.existsSync(SERVER)) {
@@ -50,7 +29,6 @@ if (!fs.existsSync(SERVER)) {
 	process.exit(1);
 }
 
-/** A free TCP port (listen(0) → the kernel assigns one) — mirrors main.cjs. */
 function freePort() {
 	return new Promise((resolve, reject) => {
 		const srv = net.createServer();
@@ -62,7 +40,6 @@ function freePort() {
 	});
 }
 
-/** One GET; resolves the status code (0 = connection refused/failed). */
 function get(url) {
 	return new Promise((resolve) => {
 		const req = http.get(url, (res) => {
@@ -78,10 +55,7 @@ function get(url) {
 }
 
 async function main() {
-	// HTTP boot alone never imports the dynamically loaded demo engine.
-	// Fail before packaging if its standalone dependency graph is incomplete.
 	verifyDemoRuntime(STANDALONE, RUNTIME);
-	// /api/models only reads catalogs; initialize the real lazy SDK offline too.
 	verifyProviderRuntime(STANDALONE, RUNTIME);
 	const port = await freePort();
 	const url = `http://127.0.0.1:${port}`;
@@ -90,7 +64,7 @@ async function main() {
 	const authFile = path.join(home, "auth.json");
 	fs.writeFileSync(authFile, "{}\n", "utf-8");
 
-	const tail = []; // rolling log tail for failure diagnosis
+	const tail = [];
 	let tailBytes = 0;
 	const keep = (buf) => {
 		for (const line of buf.toString().split("\n")) {
@@ -139,7 +113,6 @@ async function main() {
 					try {
 						child.kill("SIGKILL");
 					} catch {
-						/* already gone */
 					}
 				}
 				done();
@@ -148,7 +121,6 @@ async function main() {
 
 	let failed = null;
 	try {
-		// 1) Boot: poll GET / until 200 (or timeout / early exit).
 		let boot = 0;
 		const deadline = Date.now() + BOOT_TIMEOUT_MS;
 		while (Date.now() < deadline) {
@@ -160,7 +132,6 @@ async function main() {
 		if (boot !== 200) throw new Error(`server never answered 200 on ${url} (last status: ${boot})`);
 		console.log(`[smoke-server] boot ok: GET / → 200 (${url})`);
 
-		// 2) API surface: every probe must be 200.
 		for (const route of PROBES) {
 			const status = await get(url + route);
 			if (status !== 200) throw new Error(`GET ${route} → ${status} (expected 200)`);
@@ -173,7 +144,6 @@ async function main() {
 		try {
 			fs.rmSync(home, { recursive: true, force: true });
 		} catch {
-			/* best effort — it's under os.tmpdir() */
 		}
 	}
 

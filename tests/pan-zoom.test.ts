@@ -1,12 +1,3 @@
-/**
- * Pure tests for the shared pan/zoom viewport math (components/pan-zoom.ts),
- * harvested from the plan popup so the mermaid focus overlay runs the same
- * fit-floor geometry: fully zoomed out IS the fit, panning locks at the
- * floor (and re-centers), wheel zooms to the cursor, ceiling 4×. Pure
- * function coverage — no DOM, no rendering (the overlays' live pointer
- * wiring is exercised in the browser; these tests pin the math it runs).
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { FIT_ZOOM_MAX, ZOOM_MAX, fitGraphView, fitZoomFor, zoomedGraphView } from "../components/pan-zoom.ts";
@@ -47,7 +38,6 @@ describe("zoomedGraphView", () => {
 	it("zooms to the focus point: the focus stays visually fixed", () => {
 		const out = zoomedGraphView({ x: 0, y: 0, zoom: 1 }, 1.25, floor, { x: 200, y: 150 }, box, viewport);
 		assert.equal(out.zoom, 1.25);
-		// focus.x - x_out = (focus.x - x_in) * k → the cursor anchors.
 		assert.equal(200 - out.x, 200 * 1.25);
 		assert.equal(150 - out.y, 150 * 1.25);
 	});

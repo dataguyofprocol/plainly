@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { NextRequest } from "next/server";
-// Installed Next 16.3.2 retains the old test-helper export despite proxy.md's new name.
 import { unstable_doesMiddlewareMatch as unstable_doesProxyMatch } from "next/experimental/testing/server";
 import { desktopAPIAuthorized } from "../src/server/desktop-access.ts";
 import { proxy, config } from "../proxy.ts";
@@ -28,7 +27,7 @@ test("desktop capability injects only trusted app mainframe exact-origin API req
 		{ url: "https://thirdparty.invalid/api/settings" },
 		{ url: "http://127.0.0.1:12346/api/settings" },
 		{ url: `${origin}/chat/new` },
-		{ frame: { url: `${origin}/chat/new` } }, // forged frame identity
+		{ frame: { url: `${origin}/chat/new` } },
 		{ frame: { url: "about:srcdoc", parent: mainFrame } },
 		{ frame: null },
 		{ webContentsId: 6 },

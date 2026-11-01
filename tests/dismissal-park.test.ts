@@ -1,24 +1,9 @@
-/**
- * PARKED DISMISSALS (owner, 2026-10-04): ESC-discard while the turn is
- * still working. Mid-turn the stored record holds no pending question or
- * problem (the turn's messages land at settle), so the dismiss route
- * cannot validate — it PARKS the intent (202) and the turn's settle path
- * applies it against the freshly persisted record, only if the dismissed
- * thing really is pending there.
- *
- * These pins hold both halves: the pure park registry + apply against
- * fixture records, and the route's park contract under an isolated
- * LH_DATA_DIR (the birth-stamp discipline — the seam is set before any
- * config-loading import, every app-module import dynamic).
- */
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { after, describe, it } from "node:test";
 
-// ── the seam, BEFORE any config-loading import ──────────────────────────────
 const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-dismissal-park-"));
 process.env.LH_DATA_DIR = TMP_DATA;
 
@@ -40,8 +25,6 @@ after(() => {
 	fs.rmSync(TMP_DATA, { recursive: true, force: true });
 });
 
-/** A record whose newest assistant message carries a DANGLING quiz call —
- *  the settled state a mid-turn dismissal parks against. */
 function chatWithDanglingQuiz(id: string): string {
 	const chat = chatStore.createChat("park: dangling quiz");
 	chatStore.saveMessages(chat.id, [{
@@ -60,8 +43,6 @@ function chatWithDanglingQuiz(id: string): string {
 	return chat.id;
 }
 
-/** A record with an ACTIVE problem — the settled practice state a
- *  dismiss-problem park applies against. */
 function chatWithActiveProblem(): string {
 	const chat = chatStore.createChat("park: active problem");
 	const assistant = {
@@ -118,7 +99,6 @@ describe("applyParkedDismissal — against real records", () => {
 		applyParkedDismissal(chatStore, chat);
 		off();
 		assert.equal(emitted, 1);
-		// The call is answered now — nothing dangles.
 		assert.equal(danglingQuestionOf(chatStore.getChat(chat)!.messages), null);
 		assert.ok(answeredCallIds(chatStore.getChat(chat)!.messages).has(pending!.toolCallId));
 		assert.equal(takeParkedDismissal(chat), null);
@@ -128,7 +108,6 @@ describe("applyParkedDismissal — against real records", () => {
 		const chat = chatWithActiveProblem();
 		parkDismissal(chat, { type: "dismiss-problem", problemCallId: "call-prob-1" });
 		applyParkedDismissal(chatStore, chat);
-		// The marker freed the slot — no active problem remains.
 		assert.equal(activeProblemOf(chatStore.getChat(chat)!.messages), null);
 	});
 
@@ -155,7 +134,6 @@ describe("the dismiss route — the park contract (202)", () => {
 		assert.ok(pending);
 		const dismissRoute = await import("../app/api/chats/[id]/dismiss/route.ts");
 
-		// Mid-turn: the route cannot validate against stale truth — park.
 		assert.ok(!isTurnRunning(chat));
 		beginTurn(chat);
 		const res = await dismissRoute.POST(
@@ -174,10 +152,8 @@ describe("the dismiss route — the park contract (202)", () => {
 		);
 		assert.equal(res.status, 202);
 		assert.deepEqual(await res.json(), { ok: true, parked: true });
-		// Nothing landed yet — the record still dangles (the turn owns it).
 		assert.ok(danglingQuestionOf(chatStore.getChat(chat)!.messages));
 
-		// The settle: persistTurn (done) → applyParkedDismissal → endTurn.
 		applyParkedDismissal(chatStore, chat);
 		endTurn(chat);
 		assert.equal(danglingQuestionOf(chatStore.getChat(chat)!.messages), null);

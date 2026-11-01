@@ -3,10 +3,6 @@ import assert from "node:assert/strict";
 import { blockLayout, edgePathD, type LayoutNode, type PopupMessage } from "../components/plan-block.tsx";
 import type { PlanTree } from "../src/core/contracts.ts";
 
-// The plan marginalia: the bare diagram in the dock band's right flank —
-// full plan (padded viewBox, meet-fit), statuses + glow live by derivation,
-// nothing until a tree exists. Positioning and fade live in DockOverlay.
-
 const CHAIN: PlanTree = {
 	nodes: [
 		{ id: "a", title: "Alpha" },
@@ -20,8 +16,6 @@ const CHAIN: PlanTree = {
 	version: 1,
 };
 
-/** A transcript with a successful plan_init (carrying `tree`) and
- *  optionally a tagged quiz call. */
 function transcript(tree: PlanTree, taggedNodeId?: string): PopupMessage[] {
 	return [
 		{ id: "m1", role: "user", parts: [] } as never,
@@ -42,12 +36,6 @@ function transcript(tree: PlanTree, taggedNodeId?: string): PopupMessage[] {
 	];
 }
 
-// ─── The canvas must cover the arrows (owner, 2026-10-10) ────────────────────
-// The owner's REAL linear-algebra plan (chat_mv19m6xe, plan_init's mermaid
-// parsed to nodes/edges — golden fixtures use real data, owner ruling
-// 2026-10-10): a cross-column edge's bezier control points reached x=776
-// while dagre's node-extent width was 754 — 14px of arrow clipped at the
-// viewBox edge (the Hume plan cut 20px the same way).
 const LINEAR_ALGEBRA_NODES: LayoutNode[] = [
 { id: "vector-space-axioms", title: "What a vector space is" },
 	{ id: "span-basis-dimension", title: "Span, basis, dimension" },
@@ -87,8 +75,6 @@ const LINEAR_ALGEBRA_EDGES: ReadonlyArray<{ from: string; to: string }> = [
 describe("blockLayout ink extent", () => {
 	it("covers every edge path's control points — arrows never clip (owner, 2026-10-10)", () => {
 		const L = blockLayout(LINEAR_ALGEBRA_NODES, LINEAR_ALGEBRA_EDGES);
-		// The viewBox extent must reach the furthest control point of
-		// every drawn edge (a bezier never leaves its control-point hull).
 		let ctrlMaxX = -Infinity;
 		for (const e of LINEAR_ALGEBRA_EDGES) {
 			const pts = L.edgePts.get(`${e.from}->${e.to}`);
@@ -115,8 +101,6 @@ describe("blockLayout ink extent", () => {
 		let nodeMaxX = -Infinity;
 		for (const n of LINEAR_ALGEBRA_NODES)
 			nodeMaxX = Math.max(nodeMaxX, (L.x.get(n.id) ?? 0) + (L.nodeW.get(n.id) ?? 0));
-		// Pre-fix dagre width was 754 with ink at 776 — width must stay ≥
-		// ink, which here strictly exceeds the node extent.
 		assert.ok(L.width > nodeMaxX + 1, `layout width ${L.width} should exceed node extent ${nodeMaxX}`);
 	});
 });

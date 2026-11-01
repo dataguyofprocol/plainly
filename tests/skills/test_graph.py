@@ -213,14 +213,13 @@ class GraphTests(unittest.TestCase):
             self.assertEqual([item["id"] for item in self.result("find", query)], ["n_b"])
         self.assertEqual([item["id"] for item in self.result("find", "[brackets]?")], ["n_a"])
         self.assertEqual([item["id"] for item in self.result("find", "Café")], ["n_a"])
-        self.assertEqual(self.result("find", "n_b"), [])  # IDs are not searchable fields.
+        self.assertEqual(self.result("find", "n_b"), [])
         self.assertEqual(self.result("find", "Name must not replace"), [])
         self.assertEqual(self.result("find", " no such text "), [])
 
     def test_find_case_matching_agrees_with_app_js_regex(self):
         self.write_ledger("nodes", [node("n_case", name="Exact label", statement="Exact statement", aliases=["K", "ſ", "ı", "İ", "ς", "𐐨", "Café"])])
         for query in ("k", "s", "i", "𐐀"):
-            # Explicit stars avoid unrelated substring matches in the name.
             self.assertEqual(self.result("find", query + "*"), [], query)
         for query in ("K*", "ſ*", "ı*", "İ*", "σ*", "𐐨*", "CAFÉ*"):
             self.assertEqual([item["id"] for item in self.result("find", query)], ["n_case"], query)
@@ -318,7 +317,7 @@ class GraphTests(unittest.TestCase):
         command = [sys.executable, str(SCRIPTS / "graph.py")]
         completed = subprocess.run([*command, "--data-dir", str(self.root), "--format", "json", "sessions"], env=env, capture_output=True, text=True, check=False)
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertEqual(json.loads(completed.stdout), {"data_dir": str(self.root.resolve()), "records": []})  # Never falls back to repo/LH_DATA_DIR.
+        self.assertEqual(json.loads(completed.stdout), {"data_dir": str(self.root.resolve()), "records": []})
         bad = subprocess.run([*command, "sessions", "--data-dir", str(self.root)], env=env, capture_output=True, text=True, check=False)
         self.assertNotEqual(bad.returncode, 0)
         absent = subprocess.run([*command, "--data-dir", str(self.root / "missing"), "sessions"], env=env, capture_output=True, text=True, check=False)
@@ -341,8 +340,6 @@ class GraphTests(unittest.TestCase):
             self.assertEqual(len(born), session["propositions"])
             self.assertTrue(all(item["provenance"][0]["chatId"] == session["id"] for item in born))
         self.assertTrue(any(item["kind"] == "file" for item in sessions))
-        # Golden chat files are not the original graph birth sessions; their
-        # missing historical metadata must remain honestly undated.
         self.assertTrue(any(item["createdAt"] is None for item in sessions))
         self.assertEqual(snapshot(GOLDEN), before)
 

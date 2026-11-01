@@ -78,8 +78,6 @@ esac
 if [ "$KEEP" != "true" ]; then
 	rm -rf "$DATA_DIR"
 else
-	# --keep preserves prior sessions (multi-session testing); the dir is
-	# still created if this is the first run.
 	:
 fi
 mkdir -p "$DATA_DIR"

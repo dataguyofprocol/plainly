@@ -25,7 +25,6 @@ test("Next-style connected IPC is not desktop transport and never delays keyed A
 		for (const [mode, capability] of [[undefined, undefined], ["1", undefined], [undefined, "d".repeat(64)], ["1", "short"]]) {
 			if (mode === undefined) delete process.env.LH_DESKTOP_SERVER; else process.env.LH_DESKTOP_SERVER = mode;
 			if (capability === undefined) delete process.env.LH_DESKTOP_API_SECRET; else process.env.LH_DESKTOP_API_SECRET = capability;
-			// A framework parent cannot establish ChatGPT state by sharing only IPC.
 			(process.emit as (name: string, value: unknown) => boolean)("message", { channel: "lh:chatgpt", kind: "state", stamp: { epoch: 1, authorityRevision: 1, revision: 1 }, status: { available: true, activeId: "fixture", accounts: [{ id: "fixture", connected: true, planEnabled: true }] } });
 			const response = await GET();
 			assert.equal(response.status, 200);

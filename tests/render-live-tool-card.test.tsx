@@ -1,10 +1,3 @@
-/**
- * The LIVE tool-input card (owner, streaming round 2026-10-01): what a
- * tool call looks like while the agent writes it — Braille spinner +
- * shimmered activity label in the header (the retired bottom line's
- * text, one glimmer recipe), the streaming input watchable on expand.
- * These pins hold the working-state grammar on the card.
- */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -19,11 +12,8 @@ describe("LiveToolCard (the working-state grammar)", () => {
 		const html = renderToStaticMarkup(<LiveToolCard part={part("read", { path: "notes.md" }) as never} />);
 		assert.match(html, /data-testid="live-tool-card"/);
 		assert.match(html, /data-testid="braille-spinner"/);
-		// the label names the ACTUAL tool (the old bottom line's text)
 		assert.match(html, /Reading a file…/);
-		// the headline argument rides the header
 		assert.match(html, /notes\.md/);
-		// the streaming input is shown in the expandable body
 		assert.match(html, /Input \(streaming\)/);
 		assert.match(html, /notes\.md/);
 	});

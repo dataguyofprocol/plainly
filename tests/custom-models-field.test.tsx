@@ -8,9 +8,6 @@ import { parseHTML } from "linkedom";
 import { CustomModelsField, modelWithDetected } from "../components/custom-models-field.tsx";
 import type { CustomModelEntry } from "../src/core/custom-providers.ts";
 
-// The custom provider's models field (per-model capabilities, owner
-// 2026-10-28): rows with Vision/Thinking switches, the probe's detected
-// capabilities applied on add. Fetch is stubbed; the probe never leaves.
 const dom = parseHTML("<html><body></body></html>");
 Object.assign(globalThis, {
 	window: dom.window,

@@ -1,8 +1,4 @@
-/** GHSA-238p-pmpm-9mq7: inherited properties must not become KaTeX authority.
- * Output is inspected as inert strings/LinkeDOM; no resource or script is run.
- * node:test runs files in separate processes. Within this file all prototype
- * mutations are synchronous, non-concurrent, and restored even on failure.
- */
+/** GHSA-238p-pmpm-9mq7: inherited properties must not become KaTeX authority. */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import React from "react";

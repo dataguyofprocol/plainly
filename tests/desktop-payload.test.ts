@@ -1,4 +1,3 @@
-/** Run the real payload-curation script in throwaway repository fixtures. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
@@ -40,7 +39,6 @@ describe("desktop standalone payload", () => {
 	it("removes only traced installers/dev Electron, preserving runtime dist/ and native binaries", () => {
 		withPayload(({ root, write, run }) => {
 			for (const extra of [path.join("dist", "old.app", "nested.dmg"), path.join("node_modules", "electron", "dist", "electron.exe")]) {
-				// BOTH copies exist: curation must not touch the real repo's build/runtime.
 				write(extra);
 				write(path.join(STANDALONE, extra));
 			}

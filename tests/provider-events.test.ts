@@ -1,13 +1,3 @@
-/**
- * provider-events — the raw-wire recorder pins (owner, 2026-10-04).
- *
- * The recorder is env-gated debug tooling (LH_PROVIDER_EVENTS=1); these
- * pins hold its mechanics: off = zero surface (no observer, no file),
- * on = one JSONL per chat under data/debug/provider-events/, safe
- * degradation on non-serializable adapter payloads, and the byte cap
- * that stops a runaway turn from filling the disk.
- */
-
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
@@ -39,7 +29,6 @@ function readLines(dir: string, chatId: string): Array<Record<string, unknown>> 
 		.map((l) => JSON.parse(l) as Record<string, unknown>);
 }
 
-/** Common harness: redirect the dir, enable the env, restore both. */
 function withRecorder(t: { after: (fn: () => void) => void }): string {
 	const dir = tmpDir();
 	providerEventsDir.current = dir;
@@ -62,7 +51,7 @@ test("env off: no observer, no note, no file — zero surface", (t) => {
 
 	assert.equal(providerEventsEnabled(), false);
 	assert.equal(providerEventObserver("chat_x", "teacher"), undefined);
-	providerEventNote("chat_x", "teacher", "run start"); // must be a silent no-op
+	providerEventNote("chat_x", "teacher", "run start");
 	assert.equal(fs.existsSync(path.join(dir, "chat_x.jsonl")), false, "nothing written while off");
 });
 
@@ -98,8 +87,6 @@ test("non-serializable adapter payloads degrade to a type note, never throw", (t
 
 test("the byte cap writes one marker and stops recording", (t) => {
 	const dir = withRecorder(t);
-	// Deterministic sizing: cap 250, each event line ≈ 85B base + 200B pad
-	// ≈ 285B → the FIRST line already crosses; every later line is dropped.
 	providerEventsCap.current = 250;
 	t.after(() => {
 		providerEventsCap.current = REAL_CAP;
@@ -107,8 +94,8 @@ test("the byte cap writes one marker and stops recording", (t) => {
 
 	const observe = providerEventObserver("chat_cap", "teacher");
 	assert.ok(observe);
-	observe!({ type: "a", pad: "x".repeat(200) }, { provider: "p", id: "m" }); // crosses → written + marker
-	observe!({ type: "b" }, { provider: "p", id: "m" }); // capped: dropped
+	observe!({ type: "a", pad: "x".repeat(200) }, { provider: "p", id: "m" });
+	observe!({ type: "b" }, { provider: "p", id: "m" });
 
 	const lines = readLines(dir, "chat_cap");
 	assert.equal(lines.length, 2, "one event + one cap marker");

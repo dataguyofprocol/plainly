@@ -1,24 +1,3 @@
-/**
- * SESSION MODEL tests (components/session-core.ts — Wave D): the pure state
- * machine that replaced useChat + the AI-SDK transport. Everything the old
- * transport/merge suites pinned survives here on the native wire:
- *
- * - the 409 IDENTITY-RETRY (postInputEvent): the event was never persisted
- *   pre-acceptance, so the retry waits out the racing turn and re-POSTs
- *   the SAME body — no merge, no record read;
- * - the reattach path (resumeStream): record refetch, then the SAME
- *   verbatim-AgentEvent consume as a POST; turn-settled is the terminal;
- *   byte-split SSE frames never corrupt (the framing pin);
- * - append-only ADOPTION (adoptRecord/absorbed): server-added steers show
- *   mid-turn, the record rewrite bails to the idle full sync, and the
- *   optimistic entries the write-ahead absorbed never double their
- *   bubbles;
- * - the view application (applyWireEvent → projectView): full-partial
- *   replaces, the fork-2 question-placeholder ignore, execution states,
- *   raw error display (owner ruling);
- * - the continuation fold (needsContinuation): the mount/sync seam's
- *   native replacement for lastAssistantMessageIsCompleteWithToolCalls.
- */
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { absorbed, pendingCallTool, SessionModel } from "../components/session-core.ts";
@@ -34,12 +13,10 @@ afterEach(() => {
 	globalThis.fetch = realFetch;
 });
 
-/** SSE-frame each object the way the server's subscriber stream does. */
 function sse(...events: unknown[]): string {
 	return events.map((e) => (e === "[DONE]" ? "data: [DONE]\n\n" : `data: ${JSON.stringify(e)}\n\n`)).join("");
 }
 
-/** A Response whose body drips `text` in `slice`-byte reads (the framing pin). */
 function dripped(text: string, slice: number, status = 200): Response {
 	const bytes = new TextEncoder().encode(text);
 	const body = new ReadableStream<Uint8Array>({
@@ -53,19 +30,10 @@ function dripped(text: string, slice: number, status = 200): Response {
 	return new Response(body, { status });
 }
 
-/** A plain single-read 200 body. */
 function sseResponse(...events: unknown[]): Response {
 	return new Response(sse(...events), { status: 200 });
 }
 
-/** CONNECTION DIET B mock (owner, 2026-10-10 — parallel-session freeze
- *  postmortem): send() no longer consumes the POST response — it acks,
- *  closes, and reattaches. The wire sequence a send drives: POST /api/chat
- *  (tiny JSON ack) → GET /api/chats/chat_x (record refetch — the
- *  write-ahead absorbs the optimistic bubble) → GET .../stream (the SSE
- *  wire). `userText` seeds the record's write-ahead user message; `post`
- *  overrides the ack (409/error-path tests keep their own scripts);
- *  `onPost` observes the POST body. */
 function dietFetch(opts: {
 	stream: () => Response;
 	userText?: string;
@@ -101,9 +69,6 @@ function assistantMsg(id: string, text: string): LhMessage {
 	} as unknown as LhMessage;
 }
 
-/** A streaming assistant partial (pi events carry the FULL partial — and
- * NO message.id: the id exists only once the server's persistTurn stamps
- * the record; the client tracks the in-flight message by slot). */
 function partial(blocks: unknown[], stopReason?: string): Record<string, unknown> {
 	return {
 		type: "message_update",
@@ -122,8 +87,6 @@ function partial(blocks: unknown[], stopReason?: string): Record<string, unknown
 function model(opts: Partial<ConstructorParameters<typeof SessionModel>[0]> = {}): SessionModel {
 	return new SessionModel({ chatId: "chat_x", initialMessages: [], ...opts });
 }
-
-// ─── the 409 identity-retry ────────────────────────────────────────────────
 
 interface Call {
 	url: string;
@@ -150,18 +113,13 @@ function installFetch(routes: {
 
 describe("postInputEvent (the 409 identity-retry)", { skip: process.env.NO_SLOW ? true : undefined }, () => {
 	it("the model's default fetch is RECEIVER-SAFE (the browser 'Illegal invocation' pin)", async () => {
-		// The live empty-session bug (2026-09-26): storing globalThis.fetch
-		// UNBOUND and calling it as this.fetch(...) throws "Illegal
-		// invocation" in the browser (native fetch requires this === Window;
-		// Node's undici doesn't care, so every test passed while the app was
-		// dead). Pin the browser's receiver discipline with a strict stub.
 		let receiverWasGlobal = false;
 		globalThis.fetch = (function (this: unknown, ...args: Parameters<typeof fetch>) {
 			if (this !== globalThis) throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
 			receiverWasGlobal = true;
 			return Promise.resolve(sseResponse("[DONE]"));
 		}) as typeof fetch;
-		const m = model(); // NO injected fetch — exercises the default wrapper
+		const m = model();
 		const res = await m.postInputEvent({ type: "text", text: "hi" });
 		assert.equal(res.status, 200);
 		assert.ok(receiverWasGlobal, "the default wrapper calls fetch with the global receiver");
@@ -180,7 +138,7 @@ describe("postInputEvent (the 409 identity-retry)", { skip: process.env.NO_SLOW 
 		const event: ChatInput = { type: "text", text: "my question while the wake turn ran" };
 		const calls = installFetch({
 			chatPOST: (_c, n) => (n === 1 ? new Response("busy", { status: 409 }) : new Response("stream", { status: 200 })),
-			jobsGET: (poll) => poll <= 1, // first poll: still running; second: done
+			jobsGET: (poll) => poll <= 1,
 		});
 		const m = model({ pollMs: 10, waitMaxMs: 100 });
 		const res = await m.postInputEvent(event);
@@ -228,14 +186,12 @@ describe("postInputEvent (the 409 identity-retry)", { skip: process.env.NO_SLOW 
 	});
 });
 
-// ─── send: optimistic appends + wire consumption ────────────────────────────
-
 describe("send (one input event, verbatim consumption)", () => {
 	it("optimistically appends the text, POSTs {chatId, input}, consumes to [DONE]", async () => {
 		const posts: string[] = [];
 		globalThis.fetch = dietFetch({
 			onPost: (b) => posts.push(b),
-			userText: "my topic", // the write-ahead the record refetch absorbs
+			userText: "my topic",
 			stream: () =>
 				sseResponse(
 					{ type: "agent_start" },
@@ -249,27 +205,18 @@ describe("send (one input event, verbatim consumption)", () => {
 
 		const m = model();
 		const pending = m.send({ type: "text", text: "my topic" });
-		// The optimistic bubble is INSTANT (the instant-answer UX seam):
 		assert.equal(m.getState().status, "submitted");
 		assert.match((m.getState().nativeMessages.at(-1) as { id?: string }).id ?? "", /^c_/);
 		assert.equal(m.getState().messages.at(-1)!.parts[0]!.text, "my topic");
 		await pending;
 		assert.deepEqual(JSON.parse(posts[0]!), { chatId: "chat_x", input: { type: "text", text: "my topic" } });
 		assert.equal(m.getState().status, "ready");
-		// The streamed assistant REPLACED through full partials (never deltas):
 		const view = m.getState().messages;
 		assert.equal(view.at(-1)!.role, "assistant");
 		assert.equal(view.at(-1)!.parts.at(-1)!.text, "hello there");
 	});
 
 	it("N id-less updates replace the SAME tail slot (the per-chunk divider bug pin)", async () => {
-		// pi's wire (captured live, 2026-09-26): message_start/update/end carry
-		// AssistantMessages with NO id. The bug: minting a fresh id per event
-		// made every message_update APPEND a full copy — the tail grew one
-		// message per chunk, and projectView's step separators + thinking
-		// blocks made the transcript fill with dividers mid-stream (cleaned up
-		// only by the settle sync). The fix: the in-flight message is tracked
-		// by slot; updates REPLACE it.
 		let push: (e: unknown) => void = () => {};
 		const enc = new TextEncoder();
 		const body = new ReadableStream<Uint8Array>({
@@ -287,14 +234,10 @@ describe("send (one input event, verbatim consumption)", () => {
 			push(partial([{ type: "thinking", thinking: "hmm" }, { type: "text", text }]));
 			await settle();
 		}
-		// MID-STREAM: exactly ONE assistant message in the tail — never one
-		// per chunk — carrying the LATEST partial (full snapshot, not deltas).
 		const assistants = m.getState().nativeMessages.filter((x) => (x as { role?: string }).role === "assistant");
 		assert.equal(assistants.length, 1, "one streaming message, replaced in place");
 		assert.equal(m.getState().messages.at(-1)!.parts.filter((p) => p.type === "text").length, 1);
 		assert.equal(m.getState().messages.at(-1)!.parts.at(-1)!.text, "Hello world");
-		// Stable id across updates → stable view-part keys (no per-chunk
-		// remount of the whole transcript, mermaid included).
 		const idMid = (assistants[0] as { id?: string }).id;
 		assert.match(idMid ?? "", /^c_/, "client-minted slot id");
 
@@ -347,7 +290,6 @@ describe("send (one input event, verbatim consumption)", () => {
 		}) as typeof globalThis.fetch;
 		const m = model({ initialMessages: [newUserMessage("hi"), quizCall] });
 		const pending = m.submitAnswer("quiz", "call-1", { correct: true } as never);
-		// The dock's AnsweredCard state — before any server round-trip:
 		const state = m.getState();
 		const quizPart = state.messages
 			.flatMap((v) => v.parts)
@@ -362,11 +304,6 @@ describe("send (one input event, verbatim consumption)", () => {
 	});
 
 	it("ignores the question placeholder's clean execution end (fork 2) and keeps errors", async () => {
-		// The dock's mount gate keys on the part STATE the live execution
-		// layer drives MID-STREAM: a clean question execution stays
-		// input-available (the in-memory "Question posed" placeholder
-		// never shows); an INVALID call is output-error and NEVER mounts
-		// (the modal-realism crash pin).
 		const enc = new TextEncoder();
 		let push: (e: unknown) => void = () => {};
 		const body = new ReadableStream<Uint8Array>({
@@ -397,10 +334,6 @@ describe("send (one input event, verbatim consumption)", () => {
 		assert.equal(parts[0]!.state, "input-available", "the clean placeholder is IGNORED — the dock mounts on it");
 		assert.equal(parts[1]!.state, "output-error");
 		assert.equal(parts[1]!.errorText, "correctAnswer does not match any option value");
-		// turn_end carries the placeholder as a toolResult MESSAGE (details:
-		// null — tool-execute questionResult): it must not flip the part to
-		// output-available either — the AnsweredCard would read .dismissed off
-		// null and crash the whole render (the live crash, 2026-09-26).
 		push({
 			type: "turn_end",
 			message: { role: "assistant", content: [{ type: "text", text: "" }], stopReason: "toolUse" },
@@ -426,17 +359,12 @@ describe("send (one input event, verbatim consumption)", () => {
 	});
 
 it("Wave C: markers injected mid-run (custom role, follow-up delivery) append to the tail by id", () => {
-	// A never-settling fetch: the send only needs to flip the model into its
-	// streaming status synchronously — its POST floats (never rejects) while
-	// the injected wire events are asserted.
 	const m = model({ fetch: () => new Promise<Response>(() => {}) });
 	m.adoptRecord([
 		{ id: "u1", role: "user", content: "hello", timestamp: 1 } as never,
 	] as never);
 	void m.send({ type: "text", text: "hello" });
 
-	// pi emits message_start + message_end for an injected follow-up marker
-	// (no streaming partials) — both must UPSERT the same tail slot by id.
 	const marker = {
 		id: "steer_job_x_1",
 		role: "custom",
@@ -459,7 +387,6 @@ it("Wave C: markers injected mid-run (custom role, follow-up delivery) append to
 		"the marker renders its artifact part (SubagentSteerCard)",
 	);
 
-	// A re-delivery of the same id (message_end replay) must NOT duplicate.
 	m.applyWireEvent({ type: "message_end", message: marker } as never);
 	const again = m.getState();
 	assert.equal(again.messages.length, state.messages.length, "same id upserts, never appends a second copy");
@@ -482,8 +409,6 @@ it("Wave C: markers injected mid-run (custom role, follow-up delivery) append to
 		assert.equal(m.getState().error!.message, "OpenRouter 429: rate limited");
 	});
 });
-
-// ─── provider failures: one final-entry rule for live and saved records ──────
 
 describe("provider-error banner (live and saved)", () => {
 	function failed(id = "failed", errorMessage: string | undefined = "Google 500: fixture failure"): LhMessage {
@@ -684,8 +609,6 @@ describe("provider-error banner (live and saved)", () => {
 	});
 });
 
-// ─── reattach (resumeStream) ────────────────────────────────────────────────
-
 describe("resumeStream (the reattach path)", () => {
 	it("refetches the record, then GETs the stream endpoint", async () => {
 		const urls: string[] = [];
@@ -719,12 +642,8 @@ describe("resumeStream (the reattach path)", () => {
 		}) as typeof globalThis.fetch;
 		const m = model();
 		await m.resumeStream(false);
-		// one round-trip: straight to the stream — the page render already
-		// read the record; the replay rebuilds the partial regardless.
 		assert.deepEqual(urls, ["/api/chats/chat_x/stream"]);
 		assert.equal(m.getState().status, "ready");
-		// the mid-session caller (handoff watch) keeps the default refetch
-		// (the earlier test in this block pins that order).
 	});
 
 	it("OPTIMISTIC SUBMIT (owner, optimistic round 2026-10-02): send flips status synchronously — the placeholder is live before the server answers anything", async () => {
@@ -732,30 +651,18 @@ describe("resumeStream (the reattach path)", () => {
 		const gate = new Promise<Response>((res) => (release = res));
 		globalThis.fetch = (async (input: RequestInfo | URL) => {
 			const url = String(input);
-			if (url === "/api/chats/chat_x") return gate; // the POST hangs
+			if (url === "/api/chats/chat_x") return gate;
 			throw new Error(`unexpected fetch: ${url}`);
 		}) as typeof globalThis.fetch;
 		const m = model();
-		// send() runs synchronously to its first await — status is already
-		// "submitted" (and the optimistic user bubble is appended) before
-		// the server has answered ANYTHING.
 		const p = m.send({ type: "text", text: "q" });
 		assert.equal(m.getState().status, "submitted", "the placeholder is live pre-first-chunk");
 		assert.equal(m.getState().messages.at(-1)!.role, "user", "the optimistic bubble is up");
 		release(Response.json({ messages: [] }));
 		await p;
-		// the reattach path is the same synchronous flip (resumeStream sets
-		// submitted at entry, before its fetches).
 	});
 
 	it("PROTOCOL EVENTS RELEASE NOTHING (owner, optimistic round 3): agent_start keeps the placeholder; the first APPLIED event flips streaming", async () => {
-		// The round-2 bug chain, fixed at the machine: status used to flip
-		// streaming at the first wire BYTE (agent_start, emitted before the
-		// provider has produced anything), vanishing the placeholder into an
-		// empty wait. Now the flip waits for an event applyWireEvent ACTS
-		// on — the placeholder (gated on submitted) covers the whole
-		// provider-connect gap, and the applied event's message renders the
-		// thinking row even when its content is empty (view.ts projection).
 		let releaseProtocol!: () => void;
 		let releaseRest!: () => void;
 		const protocolGate = new Promise<void>((res) => (releaseProtocol = res));
@@ -764,9 +671,9 @@ describe("resumeStream (the reattach path)", () => {
 			async start(c) {
 				const enc = new TextEncoder();
 				c.enqueue(enc.encode(sse({ type: "agent_start" }, { type: "turn_start" })));
-				await protocolGate; // the provider is slow — nothing but protocol so far
+				await protocolGate;
 				c.enqueue(enc.encode(sse({ type: "message_start", message: { role: "assistant", content: [] } })));
-				await restGate; // the message arrived; its first token is still pending
+				await restGate;
 				c.enqueue(
 					enc.encode(
 						sse({ type: "message_update", message: { role: "assistant", content: [{ type: "thinking", thinking: "pondering" }] } }),
@@ -780,14 +687,14 @@ describe("resumeStream (the reattach path)", () => {
 		const m = model();
 		const p = m.send({ type: "text", text: "q" });
 		assert.equal(m.getState().status, "submitted", "the action is optimistic: placeholder up pre-everything");
-		await new Promise((r) => setTimeout(r, 25)); // agent_start + turn_start consumed
+		await new Promise((r) => setTimeout(r, 25));
 		assert.equal(
 			m.getState().status,
 			"submitted",
 			"protocol events apply NOTHING — the placeholder holds through the connect gap",
 		);
 		releaseProtocol();
-		await new Promise((r) => setTimeout(r, 25)); // message_start consumed
+		await new Promise((r) => setTimeout(r, 25));
 		assert.equal(m.getState().status, "streaming", "the first APPLIED event flips streaming — the thinking row renders");
 		releaseRest();
 		await p;
@@ -795,14 +702,6 @@ describe("resumeStream (the reattach path)", () => {
 	});
 
 	it("SESSION START SURVIVES A STOP() RACING THE SUBMIT (owner, 2026-10-10 — the dead-practice-start postmortem)", async () => {
-		// React StrictMode's simulated remount fires the unmount cleanup
-		// (~8ms in) while the ?prompt first send's POST is in flight — the
-		// exact live repro: pre-fix, the POST rode consumeAbort and died
-		// with AbortError, the page's sentInitial guard never retried, and
-		// the session sat dead until a second message (which then persisted
-		// WITHOUT the first). The law: submits are not abortable by view
-		// teardown — the POST completes, the turn is server-side, and the
-		// dead view attaches no stream.
 		let resolvePost!: () => void;
 		let postAborted = false;
 		const fetches: string[] = [];
@@ -826,9 +725,9 @@ describe("resumeStream (the reattach path)", () => {
 		}) as typeof globalThis.fetch;
 		const m = model();
 		const sending = m.send({ type: "text", text: "quiz me" });
-		await new Promise((r) => setTimeout(r, 5)); // the POST is in flight
-		m.stop(); // StrictMode's simulated unmount lands mid-submit
-		resolvePost(); // the ack completes anyway
+		await new Promise((r) => setTimeout(r, 5));
+		m.stop();
+		resolvePost();
 		await sending;
 		assert.equal(postAborted, false, "the submit POST carries no teardown signal at all");
 		assert.ok(fetches.includes("/api/chat"), "the submit reached the server");
@@ -837,10 +736,6 @@ describe("resumeStream (the reattach path)", () => {
 	});
 
 	it("REATTACH REPLAYS ONTO A CLEAN SLATE (owner, optimistic round 3): an aborted attempt's partials never double", async () => {
-		// StrictMode's simulated remount aborts the first resume mid-replay;
-		// its partial tail survived into the retry and the replay DOUBLED
-		// every message (the record refetch's accidental tail reset died
-		// with attach-first). resumeStream now wipes the tail itself.
 		let hold!: () => void;
 		const holdGate = new Promise<void>((res) => (hold = res));
 		let calls = 0;
@@ -856,7 +751,7 @@ describe("resumeStream (the reattach path)", () => {
 									sse({ type: "message_update", message: { role: "assistant", content: [{ type: "text", text: "part one" }] } }),
 								),
 							);
-							await holdGate; // aborted here (the partial stays in the tail)
+							await holdGate;
 							c.enqueue(enc.encode(sse({ type: "agent_end", messages: [] }, "[DONE]")));
 							c.close();
 						},
@@ -888,10 +783,9 @@ describe("resumeStream (the reattach path)", () => {
 		}) as typeof globalThis.fetch;
 		const m = model();
 		const attempt1 = m.resumeStream(false);
-		await new Promise((r) => setTimeout(r, 25)); // attempt 1 consumed its partial
-		// the simulated remount: attempt 2 aborts attempt 1 mid-replay
+		await new Promise((r) => setTimeout(r, 25));
 		const attempt2 = m.resumeStream(false);
-		hold(); // attempt 1's gate resolves after it was already aborted
+		hold();
 		await Promise.allSettled([attempt1, attempt2]);
 		const texts = m
 			.getState()
@@ -915,10 +809,6 @@ describe("resumeStream (the reattach path)", () => {
 	});
 
 	it("a replayed CONTINUATION mounts BESIDE the seeded message (the SDK replace-last seam is dead)", async () => {
-		// The seeded record ends with an assistant message; the replayed
-		// turn continues with its OWN assistant message — the view groups
-		// them as one document with a step separator (pixel-identical to a
-		// live continuation; the settle sync lands the canon).
 		globalThis.fetch = (async (input: RequestInfo | URL) => {
 			const url = String(input);
 			if (url === "/api/chats/chat_x") return Response.json({ messages: [assistantMsg("seed", "the question")] });
@@ -977,8 +867,6 @@ describe("resumeStream (the reattach path)", () => {
 	});
 });
 
-// ─── adoption (append-only ground rules, owner 2026-09-15) ──────────────────
-
 function userText(id: string, text: string): LhMessage {
 	return { ...newUserMessage(text), id };
 }
@@ -997,7 +885,7 @@ describe("adoptRecord — append-only adoption", () => {
 
 	it("a missing base id (record rewrite) bails — the idle full sync is the net", () => {
 		const m = model({ initialMessages: [userText("u1", "a"), userText("u2", "b")] });
-		m.adoptRecord([userText("u2", "b")]); // u1 vanished: a rewrite, not an append
+		m.adoptRecord([userText("u2", "b")]);
 		assert.deepEqual(
 			m.getState().nativeMessages.map((x) => x.id),
 			["u1", "u2"],
@@ -1006,15 +894,11 @@ describe("adoptRecord — append-only adoption", () => {
 	});
 
 	it("absorbs the optimistic entries the record has taken over (no doubled bubbles)", () => {
-		// A text send's optimistic bubble (local c_ id): the write-ahead's
-		// server copy absorbs it by CONTENT — the bubble never doubles.
 		const optimistic = { ...newUserMessage("my question"), id: "c_local_1" } as LhMessage;
 		const serverCopy = { ...newUserMessage("my question"), id: "srv_9" } as LhMessage;
 		assert.ok(absorbed(optimistic, [userText("u1", "topic"), serverCopy]), "content match absorbs the local copy");
 		assert.ok(!absorbed(serverCopy, [optimistic]), "server stamps are never absorbed");
 		assert.ok(!absorbed({ ...newUserMessage("my question") }, [serverCopy]), "an id-less message is never absorbed");
-		// The answer result absorbs by toolCallId (ids differ, content may too —
-		// the toolCallId is the identity of an answer).
 		const answer = { ...newAnswerResult("call-1", "quiz", { correct: true }), id: "c_local_2" } as LhMessage;
 		assert.ok(
 			absorbed(answer, [{ ...newAnswerResult("call-1", "quiz", { correct: true }), id: "srv_10" } as LhMessage]),
@@ -1031,8 +915,6 @@ describe("adoptRecord — append-only adoption", () => {
 		);
 	});
 });
-
-// ─── the continuation fold (mount/sync seam) ────────────────────────────────
 
 function assistantWithCall(id: string, callId: string, name = "research"): LhMessage {
 	return {
@@ -1092,11 +974,7 @@ describe("needsContinuation (the native lastAssistantMessageIsCompleteWithToolCa
 	});
 });
 
-// ─── the dismissal pause (owner design 2026-10-03, "A2") ────────────────────
-
 describe("the dismissal pause (needsContinuation + endsInDismissal)", () => {
-	/** The record's silent dismiss write: the toolResult the dismiss route
-	 *  appends (full answer in details — the folds read it there). */
 	function dismissedMsg(callId: string): LhMessage {
 		return {
 			...newAnswerResult(callId, "quiz", dismissedAnswer("quiz", "Pick a planet")),
@@ -1170,8 +1048,6 @@ describe("the dismissal pause (needsContinuation + endsInDismissal)", () => {
 	});
 });
 
-// ─── the pending-call tool scan ─────────────────────────────────────────────
-
 describe("pendingCallTool", () => {
 	it("finds the dangling call's tool name (the optimistic answer's stamp)", () => {
 		const messages = [assistantWithCall("a1", "call-q1", "ask_user_question")];
@@ -1179,8 +1055,6 @@ describe("pendingCallTool", () => {
 		assert.equal(pendingCallTool(messages, "call-zz"), null);
 	});
 });
-
-// ─── newAnswerResult: the two-audience split (owner, 2026-10-02) ────────────
 
 describe("newAnswerResult two audiences", () => {
 	it("MODEL sees the compact learner-only record; details keeps the FULL graded answer", () => {
@@ -1212,15 +1086,6 @@ describe("newAnswerResult two audiences", () => {
 	});
 });
 
-// ─── the practice live-view law (owner, 2026-10-05) ─────────────────────────
-//
-// The two-spinners + doubled-card incident: submitting thinking flipped the
-// POSE turn's problem call back to a live spinner mid-transcript (session
-// busyness leaked into per-call state), and the optimistic thinking marker
-// was never absorbed (role "custom" was missing from absorbed()), so the
-// adoption window rendered the submission twice for the whole turn.
-
-/** The post-settle pose-turn record of a practice session. */
 function poseRecord(): LhMessage[] {
 	return [
 		{ id: "m1", role: "user", content: "db practice" },
@@ -1242,8 +1107,6 @@ function poseRecord(): LhMessage[] {
 
 describe("the live-view law — live is positive evidence, not session busyness", () => {
 	it("a settled problem call NEVER renders live during another turn (the two-spinner bug)", () => {
-		// The thinking turn's live state: inFlight, but NOTHING streams that
-		// touches the pose call, and the executions map (per-turn) is empty.
 		const live = { executions: new Map(), inFlight: true, streamingIds: new Set<string>() };
 		const view = projectView(poseRecord(), live);
 		const problem = view.flatMap((m) => m.parts).find((p) => p.type === "tool-problem");
@@ -1288,17 +1151,12 @@ describe("absorbed — the custom role (the doubled thinking card)", () => {
 		const optimistic = { ...newThinkingMessage("call-p1", "my trace"), id: "c_opt1" } as LhMessage;
 		const serverCopy = { ...newThinkingMessage("call-p1", "my trace"), id: "srv_1" } as LhMessage;
 		assert.ok(absorbed(optimistic, [...poseRecord(), serverCopy]), "same submission → the local copy drops");
-		// A DIFFERENT submission (different text) is its own marker.
 		const other = { ...newThinkingMessage("call-p1", "a later, different trace"), id: "srv_2" } as LhMessage;
 		assert.ok(!absorbed(optimistic, [...poseRecord(), other]), "different details → not the same submission");
-		// The c_ gate: server stamps are never absorbed, whatever the role.
 		assert.ok(!absorbed(serverCopy, [optimistic]), "server ids never drop");
 	});
 
 	it("the adoption window cannot double the card (model-level end-to-end)", () => {
-		// The exact client sequence of the incident: the optimistic marker in
-		// the tail (client id), then the +400ms adoption fetch swaps in the
-		// write-ahead record (server id). ONE card must remain.
 		const m = model({ chatId: "chat_x", initialMessages: poseRecord() });
 		const optimistic = { ...newThinkingMessage("call-p1", "my trace"), id: "c_opt1" } as LhMessage;
 		m.applyWireEvent({ type: "message_start", message: optimistic });

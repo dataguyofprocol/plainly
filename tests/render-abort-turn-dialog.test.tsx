@@ -1,9 +1,3 @@
-/**
- * SSR pins — abort-turn-dialog (ESC-abort guard, owner 2026-10-02):
- * the confirm popup EVERYWHERE ruling. AbortTurnBody is the pure seam
- * (the DeleteNodeBody pattern); the wrapper owns effects + portal.
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -28,7 +22,6 @@ describe("AbortTurnBody", () => {
 		assert.match(html, /Dismiss this question\?/);
 		assert.match(html, /Skipped — the teacher moves on without it\./);
 		assert.match(html, /Dismiss/);
-		// the abort copy must not leak into the dismissal mode
 		assert.ok(!html.includes("Abort this turn"));
 	});
 

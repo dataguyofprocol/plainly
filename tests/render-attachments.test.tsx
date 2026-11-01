@@ -1,9 +1,3 @@
-/**
- * Attachment UI — the chip row and the picked/dropped-files gate
- * (owner, 2026-10-31: desktop-only path references, readable types only).
- *
- * Same tsx classic-JSX shim as render-cards.test.tsx.
- */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
 

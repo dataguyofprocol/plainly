@@ -103,7 +103,6 @@ for (const phase of ["sync", "rename"] as const) {
 test("file read/write failures are sanitized and cannot leak credential or path details", async () => {
 	const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lh-chatgpt-io-"));
 	try {
-		// Reading a directory and writing beneath a regular file both fail on all supported platforms.
 		await assert.rejects(fileStore(dir).read(), /^Error: storage$/);
 		const blocker = path.join(dir, "scratch-private-path"); await fs.writeFile(blocker, "blocker");
 		const connection = service(fileStore(path.join(blocker, "chatgpt-credentials.json")));

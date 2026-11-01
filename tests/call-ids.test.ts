@@ -4,18 +4,12 @@ import type { AgentEvent } from "@earendil-works/pi-agent-core";
 import { ToolCallIdUniquifier, collectToolCallIds } from "../src/server/pi/call-ids.ts";
 
 /**
- * THE LACAN INCIDENT (owner-approved fix, 2026-10-04): DeepSeek (via
- * OpenRouter) returns tool-call ids that reset every response — a
- * one-call-per-turn session names EVERY call `call_0`. The uniquifier sits
- * at the wire boundary (runPiTurn): colliding ids remint once, and the
- * same minting applies at settlement, so wire + record + next-turn context
- * agree. These pins drive it as a pure unit: event sequences in, remapped
- * events and settled messages out.
+ * DeepSeek (via OpenRouter) returns tool-call ids that reset every
+ * response — a one-call-per-turn session names EVERY call `call_0`.
  *
- * REFERENCE-IDENTITY CONTRACT: streaming messages carry no ids (stamped
- * at persist), so tables key by object identity — the message_end object
- * is the object agent.state.messages holds (verified against
- * pi-agent-core). The pins hold references the same way.
+ * Streaming messages carry no ids, so tables key by object identity — the
+ * message_end object is the object agent.state.messages holds (verified
+ * against pi-agent-core).
  */
 
 const assistantMsg = (id: string, callIds: string[]): any => ({
@@ -43,14 +37,12 @@ describe("ToolCallIdUniquifier", () => {
 	it("a colliding id mints `orig~2` — on the message, the execution events, and the settle, identically", () => {
 		const u = new ToolCallIdUniquifier(["call_0"]);
 		const m1 = assistantMsg("m1", ["call_0"]);
-		// the streaming shape: start/update/end — same logical message
 		for (const t of ["message_start", "message_update", "message_end"]) {
 			const e = u.event(asEvent({ type: t, message: m1 }));
 			assert.equal(firstCallId(e), "call_0~2", `${t} shows the mint`);
 		}
 		const exec = u.event(asEvent({ type: "tool_execution_end", toolCallId: "call_0", toolName: "quiz", result: null, isError: false })) as { toolCallId: string };
 		assert.equal(exec.toolCallId, "call_0~2");
-		// settle: the SAME mint, paired call + result (m1 is the state object)
 		const settled = u.remapSettled([m1, toolResultMsg("call_0")]) as Array<{
 			role: string;
 			content?: Array<{ id: string }>;
@@ -65,10 +57,8 @@ describe("ToolCallIdUniquifier", () => {
 		const m1 = assistantMsg("m1", ["call_0"]);
 		const m2 = assistantMsg("m2", ["call_0"]);
 		u.event(asEvent({ type: "message_end", message: m1 }));
-		// message_start opens the second message's epoch (the loop's shape)
 		u.event(asEvent({ type: "message_start", message: assistantMsg("m2", []) }));
 		assert.equal(firstCallId(u.event(asEvent({ type: "message_end", message: m2 }))), "call_0~3");
-		// each result pairs with ITS message's call (the scope walk)
 		const settled = u.remapSettled([m1, toolResultMsg("call_0"), m2, toolResultMsg("call_0")]) as Array<{
 			role: string;
 			content?: Array<{ id: string }>;
@@ -95,18 +85,15 @@ describe("ToolCallIdUniquifier", () => {
 	});
 
 	it("agent_end carries the full state: prior-turn history verbatim, this turn remapped", () => {
-		const priorTurn = [assistantMsg("m0", ["call_0"]), toolResultMsg("call_0")]; // legacy dupes in the record
-		// seeded exactly as chat-handler seeds it: the record's ids
+		const priorTurn = [assistantMsg("m0", ["call_0"]), toolResultMsg("call_0")];
 		const u = new ToolCallIdUniquifier(collectToolCallIds(priorTurn));
 		const m1 = assistantMsg("m1", ["call_0"]);
 		u.event(asEvent({ type: "message_end", message: m1 }));
 		const e = u.event(asEvent({ type: "agent_end", messages: [...priorTurn, m1, toolResultMsg("call_0")] })) as unknown as {
 			messages: Array<{ id?: string; role: string; content?: Array<{ id: string }>; toolCallId?: string }>;
 		};
-		// history is NEVER rewritten (its dupes heal at the fold, view.ts)
 		assert.equal(e.messages[0]!.content![0]!.id, "call_0");
 		assert.equal(e.messages[1]!.toolCallId, "call_0");
-		// this turn's pair is the mint
 		assert.equal(e.messages[2]!.content![0]!.id, "call_0~2");
 		assert.equal(e.messages[3]!.toolCallId, "call_0~2");
 	});

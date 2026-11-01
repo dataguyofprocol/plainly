@@ -1,9 +1,3 @@
-/**
- * The pdf-reader sub-agent (sources v0) — the hand-rolled loop on a faux
- * engine: triage→extract→brief flow, the unread-finish doctrine gate, the
- * render path via the headless fake, and the unreadable-source failure.
- * The pdfjs layer itself is covered by pdf-ops.test.ts against the fixture.
- */
 import assert from "node:assert/strict";
 import * as path from "node:path";
 import { describe, it } from "node:test";
@@ -71,10 +65,7 @@ describe("pdf-reader loop (faux engine)", () => {
 	it("the unread-finish gate: a brief with zero consultation is bounced, not delivered", async () => {
 		let nudged = false;
 		const engine = fauxEngine([
-			// first finish attempt with NOTHING read — the loop must inject the
-			// nudge and keep going rather than deliver invention
 			fauxAssistantMessage([fauxText("The answer is 42, trust me.")]),
-			// after the nudge: consult, then brief honestly
 			fauxAssistantMessage(
 				[fauxToolCall("pdf_search", { query: "integral", literal: false }, { id: "s1" })],
 				{ stopReason: "toolUse" },
@@ -88,8 +79,6 @@ describe("pdf-reader loop (faux engine)", () => {
 		assert.match(result.brief, /Found it on page 1/);
 		assert.deepEqual(result.pagesRead, [], "search hits consult but do not read (the split)");
 		assert.deepEqual(result.pagesConsulted, [1]);
-		// and the gate lets it through: search hits ARE genuine consultation
-		// the first (invention) answer must NOT be the delivered brief
 		assert.notEqual(result.brief, "The answer is 42, trust me.");
 	});
 
@@ -115,7 +104,6 @@ describe("pdf-reader loop (faux engine)", () => {
 			fauxAssistantMessage([fauxToolCall("pdf_render", { pages: "1", dpi: 150 }, { id: "r1" })], {
 				stopReason: "toolUse",
 			}),
-			// the reader adapts after the error: extract instead, then brief
 			fauxAssistantMessage([fauxToolCall("pdf_extract", { pages: "1" }, { id: "e1" })], {
 				stopReason: "toolUse",
 			}),
@@ -151,7 +139,6 @@ describe("pdf-reader loop (faux engine)", () => {
 			{ path: path.join(import.meta.dirname, "fixtures", "not-a-pdf.txt"), question: "anything" },
 			{ engine },
 		);
-		// had the model been consulted, the brief would be its text instead
 		assert.match(result.brief, /^PDF failed:/);
 		assert.ok(!result.brief.includes("never reached"));
 		assert.deepEqual(result.pagesRead, []);

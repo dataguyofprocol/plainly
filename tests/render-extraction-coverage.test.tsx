@@ -13,15 +13,6 @@ import {
 	type SessionCoverage,
 } from "../components/extraction-coverage.tsx";
 
-/**
- * The extraction-coverage surfaces (extraction-UX redesign, owner-locked
- * dispatch 2026-09-24): the sidebar context-menu block (numbers + the
- * manual Extract affordance) and the chat top bar's ring meter. The pure
- * folds and the presentational bodies are pinned here; the live fetch
- * chains (menu-open read, the 2s running poll, the turn-settle bump, the
- * settings signal) are Playwright's beat.
- */
-
 function coverage(over: Partial<SessionCoverage> = {}): SessionCoverage {
 	return {
 		totalMessages: 12,
@@ -36,14 +27,6 @@ function coverage(over: Partial<SessionCoverage> = {}): SessionCoverage {
 }
 
 describe("fetchGraphRead — one truth with the extraction trigger (2026-10-02)", () => {
-	// The meter's denominator MUST be the number the server's
-	// effectiveSettings gate waits for. The old hand-rolled fallback
-	// read the raw delta and guessed `?? 4096` — a stale pre-setting-era
-	// constant — so an unset budget filled the ring at half the truth
-	// (owner repro: 6k shown full, extraction correctly silent at the then-
-	// factory 8192). The 2026-10-13 ruling restored the factory to 4096 (more
-	// frequent graph updates); the LAW is unchanged — the denominator is the
-	// factory the same core resolver serves, never a hand-rolled constant.
 	const stub = (payload: unknown, ok = true) => {
 		const real = globalThis.fetch;
 		globalThis.fetch = (async () =>

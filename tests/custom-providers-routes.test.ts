@@ -1,12 +1,3 @@
-/**
- * Custom OpenAI-compatible providers end to end (custom-endpoint wave,
- * 2026-10-26): the /api/providers/custom routes over a temp data dir and
- * auth file, the engine registry picking up writes with no restart, the
- * catalog listing (keyless providers usable), the generic keys API
- * refusing LH_CUSTOM_* vars, and pricing treating custom models as
- * UNPRICED. The probe's fetch is swapped — no test touches the network.
- */
-
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -92,7 +83,6 @@ describe("the custom provider routes", () => {
 		assert.equal(piModels().getProvider("custom-local-ollama-2")?.name, "Gateway");
 		assert.deepEqual(validateModelsSettings({ strong: { model: { provider: "custom-local-ollama", id: "llama3" } } }), { ok: true });
 
-		// keyed → the stored key; keyless → the placeholder (configured by design)
 		assert.equal((await piModels().getAuth("custom-local-ollama-2"))?.auth.apiKey, "tok-2");
 		assert.equal((await piModels().getAuth("custom-local-ollama"))?.auth.apiKey, CUSTOM_PROVIDER_NO_KEY);
 

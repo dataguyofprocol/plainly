@@ -1,7 +1,5 @@
 "use strict";
 
-// LearnHarness-owned public-client OAuth. Never import pi's bundled login.
-// This module is main-process-only; dependencies are injectable for scratch tests.
 const crypto = require("node:crypto");
 const http = require("node:http");
 const fs = require("node:fs/promises");
@@ -33,7 +31,6 @@ const publicError = (err) => ({
 
 const nonempty = (v) => typeof v === "string" && v.length > 0 && !/[\x00-\x20\x7f]/.test(v);
 const planScopes = (tokens) => !!tokens?.accessToken && SCOPES.every((scope) => tokens.scopes.includes(scope));
-/** Reject the entire credential record when its schema is invalid. */
 function validateState(state) {
 	if (!state || state.version !== 1 || !nonempty(state.hostId) || !Array.isArray(state.registrations) || !(state.activeId === null || nonempty(state.activeId))) throw fail("storage");
 	if (Object.hasOwn(state, "allowBackgroundUse") && typeof state.allowBackgroundUse !== "boolean") throw fail("storage");
@@ -50,7 +47,6 @@ function validateState(state) {
 	return state;
 }
 
-/** Private, unencrypted JSON outside learning data. No OS credential-store access. */
 function fileStore(file) {
 	return {
 		async read() {
@@ -122,7 +118,6 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 		return next;
 	};
 	const active = () => !storageDenied && !suspended && !closed && !paused ? state?.registrations.find((r) => r.id === state.activeId && r.tokens && !r.reconnectRequired) : undefined;
-	// These fields are validated/verified before storage. Email is never identity.
 	const sameAccount = (a, b) => a.issuer === b.issuer && a.subject === b.subject;
 	function accountGroups() {
 		const groups = [];
@@ -184,9 +179,6 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 			allowBackgroundUse: backgroundAllowed(),
 			activeId: state?.activeId ?? null,
 			accounts: accountGroups().map((members) => {
-				// Preserve the actual active registration ID at the private transport
-				// boundary; inactive groups prefer a usable registration, then a
-				// remembered one. No credential/client records are merged or deleted.
 				const r = members.find((r) => r.id === state.activeId) ?? members.find((r) => !r.reconnectRequired && planScopes(r.tokens)) ?? members[0];
 				return {
 					id: r.id,
@@ -194,8 +186,6 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 					registration: r.clientId,
 					connected: !storageDenied && !closed && !paused && !suspended && !r.reconnectRequired && planScopes(r.tokens),
 					planEnabled: !storageDenied && !r.reconnectRequired && planScopes(r.tokens),
-					// Recovery is authorization-only, not a response to storage failure
-					// or temporary transport suspension. Never infer it from error copy.
 					canSignInAgain: !storageDenied && !closed && !paused && (r.reconnectRequired === true || !planScopes(r.tokens)),
 				};
 			}),
@@ -221,7 +211,6 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 	async function identity(idToken, clientId, nonce, expectedSubject) {
 		try {
 			const { jwtVerify, createLocalJWKSet } = await import("jose");
-			// Fixed, documented JWKS origin; never follow a discovery-supplied URL.
 			const keys = await json(JWKS);
 			const { payload } = await jwtVerify(idToken, createLocalJWKSet(keys), {
 				issuer: ISSUER, audience: clientId, algorithms: ["RS256"],
@@ -235,7 +224,6 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 	function tokenSet(body, previous) {
 		const scopes = typeof body.scope === "string" ? body.scope.split(/\s+/) : previous?.scopes;
 		if (!scopes || SCOPES.some((scope) => !scopes.includes(scope))) {
-			// Lack of entitlement is not lack of revocable material.
 			return { idToken: body.id_token ?? previous?.idToken, scopes: scopes ?? [], expiresAt: 0,
 				...(nonempty(body.refresh_token) ? { refreshToken: body.refresh_token } : previous?.refreshToken ? { refreshToken: previous.refreshToken } : {}) };
 		}
@@ -291,7 +279,6 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 				res.setHeader("Referrer-Policy", "no-referrer");
 				if (req.method !== "GET" || callback.origin !== new URL(redirectUri).origin || callback.pathname !== "/auth/callback" || req.headers.host !== new URL(redirectUri).host || consumed) { res.writeHead(404).end(); return; }
 				const params = callback.searchParams;
-				// Reject duplicate parameters and unsolicited callbacks without consuming a valid pending attempt.
 				if (["state", "code", "client_id", "error"].some((key) => params.getAll(key).length > 1) || params.get("state") !== expectedState) { res.writeHead(400).end("Sign-in could not be verified."); return; }
 				consumed = true;
 				res.writeHead(200, { "content-type": "text/plain; charset=utf-8" }).end("Return to Plainly to view the sign-in result. You may close this tab.");
@@ -318,7 +305,7 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 						next.registrations = next.registrations.filter((r) => r.id !== record.id).concat(record);
 						next.activeId = record.id;
 						const previous = structuredClone(state);
-						await save(next); // Active identity changes only AFTER validation and durable persistence.
+						await save(next);
 						if (closed || abort.signal.aborted || epoch !== attemptEpoch) {
 							await save(previous);
 							throw fail("cancelled");
@@ -344,7 +331,7 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 				state: expectedState, nonce, code_challenge_method: "S256",
 				code_challenge: crypto.createHash("sha256").update(verifier).digest("base64url"),
 			}).toString();
-			await openExternal(url.toString()); // Trusted main only. Never return this URL to the renderer.
+			await openExternal(url.toString());
 		} catch (err) { cancel(err.code || "network"); }
 		void completion;
 		return snapshot();
@@ -385,8 +372,6 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 					if (body.id_token !== undefined) await identity(body.id_token, account.clientId, undefined, account.subject);
 					tokens = tokenSet(body, account.tokens);
 				} catch (err) {
-					// The fixed token endpoint may have rotated already. Preserve only
-					// verified identity and a single likely-latest revocation handle.
 					stop();
 					const restricted = structuredClone(state);
 					const record = restricted.registrations.find((r) => r.id === account.id);
@@ -418,7 +403,6 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 		try {
 			await ready();
 			if (!active()) return modelValue();
-			// Discovery is identity/scope authorization, not an invented model lease.
 			const token = await credential(false);
 			const body = await json(`${RESOURCE}/models`, { headers: { Authorization: `Bearer ${token.accessToken}` }, signal: AbortSignal.any([transportAbort.signal, AbortSignal.timeout(15000)]) });
 			authorized(false, undefined, token.epoch);
@@ -456,10 +440,9 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 	}
 	async function consent(enabled) {
 		if (typeof enabled !== "boolean") throw fail("identity");
-		// One app-owned intent, independent of account/registration lifetime.
 		const intent = { enabled: false };
-		backgroundIntent = intent; // ON cannot grant until its durable save.
-		if (!enabled) stop(true); // Revoke all ChatGPT background streams only.
+		backgroundIntent = intent;
+		if (!enabled) stop(true);
 		await ready();
 		return serial(async () => {
 			await save({ ...structuredClone(state), allowBackgroundUse: enabled });
@@ -480,15 +463,13 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 						const response = await request(config.revocation_endpoint, { method: "POST", redirect: "error", signal: AbortSignal.timeout(5000), headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token: account.tokens.refreshToken, token_type_hint: "refresh_token", client_id: account.clientId }) });
 						revoked = response.status === 200;
 						if (revoked || response.status < 500) break;
-					} catch { /* retry only while the refresh token is still in memory */ }
+					} catch { }
 				}
 			}
-		} catch { /* local action is mandatory even when revocation is unavailable */ }
+		} catch { }
 		return revoked;
 	}
 	async function disconnect(id) {
-		// Explicit local forgetting: a visible account represents every retained
-		// registration with this exact verified issuer/subject, never its email.
 		pending?.cancel();
 		const initial = state?.registrations.find((r) => r.id === id);
 		let stopped = !!initial && state.registrations.some((r) => r.id === state.activeId && sameAccount(r, initial));
@@ -505,7 +486,7 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 			for (const member of members) { const confirmed = await revoke(member); revoked = confirmed && revoked; }
 			const next = structuredClone(state);
 			next.registrations = next.registrations.filter((r) => !sameAccount(r, target));
-			if (activeGroup) next.activeId = null; // Never silently select another account.
+			if (activeGroup) next.activeId = null;
 			await save(next);
 			if (members.some((r) => r.clientId === retryRegistration?.clientId)) retryRegistration = undefined;
 			if (stopped && !closed && epoch === disconnectEpoch) suspended = false;

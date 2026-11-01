@@ -1,25 +1,12 @@
-/**
- * THE SESSION MARKDOWN EXPORT ROUTE (owner, release polish 2026-10-06):
- * GET /api/chats/:id/markdown — the user-facing export. The engine
- * itself is pinned by tests/session-markdown.test.ts; this file pins
- * the ROUTE contract: 404 unknown chat, the attachment headers, the
- * slugified filename, the anchorless document with the title header.
- *
- * Runs under an isolated LH_DATA_DIR (the chat-birth-stamp discipline:
- * the seam is set before any config-loading import, so every
- * app-module import is dynamic).
- */
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { after, before, describe, it } from "node:test";
 
-// ── the seam, BEFORE any config-loading import ──────────────────────────────
 const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-md-export-"));
 process.env.LH_DATA_DIR = TMP_DATA;
 
-/** The route handler + the store seam, loaded AFTER the env is set. */
 type Get = (req: Request, ctx: { params: Promise<{ id: string }> }) => Promise<Response>;
 let GET: Get;
 let createChat: (title: string, kind?: "practice") => { id: string; title: string };
@@ -60,7 +47,7 @@ describe("GET /api/chats/:id/markdown", () => {
 	});
 
 	it("an unsalvageable title falls back to 'session'", async () => {
-		const chat = createChat("日本語"); // no ascii alphanumerics survive the slug
+		const chat = createChat("日本語");
 		saveMessages(chat.id, [{ id: "m1", role: "user", content: "hello" }]);
 		const res = await GET(new Request("http://x/api"), { params: Promise.resolve({ id: chat.id }) });
 		assert.equal(res.status, 200);

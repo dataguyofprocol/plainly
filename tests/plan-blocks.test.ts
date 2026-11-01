@@ -1,13 +1,3 @@
-/**
- * plan-blocks — the INTERIM plan presentation seam (docs/probe-teach-split.md
- * §6): the full block renders IN FLOW exactly once, attached to the
- * assistant group carrying the successful plan_init call. Wave B: emission
- * is a NATIVE plan-block marker (one per TURN, for the last successful
- * call), and the one-way projection splices its data part right after the
- * last successful plan_init tool part. The neighborhood-block machinery is
- * retired (position derives live from derivePlanStatuses); the persistent
- * DAG window (UI wave) succeeds this.
- */
 import assert from "node:assert";
 import test from "node:test";
 import type { PlanTree } from "../src/core/contracts.ts";
@@ -16,7 +6,6 @@ import { planBlocksFor } from "../src/core/plan-blocks.ts";
 import { projectView as projectNative } from "../src/core/view.ts";
 import type { PlanBlockData } from "../src/core/contracts.ts";
 
-// 5-node fixture: a → b → c, b → d, d → e.
 const TREE: PlanTree = {
 	nodes: [
 		{ id: "a", title: "A" },
@@ -34,7 +23,6 @@ const TREE: PlanTree = {
 	version: 1,
 };
 
-/** A rewrite fixture: 3 fresh nodes (x, y, z), different from TREE. */
 const TREE2: PlanTree = {
 	nodes: [
 		{ id: "x", title: "X" },
@@ -45,8 +33,6 @@ const TREE2: PlanTree = {
 	version: 2,
 };
 
-/** A native assistant message with one tool call (the projection's tool
- *  part source) — minimal fixture shape, same as the record holds. */
 function assistantWithCall(id: string, name: string, args: unknown, ...text: string[]): LhMessage {
 	const content: unknown[] = [];
 	for (const t of text) content.push({ type: "text", text: t });
@@ -64,8 +50,6 @@ function assistantWithCall(id: string, name: string, args: unknown, ...text: str
 	} as never;
 }
 
-/** A native tool result for a call (details = what the record + projection
- *  read; the plan tool persists {ok, tree} here). */
 function resultOf(callId: string, toolName: string, details: unknown, isError = false): LhMessage {
 	return {
 		id: `r_${callId}${isError ? "_e" : ""}`,
@@ -79,11 +63,7 @@ function resultOf(callId: string, toolName: string, details: unknown, isError = 
 	} as never;
 }
 
-/** Emit + persist + project: the full persistTurn slice for a turn whose
- *  new messages are `turn`, run over `record`. Returns the projection of
- *  the whole record after the write. */
 function projectAfter(record: LhMessage[], turn: LhMessage[], tree: PlanTree | null) {
-	// Wave D: the status derivation reads the NATIVE transcript.
 	const blocks = planBlocksFor(record, turn, tree, [...record, ...turn]);
 	return projectNative([...record, ...turn, ...blocks]);
 }
@@ -127,8 +107,6 @@ test("idempotent — a call whose block the record already carries is never re-e
 	];
 	const first = projectAfter([], turn, TREE);
 	assert.equal(blocksOf(first).length, 1);
-	// Persist replay: the same turn's messages land again over a record
-	// that already emitted the marker → no duplicate.
 	const record: LhMessage[] = [...turn, ...planBlocksFor([], turn, TREE, turn)];
 	const blocks2 = planBlocksFor(record, turn, TREE, record);
 	assert.equal(blocks2.length, 0, "no duplicate block on persist replay");
@@ -151,16 +129,13 @@ test("a plan REWRITE (a later turn's successful plan_init) gets its own full blo
 });
 
 test("the block renders IN FLOW immediately after the plan_init part — not appended under the turn's later parts", () => {
-	// Real-world shape (user session chat_mtwgb9lj): the authoring turn
-	// carries plan_init + prose + a quiz call — emission runs at persistTurn
-	// AFTER all of that exists.
 	const turn = [
 		assistantWithCall("m1", "plan_init", { tree: TREE }),
 		resultOf("m1", "plan_init", { ok: true, tree: TREE }),
 		assistantWithCall("m1b", "quiz", { question: "q?" }, "Here's the plan."),
-		resultOf("m1", "plan_init", { ok: true, tree: TREE }), // (kept out via emitted set — see next test)
+		resultOf("m1", "plan_init", { ok: true, tree: TREE }),
 	];
-	turn.pop(); // drop the stray duplicate — build the real shape below
+	turn.pop();
 	const real = [
 		assistantWithCall("m1", "plan_init", { tree: TREE }),
 		resultOf("m1", "plan_init", { ok: true, tree: TREE }),
@@ -215,7 +190,6 @@ test("no tree / empty tree / no messages are no-ops", () => {
 });
 
 test("mid-lesson rewrite snapshot derives statuses from the whole transcript", () => {
-	// A tagged quiz call on node b happened before the rewrite: b is current.
 	const before = [
 		assistantWithCall("m0", "quiz", { nodeId: "b", question: "q?" }),
 		resultOf("m0", "quiz", { correct: true }),

@@ -1,4 +1,3 @@
-/** Real installed Pi/Google SDK only; no provider stubs, keys, or generation. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
@@ -13,7 +12,6 @@ const run = (payload: string) => spawnSync(process.execPath, [script, "--standal
 
 describe("offline native Pi Google initialization gate", () => {
 	it("reaches the sentinel for direct Google and Google-backed OpenCode adapters using the real SDK", () => {
-		// This is an unbundled positive control, NOT proof of standalone completeness.
 		const result = run(checkout);
 		assert.equal(result.status, 0, String(result.stderr));
 		for (const provider of ["google", "opencode", "opencode-go"]) assert.ok(String(result.stdout).includes(`${provider}: native lazy Google adapter reached onPayload`));

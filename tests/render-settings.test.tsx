@@ -1,11 +1,3 @@
-/**
- * Settings-surface render tests (thin settings wave): SSR of the section
- * components pins the THIN markup — toggle rows, the graph ladder's
- * graying, the mode control's honest disabled state, the role rows and
- * tool rows. Fetches don't run under renderToStaticMarkup (effects never
- * fire), so the SSR state IS the loading state — asserted as such.
- * Same tsx classic-JSX shim as render-sidebar.test.tsx.
- */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
 
@@ -20,9 +12,6 @@ import type { GraphSettings } from "../src/core/index.ts";
 import { SettingsDialogBody, SettingsDialogProvider } from "../components/settings/settings-dialog.tsx";
 import { KEYBOARD_ACTIONS } from "../src/core/index.ts";
 
-/** The full opening tag of the element carrying a testid — attribute
- *  order in React output is not contractual, so assertions run on the
- *  whole tag instead of ordered regex chains. */
 function tagOf(html: string, testid: string): string {
 	const i = html.indexOf(`data-testid="${testid}"`);
 	assert.ok(i >= 0, `missing ${testid}`);
@@ -49,14 +38,10 @@ describe("SettingsDialog (the designed surface, SSR)", () => {
 		for (const id of ["keys", "agent", "appearance", "graph", "keyboard"]) {
 			assert.ok(html.includes(`data-testid="settings-nav-${id}"`), id);
 		}
-		// Providers is the first landing section; internal keys deep links survive.
 		assert.ok(tagOf(html, "settings-nav-keys").includes('aria-current="true"'));
-		// General held only the auto-update switch, removed with it (owner, 2026-10-27).
 		assert.ok(!html.includes('data-testid="settings-nav-general"'));
 		assert.ok(tagOf(html, "settings-nav-keyboard").includes('aria-current="false"'));
-		// Fetches don't run under SSR — the loading state IS the SSR state.
 		assert.ok(html.includes("Loading settings…"));
-		// Modal-only doctrine: no link back to /settings anywhere in it.
 		assert.ok(!html.includes('href="/settings"'));
 	});
 });
@@ -66,20 +51,13 @@ describe("AgentSection (thin SSR)", () => {
 		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
 		for (const slot of ["strong", "cheap", "vision"]) {
 			assert.ok(html.includes(`data-testid="slot-row-${slot}"`), slot);
-			// The shared model-picker dropdown as the opened menu (owner,
-			// 2026-09-20), the thin trigger as the collapsed look.
 			assert.ok(html.includes(`data-testid="slot-model-${slot}"`), `${slot} model trigger`);
 			assert.ok(html.includes(`data-testid="slot-thinking-${slot}"`), `${slot} thinking trigger`);
-			// the roster hint rides every row
 			assert.ok(html.includes("Teaches your lessons") || slot !== "strong", "strong roster");
 		}
-		// Fix wave: no Default anywhere — an unpicked slot reads "—"
-		// (the owner's no-factory-fallback language), and no menu
-		// carries a Default row (menu-default testid is retired).
 		assert.equal((html.match(/>Default<\/span>/g) ?? []).length, 0, "no Default trigger");
 		assert.ok(!html.includes('data-testid="menu-default"'), "no Default row");
 		assert.equal((html.match(/>—<\/span>/g) ?? []).length, 6, "three slots × two — triggers");
-		// the per-role rows are GONE (slots-only)
 		for (const role of ["researcher", "demoBuilder", "visualMaker"]) {
 			assert.ok(!html.includes(`data-testid="role-row-${role}"`), `${role} retired`);
 		}
@@ -92,9 +70,7 @@ describe("AgentSection (thin SSR)", () => {
 		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
 		assert.ok(html.includes('data-testid="search-engine-row"'), "the row");
 		assert.ok(html.includes('data-testid="search-engine-trigger"'), "the trigger");
-		// SSR: /api/search never fired → no reason line yet, trigger reads Automatic
 		assert.ok(html.includes("Automatic"), "unset engine reads Automatic");
-		// the explicit preference shows the chosen engine in the trigger
 		const html2 = renderToStaticMarkup(
 			<AgentSection agent={{ search: { engine: "tavily" } }} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />,
 		);
@@ -102,13 +78,10 @@ describe("AgentSection (thin SSR)", () => {
 	});
 
 	it("the prober graph-tools row: FIRST in the Tools group, default ON, its own key (wave 7)", () => {
-		// Default state: graph on, graphTools absent → ON, the describing
-		// hint rides (the search-row hint discipline).
 		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
 		const toolsGroup = html.split('data-testid="group-tools"')[1] ?? "";
 		const rows = [...toolsGroup.matchAll(/data-testid="(graph-tools-row|tool-row-\w+)"/g)].map((m) => m[1]);
 		assert.equal(rows[0], "graph-tools-row", "graph tools is the FIRST row of the Tools group");
-		// (the apostrophe in "sessions'" HTML-escapes — match up to it)
 		assert.ok(html.includes("Lets the tutor consult your knowledge map between sessions"), "the describing hint");
 		assert.ok((html.split('data-testid="graph-tools-row"')[1] ?? "").includes('aria-checked="true"'), "absent = on");
 		const rowHtml = html.split('data-testid="graph-tools-row"')[1]?.split('data-testid="tool-row-')[0] ?? "";
@@ -155,8 +128,6 @@ describe("AgentSection (thin SSR)", () => {
 				onModelsChange={() => {}}
 			/>,
 		);
-		// The trigger shows the stored id even with no catalog loaded (a
-		// trigger reading "Default" over a live override would lie).
 		assert.ok(html.includes("glm-4.7-flash"), "the override id is visible (prettyModel form, no auto-caps)");
 		assert.ok(tagOf(html, "toggle-tool-demo").includes('aria-checked="false"'), "demo off");
 		assert.ok(tagOf(html, "toggle-tool-visual").includes('aria-checked="true"'), "visual still on");
@@ -169,13 +140,6 @@ describe("AgentSection (thin SSR)", () => {
 });
 
 describe("GraphSection — master switch + chunk budget (wave 7 + 2026-10-02)", () => {
-	// Wave 7 (owner ruling 2026-09-23): the section is the master switch —
-	// the embedding/clustering/labeling rungs and the BYOK model picker are
-	// gone (clustering is the free birth-session partition, labels ARE
-	// session names). The chunk budget (2026-10-02) joined as the second and
-	// only other control — it denominates the coverage ring and gates the
-	// auto-extraction trigger, resolved through the same core resolver the
-	// server uses (the 4096-fallback fix).
 	it("renders the master-switch row — EXTRACTION since 2026-10-06 (the data channel, renamed when rendering split off)", () => {
 		const html = renderToStaticMarkup(<GraphSection graph={undefined} onSectionChange={() => {}} />);
 		assert.ok(html.includes('data-testid="graph-row-enabled"'));
@@ -263,8 +227,6 @@ describe("KeyboardSection (thin SSR)", () => {
 		const html = renderToStaticMarkup(<KeyboardSection />);
 		assert.ok(html.includes("Fixed — part of this screen"));
 		assert.ok(!html.includes(`data-testid="kbd-rebind-question-next-row"`), "surface keys stay put");
-		// The model-menu entries are GONE entirely (owner, 2026-10-10):
-		// obvious in-field navigation, not settings material.
 		assert.ok(!html.includes("Model menu"), "model-menu rows removed");
 		assert.ok(!KEYBOARD_ACTIONS.some((a) => a.id as string === "model-menu-walk"));
 		assert.ok(!KEYBOARD_ACTIONS.some((a) => a.id as string === "model-menu-pick"));

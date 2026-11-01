@@ -1,11 +1,3 @@
-/**
- * The read tool (sources v0) — a Node port of pi's read semantics:
- * truncation with continuation offsets, image mime detection, error paths.
- * Driven through the NATIVE AgentTool execute (Wave A, 2026-09-26): text
- * reads return the raw string as details (the record's tool part output
- * reads it); image reads return native pi content parts (text + image)
- * with null details (the output-less part until the record persists).
- */
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -21,7 +13,6 @@ function write(name: string, content: string): string {
 	return file;
 }
 
-/** Native execute → the raw string body (text reads ride details verbatim). */
 const run = (args: { path: string; offset?: number; limit?: number }) =>
 	readTool.execute!("test", args).then((r) => {
 		assert.ok(r.content.length >= 1);
@@ -39,9 +30,6 @@ describe("read tool — text semantics", () => {
 	});
 
 	it("resolves relative paths against the learner's home (sources v1 anchoring)", async () => {
-		// sources v1: the harness has no meaningful cwd — "find my notes" must
-		// work from a bare relative path, so the home directory is the anchor
-		// (fs-shared resolveSourcePath). Scratch file in home, cleaned up.
 		const rel = `lh-read-rel-test-${process.pid}.txt`;
 		const homeFile = path.join(os.homedir(), rel);
 		fs.writeFileSync(homeFile, "rel", "utf-8");
@@ -56,7 +44,6 @@ describe("read tool — text semantics", () => {
 		const body = Array.from({ length: 30 }, (_, i) => `line ${i + 1}`).join("\n");
 		const file = write("thirty.txt", body);
 		const out = (await run({ path: file, offset: 10, limit: 3 })).text;
-		// pi parity: the explicit limit stopping short gets a remaining notice
 		assert.match(out, /^line 10\nline 11\nline 12\n\n\[18 more lines in file\. Use offset=13 to continue\.\]$/);
 	});
 
@@ -79,13 +66,11 @@ describe("read tool — text semantics", () => {
 	});
 
 	it("truncates at 50KB with the same continuation notice", async () => {
-		// 200 lines of ~400B = ~80KB total, under the line cap — byte cap fires
 		const line = "x".repeat(400);
 		const body = Array.from({ length: 200 }, () => line).join("\n");
 		const file = write("wide.txt", body);
 		const out = (await run({ path: file })).text;
 		assert.match(out, /50\.0KB limit\)\. Use offset=\d+ to continue\./);
-		// and the truncation actually cut content
 		assert.ok(out.length < 52_000, "the 50KB ceiling must cut the 80KB body");
 	});
 
@@ -100,7 +85,6 @@ describe("read tool — text semantics", () => {
 describe("read tool — image semantics (native content parts)", () => {
 	it("returns native text + image parts for image files, details null (output-less part)", async () => {
 		const file = path.join(tmp, "dot.png");
-		// minimal valid PNG header bytes are enough — detection is by extension
 		fs.writeFileSync(file, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
 		const result = await readTool.execute!("test", { path: file });
 		assert.equal(result.content.length, 2);

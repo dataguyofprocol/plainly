@@ -1,17 +1,3 @@
-/**
- * Researcher PDF capability (PDF wave, 2026-10-07, design B): web_fetch_pdf
- * downloads a PDF into a per-job temp dir and returns the triage summary;
- * pdf_info/pdf_extract/pdf_search read it page-level, ALL scoped to the dir
- * (the researcher's filesystem ends at the temp wall). web_fetch gained the
- * PDF POINTER (no dead-end) and the Source line with final URL + HTTP
- * status (the "ill-formed request" lesson: 200-served error bodies must be
- * distinguishable from real pages).
- *
- * Zero network: globalThis.fetch is stubbed with a REAL minimal PDF built
- * programmatically (correct xref offsets — pdfjs parses it like any
- * download). Rendering is out of scope here (no vision in the researcher).
- */
-
 import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
@@ -20,10 +6,8 @@ import { after, describe, it } from "node:test";
 import { createPdfReadTools } from "../src/agent/tools/pdf-read.ts";
 import { createWebTools } from "../src/agent/tools/web.ts";
 
-/** Build a valid N-page PDF in memory — ASCII-only so string offsets ARE
- *  byte offsets; xref entries computed as we assemble. */
 function buildPdf(pageTexts: string[]): Uint8Array {
-	const objects: string[] = []; // 1-indexed
+	const objects: string[] = [];
 	const pageIds = pageTexts.map((_, i) => 3 + i * 2);
 	const fontId = 3 + pageTexts.length * 2;
 	objects[1] = "<</Type/Catalog/Pages 2 0 R>>";
@@ -55,7 +39,6 @@ function buildPdf(pageTexts: string[]): Uint8Array {
 	return new TextEncoder().encode(pdf);
 }
 
-/** A fresh Response per call (bodies are single-use). */
 const pdfResponse = () =>
 	new Response(PDF_BYTES.slice().buffer as ArrayBuffer, { headers: { "content-type": "application/pdf" } });
 
@@ -74,7 +57,6 @@ after(async () => {
 	await Promise.all(tempDirs.map((d) => fs.rm(d, { recursive: true, force: true })));
 });
 
-/** Tool-result .details → displayable string (the agent sees this shape). */
 function asText(result: unknown): string {
 	const r = result as { details?: unknown };
 	if (typeof r?.details === "string") return r.details;

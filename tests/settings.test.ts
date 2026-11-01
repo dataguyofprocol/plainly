@@ -1,12 +1,3 @@
-/**
- * Tests for the settings record's core layer (settings-storage wave,
- * 2026-09-19): the delta schema's sanitizer (core/settings.ts) — strict
- * known-field validation with graceful degradation, unknown-key
- * preservation (forward-compat: a newer record must survive an older
- * app), and the factory defaults. The store/adapter tests live in
- * settings-store.test.ts; resolution in settings-resolution.test.ts.
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
@@ -21,19 +12,15 @@ describe("FACTORY_SETTINGS (the compiled factory layer)", () => {
 	it("pins the owner-decided defaults", () => {
 		assert.equal(CURRENT_SETTINGS_VERSION, 1);
 		assert.deepEqual(FACTORY_SETTINGS.general, { dailyGoalMinutes: 30 });
-		// wave 7 collapse: the master switch ONLY + the extraction-UX
-		// redesign's chunk budget (2026-09-24); doubled to 8192 with the
-		// digest-aware redesign (2026-09-30), then HALVED BACK to 4096
-		// with the message anchors (owner, 2026-10-13)
 		assert.deepEqual(FACTORY_SETTINGS.graph, { enabled: true, rendering: true, extractionChunkTokens: 4096 });
 		const a = FACTORY_SETTINGS.appearance;
 		assert.equal(a.mode, "system");
-		assert.equal(a.background, null); // the mode's own default, not a factory hex
-		assert.equal(a.fontFamily, null); // Literata
+		assert.equal(a.background, null);
+		assert.equal(a.fontFamily, null);
 		assert.equal(a.proseFontSize, 17);
 		assert.equal(a.sessionNameSerif, true);
 		assert.equal(a.mdRendering.headingWeight, 600);
-		assert.equal(a.mdRendering.boldColor, null); // stored but never applied
+		assert.equal(a.mdRendering.boldColor, null);
 		assert.equal(a.mdRendering.italicColor, null);
 	});
 
@@ -116,10 +103,6 @@ describe("sanitizeUserSettings", () => {
 		assert.deepEqual(out.appearance, {});
 		assert.deepEqual(out.graph, {});
 
-		// extractionChunkTokens (extraction-UX redesign, 2026-09-24):
-		// clamp-never-reject — a finite positive value survives (fractions
-		// floor), below-floor values clamp UP to the cost floor, junk drops
-		// (the factory default resolves at read time).
 		const budget = sanitizeUserSettings({ version: 1, graph: { enabled: true, extractionChunkTokens: 2048 } });
 		assert.deepEqual(budget?.graph, { enabled: true, extractionChunkTokens: 2048 });
 		const fraction = sanitizeUserSettings({ version: 1, graph: { extractionChunkTokens: 1024.9 } });
@@ -167,10 +150,10 @@ describe("sanitizeUserSettings", () => {
 		const out = sanitizeUserSettings({
 			agent: {
 				models: {
-					teacher: { thinkingLevel: "low" }, // NOT a background role — drops
+					teacher: { thinkingLevel: "low" },
 					researcher: { model: { provider: "openrouter", id: "x/y" } },
-					extractor: { model: { provider: 3, id: "x/y" }, thinkingLevel: "high" }, // bad model, keeps thinking
-					auditor: { thinkingLevel: "banana" }, // invalid level → empty override drops
+					extractor: { model: { provider: 3, id: "x/y" }, thinkingLevel: "high" },
+					auditor: { thinkingLevel: "banana" },
 				},
 			},
 		});

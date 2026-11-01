@@ -31,7 +31,6 @@ function validateState(providerId, state) {
 	if (hasId) validateCredential(providerId, state.credential);
 	return state;
 }
-/** Main-process-only, one independent owner-only file per provider. No recovery writes on corruption. */
 function fileStore(file, providerId, io = fs) {
 	return {
 		async read() {

@@ -1,11 +1,3 @@
-/**
- * THE TEST SANDBOX (2026-10-27): a test process can never resolve the
- * learner's real data. Before this, tests that forgot to set LH_DATA_DIR
- * wrote hundreds of fixture sessions ("Fixture mixed queue", "steer: live",
- * …) into the repo's data/. Each case runs config.ts in a fresh child
- * process so the import-time resolution is observed cleanly.
- */
-
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";

@@ -1,5 +1,5 @@
 /**
- * verify-release.ts — the final desktop-release gate (2026-10-13).
+ * verify-release.ts — the final desktop-release gate.
  *
  * Runs in the release workflow's LAST job, after all three packaging jobs
  * have uploaded to the tag's single draft GitHub Release, and fails the
@@ -12,8 +12,7 @@
  * builder (app-builder-lib 26.15.3) — these are the artifacts it actually
  * emits for this repo's electron-builder.yml, not pattern guesses:
  *
- *   mac (zip only, arm64; no user artifactName there — the DMG was
- *        dropped 2026-10-27, owner ruling):
+ *   mac (zip only, arm64; no user artifactName there):
  *     zip    Plainly-<v>-arm64-mac.zip   + .blockmap (createBlockmap;
  *            install.sh and electron/mac-updater.cjs both install from it)
  *     script install.sh — scripts/install.sh, uploaded beside the zip
@@ -76,8 +75,6 @@ import { pathToFileURL } from "node:url";
 const require = createRequire(import.meta.url);
 const yaml = require("js-yaml") as { load(source: string): unknown };
 
-// Types
-
 export type ReleaseAsset = { id: number; name: string; size: number; state: string };
 export type ReleaseRecord = { id: number; tag_name: string; draft: boolean; assets: ReleaseAsset[] };
 
@@ -86,22 +83,17 @@ export type DraftSelection =
 	| { ok: true; release: ReleaseRecord; warnings: string[] }
 	| Failures;
 
-/** The full expected asset inventory for one version (10 files). */
 export type ExpectedAssets = {
 	version: string;
 	mac: { zip: string; installer: string; feed: string };
 	win: { exe: string; feed: string };
 	linux: { appImage: string; deb: string; feed: string };
-	/** Every asset name the draft must hold, and no others. */
 	files: string[];
 };
 
 type Issue = string;
 type Issues = Issue[];
 
-// Version + expected assets
-
-/** Verified product name spelled into every artifact (electron-builder.yml productName). */
 const PRODUCT_NAME = "Plainly";
 
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
@@ -113,7 +105,6 @@ export function checkVersion(version: unknown): { ok: true; version: string } | 
 	return { ok: true, version };
 }
 
-/** The exact asset set the installed builder emits for this repo's config. */
 export function expectedAssets(version: string): ExpectedAssets {
 	const mac = {
 		zip: `${PRODUCT_NAME}-${version}-arm64-mac.zip`,
@@ -140,8 +131,6 @@ export function expectedAssets(version: string): ExpectedAssets {
 		files: [mac.zip, mac.installer, win.exe, linux.appImage, linux.deb, ...blockmaps, mac.feed, win.feed, linux.feed],
 	};
 }
-
-// Release-list parsing (fail closed on any malformed entry)
 
 /**
  * `gh api --paginate --slurp` emits an array of pages ([[...], [...]]); a
@@ -207,8 +196,6 @@ export function parseReleases(entries: unknown[]): { ok: true; releases: Release
 	return { ok: true, releases };
 }
 
-// Draft selection (replicates the draft job's + builder's matching, fail-closed)
-
 export function selectDraft(releases: ReleaseRecord[], tag: string, version: string): DraftSelection {
 	const matches = releases.filter((release) => release.tag_name === tag || release.tag_name === version);
 	if (matches.length === 0) {
@@ -241,11 +228,6 @@ export function selectDraft(releases: ReleaseRecord[], tag: string, version: str
 	return { ok: true, release: match, warnings };
 }
 
-// Packaging-config drift guard
-
-/** Names below were derived from these exact config shapes; drift means the
- *  expectations in this file must be re-derived against the new builder
- *  output. Failing here is deliberate: a silently stale gate is worse. */
 export function verifyConfigAssumptions(config: unknown, pkg: unknown): { ok: true } | { ok: false; errors: Issues } {
 	const errors: Issues = [];
 	const bad = (message: string) => errors.push(message);
@@ -294,15 +276,12 @@ export function verifyConfigAssumptions(config: unknown, pkg: unknown): { ok: tr
 	return { ok: true };
 }
 
-// Asset inventory
-
 export function verifyAssets(release: ReleaseRecord, expected: ExpectedAssets): { ok: true } | { ok: false; errors: Issues } {
 	const errors: Issues = [];
 	const seen = new Map<string, ReleaseAsset>();
 	for (const asset of release.assets) {
 		if (seen.has(asset.name)) errors.push(`duplicate asset name on the release: ${asset.name}`);
 		else seen.set(asset.name, asset);
-		// Checked for EVERY entry, duplicates included — fail closed.
 		if (asset.state !== "uploaded") errors.push(`${asset.name}: state is "${asset.state}", not "uploaded"`);
 		if (!(asset.size > 0)) errors.push(`${asset.name}: zero-size asset (size=${asset.size})`);
 		if (!expected.files.includes(asset.name)) {
@@ -316,13 +295,9 @@ export function verifyAssets(release: ReleaseRecord, expected: ExpectedAssets): 
 	return { ok: true };
 }
 
-// Update-feed (latest*.yml) verification
-
 type FeedExpectation = {
 	file: string;
-	/** Every files[].url the feed must reference — exactly these, no more. */
 	urls: string[];
-	/** If set, files[0].url must be this entry (mac: the updater ZIP). */
 	first?: string;
 };
 
@@ -334,9 +309,6 @@ export function feedExpectations(expected: ExpectedAssets): FeedExpectation[] {
 	];
 }
 
-/** An updater reference must be a bare file name: no directories, no
- *  traversal, no URI scheme, no query/fragment. Anything else is a path the
- *  updater could be steered with. */
 export function isPlainAssetName(url: unknown): url is string {
 	return typeof url === "string" && url !== "" && url !== "." && url !== ".." &&
 		!url.includes("/") && !url.includes("\\") && !url.includes(":") && !url.includes("?") && !url.includes("#") && !url.startsWith("~");
@@ -439,8 +411,6 @@ export function verifyMetadataFiles(
 	return { ok: true };
 }
 
-// CLI (thin: parse args, read files, run the pure core, print, exit)
-
 function usage(): string {
 	return [
 		"usage:",
@@ -471,8 +441,6 @@ function loadReleases(file: string): { ok: true; releases: ReleaseRecord[] } | {
 	return parseReleases(normalized.releases);
 }
 
-/** Reads package.json (version) + electron-builder.yml from the cwd — the
- *  workflow checks out the tagged revision before running the gate. */
 function loadRepoConfig(): { ok: true; pkg: unknown; config: unknown } | { ok: false; errors: Issues } {
 	const pkg = readJson("package.json");
 	if (!pkg.ok) return { ok: false, errors: [pkg.error] };
@@ -512,7 +480,6 @@ function parseArgs(argv: string[]): { ok: true; command: string; positional: str
 	return { ok: true, command, positional: positional.slice(1), tag };
 }
 
-/** Tag ↔ version agreement + release-list load, shared by both commands. */
 function startGate(argv: string[]):
 	| { ok: true; tag: string; version: string; releases: ReleaseRecord[]; config: unknown; pkg: unknown; positional: string[] }
 	| { ok: false; errors: Issues } {
@@ -562,7 +529,6 @@ function main(argv: string[]): number {
 		return 0;
 	}
 
-	// verify
 	const metadataDir = start.positional[1];
 	if (metadataDir == null) return fail([usage()]);
 	const errors: Issues = [];
@@ -579,7 +545,6 @@ function main(argv: string[]): number {
 		try {
 			files[name] = fs.readFileSync(path.join(metadataDir, name), "utf8");
 		} catch {
-			// verifyMetadataFiles reports the missing feed by name.
 		}
 	}
 	const metadata = verifyMetadataFiles(files, selection.release, expected);

@@ -1,4 +1,3 @@
-/** Platform window chrome + packaging policy, without launching Electron. */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -12,9 +11,6 @@ const mainFile = fileURLToPath(new URL("../electron/main.cjs", import.meta.url))
 const mainSource = readFileSync(mainFile, "utf8");
 const mainRequire = createRequire(mainFile);
 
-/** Decline the single-instance lock so normal boot never spawns a server.
- * Then call the REAL createWindow with a stub Electron API and inspect its
- * constructor options. No rewritten copy of the production logic. */
 function windowOptions(platform: string, dark = false) {
 	class FakeWindow {
 		constructor(readonly options: unknown) {}
@@ -88,7 +84,6 @@ describe("desktop window chrome", () => {
 		assert.deepEqual(Object.keys(bridge).sort(), [
 			"chatgpt", "getZoom", "installUpdate", "onUpdateStatus", "onZoom", "pathForFile", "platform", "setTheme", "subscriptions",
 		]);
-		// Attachments: the File → disk path seam forwards to webUtils, nothing more.
 		assert.equal((bridge.pathForFile as (f: { name: string }) => string)({ name: "lec7.pdf" }), "/disk/lec7.pdf");
 		assert.deepEqual(Object.keys(bridge.subscriptions as object).sort(), ["cancel", "consent", "disconnect", "login", "onChange", "open", "respond", "retry", "status"]);
 	});
@@ -104,7 +99,6 @@ describe("desktop packaging policy", () => {
 	});
 
 	it("ships Mac arm64, Windows NSIS x64, and both Linux x64 channels", () => {
-		// zip only: install.sh and the in-app updater both install from it.
 		assert.deepEqual(config.mac.target, [{ target: "zip", arch: ["arm64"] }]);
 		assert.deepEqual(config.win.target, [{ target: "nsis", arch: ["x64"] }]);
 		assert.equal(config.win.signExecutable, false);
@@ -180,7 +174,6 @@ describe("desktop release workflow", () => {
 	assert.ok(script);
 	type Release = { id: number; tag_name: string; draft: boolean };
 
-	/** Execute the REAL action script with an in-memory GitHub API. */
 	async function prepareDraft(releases: Release[]) {
 		const created: Record<string, unknown>[] = [];
 		const listReleases = () => {};
@@ -252,7 +245,6 @@ describe("desktop release workflow", () => {
 
 	it("reuses an existing draft without creating another", async () => {
 		assert.deepEqual(await prepareDraft([{ id: 10, tag_name: "v0.3.0", draft: true }]), []);
-		// Match the publisher's support for legacy unprefixed tags too.
 		assert.deepEqual(await prepareDraft([{ id: 10, tag_name: "0.3.0", draft: true }]), []);
 	});
 

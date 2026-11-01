@@ -1,15 +1,3 @@
-/**
- * The P2 tool-toggle bridge (2026-09-19): AgentBuildOptions.toolToggles is
- * first-class — the agent constructors thread it to the factories' enabled?
- * param (an explicit opts.tools registry is never filtered), and the
- * settings write side rejects unknown tool keys against TOGGLEABLE_TOOLS
- * (the definitive adjudicated list — a persisted `quiz: false` would
- * genuinely drop the quiz once the bridge honors the delta).
- *
- * Parser tests are PURE (no fs — parallel-test discipline); the agent
- * construction tests use an in-memory chat fixture like
- * question-tools.test.ts.
- */
 import assert from "node:assert/strict";
 import { z } from "zod";
 import { describe, it } from "node:test";
@@ -23,8 +11,6 @@ import { chatStore } from "../src/store/chats.ts";
 import { createFauxCore } from "@earendil-works/pi-ai";
 import type { PiEngine } from "../src/agent/models.ts";
 
-/** A scripted pi engine — the agent builds need an injected engine since
- *  BYOK removed the factory pins (owner, 2026-09-22). */
 function fauxEngine(): PiEngine {
 	const faux = createFauxCore({});
 	return { model: faux.getModel(), streamFn: faux.streamSimple };
@@ -36,8 +22,6 @@ describe("AgentBuildOptions.toolToggles (the P2 bridge)", () => {
 		agent.state.tools.map((t) => t.name).sort();
 
 	it("flows into the teacher's registry: a job-tool delta is a no-op on the bare set", () => {
-		// No ctx → bare agent: quiz/ask only. A job-tool delta names tools
-		// that don't exist there — the bridge must not crash on it.
 		const bare = createTeacherAgent(undefined, { engine: fauxEngine(), toolToggles: { research: false } });
 		assert.deepEqual(toolNames(bare), ["ask_user_question", "quiz"]);
 	});

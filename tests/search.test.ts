@@ -1,14 +1,3 @@
-/**
- * The search engines (search port + model slots wave, 2026-09-20):
- * engine resolution (the owner's auto-detect decision — a key is enough,
- * no engine choice needed; explicit pin requires the key; no silent
- * fallback) + the Tavily/Brave adapters against a STUB fetch (never the
- * network — the wire shapes are verified against the published docs, and
- * the tests pin those shapes).
- *
- * PURE + injected fetch — this file owns no fs.
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { resolveSearchEngineFor, tavilyProvider, braveProvider } from "../src/server/search.ts";
@@ -60,7 +49,6 @@ describe("resolveSearchEngineFor (the auto-detect decision)", () => {
 	});
 });
 
-/** A one-shot stub fetch: asserts the request shape and returns the canned response. */
 function stubFetch(canned: unknown, expect: (url: string, init: RequestInit) => void) {
 	return async (url: string, init: RequestInit): Promise<Response> => {
 		expect(url, init);
@@ -85,7 +73,6 @@ describe("tavilyProvider (wire shape per docs.tavily.com, verified 2026-09-20)",
 				const body = JSON.parse(init.body as string);
 				assert.equal(body.query, "test query");
 				assert.equal(body.max_results, 5);
-				// The legacy api_key-in-body form is retired — auth is the header.
 				assert.equal(body.api_key, undefined);
 			},
 		));
@@ -114,7 +101,7 @@ describe("braveProvider (wire shape per Brave's dashboard docs, verified 2026-09
 			},
 			(url, init) => {
 				assert.ok(url.startsWith("https://api.search.brave.com/res/v1/web/search?"), url);
-				assert.ok(url.includes("q=test+query"), url); // URLSearchParams: spaces as +
+				assert.ok(url.includes("q=test+query"), url);
 				assert.ok(url.includes("count=5"));
 				const headers = init.headers as Record<string, string>;
 				assert.equal(headers["x-subscription-token"], "brave-throwaway-key-00001");

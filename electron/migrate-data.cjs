@@ -1,8 +1,5 @@
 "use strict";
 
-// One-time copy of a LearnHarness userData folder into Plainly's (owner,
-// 2026-10-27). The source is never modified or deleted.
-//
 // Electron creates userData before main.cjs runs (measured: the folder exists
 // at module load), so "target missing" can't be the trigger. The target
 // counts as fresh while it holds neither data/ nor auth.json; those two are
@@ -19,8 +16,6 @@ const LEGACY_NAME = "LearnHarness";
 const SKIP = new Set(["SingletonLock", "SingletonCookie", "SingletonSocket", "Cache", "Code Cache", "GPUCache", "DawnGraphiteCache", "DawnWebGPUCache", "Crashpad"]);
 const LAST = ["data", "auth.json"];
 
-/** userData of the upstream app that sits beside `target`
- *  (".../Plainly" → ".../LearnHarness", ".../Plainly-dev" → ".../LearnHarness-dev"). */
 function legacyUserData(target) {
 	const suffix = path.basename(target).endsWith("-dev") ? "-dev" : "";
 	return path.join(path.dirname(target), `${LEGACY_NAME}${suffix}`);
@@ -31,7 +26,7 @@ function migrateUserData(target, source = legacyUserData(target)) {
 	if (!fs.existsSync(source)) return "no-source";
 	if (LAST.some((name) => fs.existsSync(path.join(target, name)))) return "already";
 	const staging = `${target}.migrating`;
-	fs.rmSync(staging, { recursive: true, force: true }); // leftovers of a failed run
+	fs.rmSync(staging, { recursive: true, force: true });
 	fs.cpSync(source, staging, {
 		recursive: true,
 		preserveTimestamps: true,

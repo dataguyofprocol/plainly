@@ -1,10 +1,3 @@
-/**
- * GET /api/stt/token's failure reasons (dictation round 4, 2026-10-29):
- * a grant Deepgram refuses for the KEY ITSELF (401/403) comes back tagged
- * `reason: "key-rejected"` so the client can offer "Fix key"; any other
- * upstream failure stays untagged. Deepgram is faked at global fetch — no
- * network. The LH_DATA_DIR seam is set BEFORE any config-loading import.
- */
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import * as os from "node:os";

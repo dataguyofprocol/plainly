@@ -1,9 +1,3 @@
-/**
- * Opened hints in the practice dock (owner, 2026-10-27): each hint request
- * (a practice-thinking marker carrying a rung) pairs with the tutor's
- * reply — the text of the assistant message(s) that follow it — and the
- * right panel's resize clamp.
- */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { clampDockWidth } from "../components/chat.tsx";

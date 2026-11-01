@@ -1,8 +1,3 @@
-/**
- * The v4 node card's reasoning lists (redesign, 2026-10-26): what an idea
- * rests on (premises of chains concluding at it) and what it leads to
- * (conclusions of chains it is a premise of), read from stored chains.
- */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { ideaNeighbours } from "../components/graph-view.tsx";

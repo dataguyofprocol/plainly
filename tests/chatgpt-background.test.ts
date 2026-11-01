@@ -5,8 +5,6 @@ import os from "node:os";
 import path from "node:path";
 import { Agent, type AgentMessage } from "@earendil-works/pi-agent-core";
 import { AssistantMessageEventStream } from "@earendil-works/pi-ai/utils/event-stream";
-// The data seam is set BEFORE any app module loads (config.ts resolves the
-// data dir at import time), so every app import below is dynamic.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lh-chatgpt-background-"));
 process.env.LH_DATA_DIR = path.join(dir, "data");
 process.env.LH_AUTH_FILE = path.join(dir, "scratch-auth.json");
@@ -77,8 +75,6 @@ for (const revokedAfterQueue of [false, true]) {
 		assert(contexts[0]!.includes("Please continue my learning"));
 		assert(!contexts[0]!.includes(marker.id), "automatic marker must not enter the foreground batch");
 		assert(!agent.hasQueuedMessages());
-		// Ordinary lease/catalog replies are not consent changes and must never
-		// reset/replay a learner steer that the agent has already consumed.
 		ipc({ channel: "lh:chatgpt", id: "ordinary-reply-with-no-pending-call", value: { accessToken: "scratch-only" } });
 		assert(!agent.hasQueuedMessages());
 		const persisted = persistTurn(stores.chatStore, chat.id, 0, agent.state.messages, false);

@@ -1,4 +1,3 @@
-/** Display repair is shared, not a mutation of saved practice/teaching arguments. */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
 
@@ -22,15 +21,13 @@ const tex = String.raw`\nabla f(x) \in \mathbb{R}^{m \times n}`;
 const clean = `$${tex}$`;
 const doubled = clean.replace(/\\/g, "\\\\");
 const quadrupled = clean.replace(/\\/g, "\\\\\\\\");
-const debris = "$\forall x \\in \\mathbb{R}$"; // JSON's form feed consumed the f.
+const debris = "$\forall x \\in \\mathbb{R}$";
 const repairedDebris = String.raw`\forall x \in \mathbb{R}`;
 const matrix = "$$\n" + String.raw`\\begin{pmatrix}1 & 2 \\ 3 & 4\\end{pmatrix}` + "\n$$";
 const repairedMatrix = String.raw`\begin{pmatrix}1 & 2 \\ 3 & 4\end{pmatrix}`;
 const part = (input: unknown, over: Partial<ArtifactPartProps["part"]> = {}): ArtifactPartProps["part"] => ({
 	type: "tool-problem", state: "input-available", toolCallId: "call_math", input, ...over,
 });
-// The problem statement renders in ONE place since the v4 rebuild (the
-// problem card; the practice dock is the learner's working only).
 const dock = (input: { statement: string }) => <ProblemCard part={part(input)} />;
 
 function math(html: string) {
@@ -55,13 +52,13 @@ describe("repairMathForDisplay — the existing composition, unchanged", () => {
 		String.raw`$a \\\nabla b$`,
 		String.raw`$a \\\\\nabla b$`,
 		String.raw`$a \\ 2 \\& 3 \\[6pt] 4$`,
-		"$$\na \\\\\\\\ 2\nb\n$$", // four real row-break slashes survive too.
+		"$$\na \\\\\\\\ 2\nb\n$$",
 		"`" + doubled + "`",
 		"```tex\n" + doubled + "\n```",
 		"`" + debris + "`",
 		"```tex\n" + debris + "\n```",
 		String.raw`$\\nabla`,
-		"$$A = \\\\begin{pmatrix}\n1 & 2\n\\\\end{pmatrix}$$", // unsupported midline display close.
+		"$$A = \\\\begin{pmatrix}\n1 & 2\n\\\\end{pmatrix}$$",
 	];
 	for (const [index, value] of [...unchanged, doubled, quadrupled, debris, matrix,
 		String.raw`\(\\nabla\)`, "\\[\n\\\\nabla\n\\]"].entries()) {
@@ -181,7 +178,6 @@ describe("practice display surfaces", () => {
 		const active = activeProblemOf(messages);
 		assert.ok(active);
 		assert.equal((active.input as { statement: unknown }).statement, 17);
-		// Mirror the runtime cast at the Chat -> problem card seam.
 		const input = active.input as { statement: string };
 		let expanded = "";
 		assert.doesNotThrow(() => { expanded = renderToStaticMarkup(dock(input)); });
@@ -210,7 +206,7 @@ describe("practice display surfaces", () => {
 		assert.deepEqual(math(dismissed).annotations, []);
 		const plain = math(renderToStaticMarkup(<MessageResponse>{doubled}</MessageResponse>));
 		assert.deepEqual(plain.annotations, [doubled.slice(1, -1)]);
-		assert.ok(!plain.glyphs.includes("∇")); // Same unchanged assistant/user MessageResponse path.
+		assert.ok(!plain.glyphs.includes("∇"));
 	});
 
 	it("teaching quiz/ask/explain still repair the same bytes without mutating their inputs", () => {

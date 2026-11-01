@@ -1,11 +1,3 @@
-/**
- * The final release gate (scripts/verify-release.ts) — pure-function tests
- * plus CLI end-to-end runs, all offline against fixtures. The expected asset
- * names asserted here are the ones verified against the INSTALLED
- * app-builder-lib 26.15.3 (see the script header for the derivation):
- * 10 assets — the mac ZIP and install.sh, 3 installers (NSIS exe /
- * AppImage / deb), the zip/exe blockmaps, and the three latest*.yml feeds.
- */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
@@ -27,14 +19,12 @@ const script = path.join(repoRoot, "scripts", "verify-release.ts");
 const VERSION = "0.2.0";
 const TAG = `v${VERSION}`;
 
-/** A base64-looking sha512 (the gate checks shape, not the actual digest). */
 const sha512 = (seed: string) => Buffer.from(seed.padEnd(64, "0")).toString("base64");
 
 function asset(id: number, name: string, overrides: Partial<ReleaseAsset> = {}): ReleaseAsset {
 	return { id, name, size: 5000, state: "uploaded", ...overrides };
 }
 
-/** The complete, healthy 10-asset draft for a version. */
 function healthyRelease(version: string, tagForm: "v" | "bare" = "v"): ReleaseRecord {
 	const e = expectedAssets(version);
 	return {
@@ -45,7 +35,6 @@ function healthyRelease(version: string, tagForm: "v" | "bare" = "v"): ReleaseRe
 	};
 }
 
-/** The three update feeds exactly as app-builder-lib writes them. */
 function healthyFeeds(version: string, release: ReleaseRecord): Record<string, string> {
 	const byName = new Map(release.assets.map((entry) => [entry.name, entry]));
 	const feeds: Record<string, string> = {};
@@ -166,7 +155,7 @@ describe("release gate — packaging-config drift guard", () => {
 		["win target", (config) => { (config.win as Record<string, unknown>).target = [{ target: "appx", arch: ["x64"] }]; }],
 		["linux targets", (config) => { (config.linux as Record<string, unknown>).target = [{ target: "AppImage", arch: ["x64"] }]; }],
 		["publish provider", (config) => { config.publish = [{ provider: "github", releaseType: "prerelease" }]; }],
-		["package name", () => { /* pkg checked below */ }],
+		["package name", () => { }],
 	];
 	for (const [label, mutate] of drifts) {
 		it(`fails when ${label} drifts (expectations must be re-derived)`, () => {
@@ -222,8 +211,6 @@ describe("release gate — update feeds", () => {
 		const release = healthyRelease(VERSION);
 		const e = expectedAssets(VERSION);
 		const feeds = healthyFeeds(VERSION, release);
-		// Same content, deb entry first (writeUpdateInfoFiles keeps whichever
-		// target finished first; the gate must accept both).
 		feeds["latest-linux.yml"] = [
 			`version: ${VERSION}`,
 			"files:",
@@ -315,7 +302,6 @@ describe("release gate — workflow wiring", () => {
 		assert.ok(verify);
 		assert.equal(verify.needs, "package");
 		assert.equal(verify.if, "github.event_name == 'push'");
-		// GitHub's release-list API hides drafts from read-only tokens.
 		assert.deepEqual(verify.permissions, { contents: "write" });
 		assert.equal(verify.env?.GH_TOKEN, undefined);
 	});
@@ -347,7 +333,6 @@ describe("release gate — workflow wiring", () => {
 		const final = verify.steps.find((step: any) => step.run?.includes("verify-release.ts verify"));
 		assert.ok(select && final);
 		assert.match(final.run, /--tag "\$GITHUB_REF_NAME"/);
-		// The gate's own job: nothing here may create, edit, publish, or delete.
 		for (const step of verify.steps) {
 			assert.equal(step.run?.includes("create") ?? false, false, String(step.name));
 		}
@@ -362,8 +347,6 @@ describe("release gate — workflow wiring", () => {
 });
 
 describe("release gate — CLI (offline, repo config)", () => {
-	// CLI fixtures follow the real package version; pure-core fixtures above
-	// intentionally stay at 0.2.0. A release version bump must not break tests.
 	const VERSION = (JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")) as { version: string }).version;
 	const TAG = `v${VERSION}`;
 	const tsxImport = fileURLToPath(import.meta.resolve("tsx"));

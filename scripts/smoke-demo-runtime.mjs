@@ -1,8 +1,4 @@
 /**
- * Import the demo dependency graph from ONLY a standalone payload. With --browser,
- * also drive the packaged app's own --browser-service (never system Chrome).
- * No server, model, keys, installed app UI, or production diagnostic route needed.
- *
  * node scripts/smoke-demo-runtime.mjs --standalone <dir> --runtime <electron binary> [--browser]
  * --runtime defaults to host Node for the import-only gate.
  */
@@ -30,8 +26,6 @@ export function probeEnv(env, home) {
 	};
 }
 
-// Keep fetch's nested cause (including AggregateError socket failures), but
-// never dump arbitrary error properties such as request headers or environment.
 export function formatProbeError(error, depth = 0) {
 	if (depth > 5) return "[cause chain truncated]";
 	if (!error || typeof error !== "object") return String(error);
@@ -73,7 +67,7 @@ async function importPayload(standalone) {
 	};
 	const require = createRequire(path.join(root, "server.js"));
 	const entry = require.resolve("puppeteer-core");
-	inside(entry); // require.resolve must not silently fall back to checkout node_modules.
+	inside(entry);
 	const loaded = new Set();
 	const hooks = registerHooks({
 		resolve(specifier, context, nextResolve) {

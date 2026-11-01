@@ -1,12 +1,3 @@
-/**
- * Turn liveness registry unit tests (src/server/turn-liveness.ts): one turn
- * per chat, ever — begin/end round trip, double-begin rejection, restart
- * after end. The 30-minute stale-eviction TTL is not tested (it is a leak
- * guard, not a behavior). The lifecycle-emitter pins ride the same seams:
- * turn-started on the accepted begin only, turn-settled on the live end
- * only, and the registry already consistent when the listener runs.
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { beginTurn, endTurn, isTurnRunning } from "../src/server/turn-liveness.ts";
@@ -34,7 +25,7 @@ describe("turn lifecycle events", () => {
 		assert.equal(beginTurn(id), true, "fresh chat accepts the turn");
 		assert.equal(beginTurn(id), false, "the rejected double-begin");
 		assert.deepEqual(got, [{ type: "turn-started", chatId: id }], "exactly one event");
-		endTurn(id); // cleanup (its settle is asserted in the next case's terms)
+		endTurn(id);
 		off();
 	});
 
@@ -44,15 +35,12 @@ describe("turn lifecycle events", () => {
 		let runningAtSettle: boolean | undefined;
 		const off = subscribe((e) => {
 			got.push(e);
-			// The settle must be observable as already-idle: the registry
-			// write happens BEFORE the emit, so a listener that fetches truth
-			// (the whole point of notify → fetch) reads consistent state.
 			if (e.type === "turn-settled") runningAtSettle = isTurnRunning(id);
 		});
 		beginTurn(id);
-		got.length = 0; // focus on the settle path
-		endTurn(id); // live entry → settle
-		endTurn(id); // absent entry → defensive no-op, must stay silent
+		got.length = 0;
+		endTurn(id);
+		endTurn(id);
 		assert.deepEqual(got, [{ type: "turn-settled", chatId: id }]);
 		assert.equal(runningAtSettle, false, "listener sees the registry already cleared");
 		off();

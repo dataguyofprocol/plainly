@@ -1,15 +1,3 @@
-/**
- * enter-submits + focus-hygiene — the pointer/keyboard Enter split and the
- * transient-control blur (owner, keyboard round 2026-10-10).
- *
- * The regression this pins: clicking a transcript control (a thinking
- * toggle) left focus on its <button>; the learner's next Enter re-activated
- * the toggle instead of submitting. The law now: Enter from a
- * POINTER-focused transcript button submits (the window listener also
- * preventDefaults, suppressing the default activation underneath);
- * keyboard-focused buttons and buttons inside open overlays (menus walk
- * focus with arrows, dialogs are their own layer) keep native Enter.
- */
 import assert from "node:assert/strict";
 import { parseHTML } from "linkedom";
 import { describe, it } from "node:test";

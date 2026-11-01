@@ -90,8 +90,6 @@ test("a failed earlier run is cleaned up and finished", () => {
 	const s = sandbox();
 	try {
 		seedSource(s.source);
-		// A crash after some entries moved: staging leftovers, and the target
-		// holds an early entry but not data/ or auth.json (moved last).
 		fs.mkdirSync(path.join(`${s.target}.migrating`, "junk"), { recursive: true });
 		fs.mkdirSync(path.join(s.target, "Local Storage"), { recursive: true });
 		fs.writeFileSync(path.join(s.target, "Local Storage", "x"), "ls");

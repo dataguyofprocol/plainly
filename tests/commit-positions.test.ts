@@ -1,18 +1,3 @@
-/**
- * The positions-commit sanitizer (PUT /api/graph/positions) — the arg_
- * fix (owner, 2026-10-06): the canvas persists the derived view's whole
- * world (stored propositions + derived arg_ implication nodes), and the
- * commit must KEEP both. Stripping the args purged their ledger entries
- * on every drag-commit, so each mount re-seeded them on a giant ring —
- * the "splattered from the middle" report. Also pins the grew-check:
- * a payload covering the whole view runs NO settle (the file equals the
- * payload exactly); a payload missing a view node (a merge landed
- * mid-drag) triggers exactly one absorbing settle.
- *
- * Hermetic: LH_DATA_DIR → a temp dir, set BEFORE the first import of
- * the server modules (the seam is env-at-module-load, see
- * tests/data-dir-seam.test.ts).
- */
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -34,8 +19,6 @@ before(async () => {
 	appendNode = stores.graphStore.appendNode as (node: unknown) => void;
 	appendChain = stores.graphStore.appendChain as (assertion: unknown) => void;
 
-	// Two propositions + one two-premise chain → the derived view is
-	// 2 props + 1 arg_ node.
 	const node = (id: string) => ({
 		id,
 		name: id,
@@ -86,7 +69,6 @@ describe("commitPositions (the arg_ fix)", () => {
 	});
 
 	it("a payload missing a view node (a merge landed mid-drag) triggers the absorbing settle", () => {
-		// The client never knew arg_chain1 (it merged after the drag began).
 		commitPositions({
 			n_a: { x: 1, y: 2 },
 			n_b: { x: 3, y: 4 },
@@ -94,7 +76,6 @@ describe("commitPositions (the arg_ fix)", () => {
 		});
 		const after = readPositions();
 		assert.ok("arg_chain1" in after, "the settle laid out the node the client missed");
-		// The client's anchors are honored (warm start), not clobbered to 0.
 		assert.ok(Math.abs(after.n_a!.x - 1) < 50, `anchor n_a near its committed rest (got ${after.n_a!.x})`);
 	});
 

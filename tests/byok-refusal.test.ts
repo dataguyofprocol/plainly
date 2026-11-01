@@ -11,14 +11,6 @@ import {
 } from "../src/core/settings.ts";
 import type { ModelCatalogEntry, ModelSlotName } from "../src/core/index.ts";
 
-/**
- * The BYOK universal gate rendered honestly (owner, 2026-09-22): the server
- * refuses ALL turns with 503 {error, code: "models_not_configured", missing}
- * when a slot tier is unset. These pin the client's pure seams: the refusal
- * detector (the transport throws the 503 body verbatim as the error text),
- * the job-record refusal matcher, and the SetupDialog's prefill.
- */
-
 const REFUSAL = JSON.stringify(modelsNotConfigured(["strong"]));
 
 describe("parseModelsRefusal — the send refusal detector", () => {
@@ -32,10 +24,10 @@ describe("parseModelsRefusal — the send refusal detector", () => {
 
 	it("anything else is a real error — null, the honest banner stays", () => {
 		assert.equal(parseModelsRefusal(undefined), null);
-		assert.equal(parseModelsRefusal("Something went wrong"), null); // not JSON
-		assert.equal(parseModelsRefusal('{"error":"A turn is already running"}'), null); // JSON, wrong code
-		assert.equal(parseModelsRefusal('{"code":"models_not_configured","missing":"strong"}'), null); // missing not an array
-		assert.equal(parseModelsRefusal('{"code":"models_not_configured","missing":[42]}'), null); // tiers are strings
+		assert.equal(parseModelsRefusal("Something went wrong"), null);
+		assert.equal(parseModelsRefusal('{"error":"A turn is already running"}'), null);
+		assert.equal(parseModelsRefusal('{"code":"models_not_configured","missing":"strong"}'), null);
+		assert.equal(parseModelsRefusal('{"code":"models_not_configured","missing":[42]}'), null);
 	});
 });
 
@@ -74,7 +66,7 @@ describe("parseProviderKeyRefusal — the send refusal detector's twin (zero-key
 	});
 
 	it("anything else is a real error — false, the honest banner stays", () => {
-		assert.equal(parseProviderKeyRefusal(REFUSAL), false); // the models refusal is NOT this one
+		assert.equal(parseProviderKeyRefusal(REFUSAL), false);
 		assert.equal(parseProviderKeyRefusal("FAILED: headless crashed"), false);
 		assert.equal(parseProviderKeyRefusal(undefined), false);
 		assert.equal(parseProviderKeyRefusal("{not json"), false);

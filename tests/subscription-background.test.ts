@@ -5,8 +5,6 @@ import os from "node:os";
 import path from "node:path";
 import { Agent, type AgentMessage } from "@earendil-works/pi-agent-core";
 import { AssistantMessageEventStream } from "@earendil-works/pi-ai/utils/event-stream";
-// The data seam is set BEFORE any app module loads (config.ts resolves the
-// data dir at import time), so every app import below is dynamic.
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), "lh-subscription-background-"));
 process.env.LH_DATA_DIR = path.join(directory, "data"); process.env.LH_AUTH_FILE = path.join(directory, "auth.json"); fs.writeFileSync(process.env.LH_AUTH_FILE, "{}");
 const { piModels } = await import("../src/agent/models.ts");

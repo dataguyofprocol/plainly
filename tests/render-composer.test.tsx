@@ -1,10 +1,3 @@
-/**
- * Composer render tests — the chat input row (content only; the persistent
- * rounded shell lives in the chat view's overlay so it can morph into the
- * question dock without remounting).
- *
- * Same tsx classic-JSX shim as render-cards.test.tsx.
- */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
 
@@ -83,12 +76,6 @@ describe("Composer", () => {
 	});
 });
 
-// The Enter decision (composer steering, 2026-10-03): while a turn runs,
-// typed text makes Enter a STEER; Enter with an empty composer stays the
-// stop shortcut. (The plan-verdict accept branch died 2026-09-26 with the
-// verdict itself — the post-plan reply is a natural text message.) Pure
-// function so the static-render harness can pin it (key events can't be
-// simulated in renderToStaticMarkup).
 describe("enterAction", () => {
 	it("busy stream with text: Enter steers (the queued send)", () => {
 		assert.equal(enterAction({ busy: true, canSend: true }), "send");

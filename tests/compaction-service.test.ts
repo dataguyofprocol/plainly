@@ -1,24 +1,9 @@
-/**
- * THE COMPACTION SERVICE (owner round 14, 2026-10-05): the trigger
- * plumbing — settle kick + turn-start gate, the registry mutex, the
- * summary call, usage, events. Pinned here with an injected summarizer
- * (the sub-agent one-shot needs a live engine; the SERVICE laws don't).
- *
- * The laws:
- * - the registry is a mutex: concurrent ensureCompacted → ONE summary;
- * - over-threshold → marker appended + usage logged + events emitted;
- * - under-threshold (or the projection post-marker) → no-op;
- * - chained compaction: the span carries the prior summary forward;
- * - the effective threshold: min(setting, window − reserve).
- */
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { after, describe, it } from "node:test";
 
-// ── the seam, BEFORE any config-loading import (the birth-stamp discipline) ─
 const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-compaction-"));
 process.env.LH_DATA_DIR = TMP_DATA;
 
@@ -39,11 +24,8 @@ after(() => {
 	fs.rmSync(TMP_DATA, { recursive: true, force: true });
 });
 
-// ── fixtures ────────────────────────────────────────────────────────────────
-
 const big = (text: string, kb = 100): LhMessage => newUserMessage(`${text}: ${"x".repeat(kb * 1024)}`);
 
-/** A chat whose record projects far over any test threshold. */
 function overThresholdChat(label: string): string {
 	const chat = chatStore.createChat(label);
 	const messages = [big("m1"), big("m2"), big("m3"), newUserMessage("recent")];
@@ -54,8 +36,6 @@ function overThresholdChat(label: string): string {
 let summarizeCalls = 0;
 const depsOf = (chatId: string, thresholdTokens: number): CompactionDeps => ({
 	chatStore,
-	// The engine is never touched when summarize is injected (only its
-	// identity rides the marker's provenance) — a minimal stand-in.
 	engine: { model: { provider: "faux", id: "test", contextWindow: 1_000_000 } } as never,
 	modelId: "faux:test",
 	kind: "teach",
@@ -70,8 +50,6 @@ const depsOf = (chatId: string, thresholdTokens: number): CompactionDeps => ({
 		};
 	},
 });
-
-// ── the laws ────────────────────────────────────────────────────────────────
 
 describe("the compaction service", () => {
 	it("background eligibility skips both entrypoints without writes, but still awaits an existing structural run", async () => {
@@ -108,11 +86,8 @@ describe("the compaction service", () => {
 		assert.ok(marker!.content.includes("SUMMARY #"));
 		assert.ok(marker!.details.tokensBefore > 40_000, "provenance carries the trigger reading");
 		assert.equal(marker!.details.model, "faux:test");
-		// the projection now fits: the dropped span is gone from the wire view
 		assert.ok(projectedContextTokens(record.messages, 100) < 40_000, "the cut brought the projection under threshold+summary");
-		// usage landed on the money channel, keyed by the marker
 		assert.ok((record.turns ?? []).some((t) => t.messageId === marker!.id && t.model === "faux:test"), "usage keyed by the marker");
-		// events: running true → record-changed → running false
 		assert.deepEqual(events, ["true", "record", "false"]);
 	});
 
@@ -140,7 +115,7 @@ describe("the compaction service", () => {
 			if (e.type === "compaction-changed" && c === chatId) events.push(`${running}`);
 		});
 		const p = ensureCompacted(depsOf(chatId, 40_000), chatId);
-		await awaitCompaction(chatId); // rides the same promise
+		await awaitCompaction(chatId);
 		await p;
 		off();
 		assert.deepEqual(events, ["true", "false"], "no second compaction started");
@@ -159,11 +134,8 @@ describe("the compaction service", () => {
 				};
 			},
 		};
-		// first compaction
 		await ensureCompacted({ ...depsOf(chatId, 40_000) }, chatId);
-		// grow the record past the threshold again (post-markers + new tail)
 		chatStore.saveMessages(chatId, [...chatStore.getChat(chatId)!.messages, big("m9"), big("m10"), big("m11")]);
-		// second compaction — the span must open with the FIRST summary
 		await ensureCompacted(deps, chatId);
 		assert.ok(seenPrompt.includes("prior compaction summary"), "the prior summary rides the span");
 		assert.ok(seenPrompt.includes(COMPACTED_HISTORY_HEADER), "as the marker's canonical text");
@@ -191,16 +163,12 @@ describe("the compaction service", () => {
 		assert.equal(built, 1, "deps built once");
 		await awaitCompaction(chatId);
 		assert.equal(summarizeCalls, before + 1);
-		// beneath threshold now → a second kick builds its deps, the
-		// pre-check refuses, and NO summary runs (building deps is the
-		// kick's discovery step — the run is what costs)
 		const afterFirst = summarizeCalls;
 		kickCompaction(() => {
 			built++;
 			return depsOf(chatId, 40_000);
 		}, chatId);
 		assert.equal(summarizeCalls, afterFirst, "post-compaction record is under threshold — no run");
-		// a null deps build (engineless) is a silent no-op
 		kickCompaction(() => null, chatId);
 	});
 
@@ -246,7 +214,6 @@ describe("the compaction service", () => {
 		};
 		await ensureCompacted(failing, chatId);
 		assert.equal(activeCompactionOf(chatStore.getChat(chatId)!.messages), null, "no marker on failure");
-		// the next gate retries cleanly
 		await ensureCompacted(depsOf(chatId, 40_000), chatId);
 		assert.ok(activeCompactionOf(chatStore.getChat(chatId)!.messages));
 		assert.equal(summarizeCalls, before + 1);

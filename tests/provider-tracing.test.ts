@@ -1,11 +1,9 @@
-/** JS matcher + config-policy regressions; native Turbopack needs the real payload gate. */
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { describe, it } from "node:test";
 import nextConfig from "../next.config.ts";
 
 const require = createRequire(import.meta.url);
-// Use Next's actual bundled matcher, not a different glob implementation.
 const picomatch = require("next/dist/compiled/picomatch");
 const { makeIgnoreFn } = require("next/dist/build/collect-build-traces");
 const patterns = nextConfig.outputFileTracingExcludes!["*"];
@@ -19,7 +17,6 @@ describe("standalone JavaScript tracing exclusions and native workaround policy"
 			for (const relative of ["data/canary.json", "nested/data/private.json", "auth.json", ".env", ".env.local"]) {
 				assert.equal(ignored(file(relative)), true, relative);
 			}
-			// The explicit includes remain necessary: this raw ignore still matches SDK data.
 			assert.equal(ignored(file("node_modules/@earendil-works/pi-ai/dist/providers/data/models.json")), true);
 			assert.ok(nextConfig.outputFileTracingIncludes!["*"]!.includes("node_modules/@earendil-works/pi-ai/dist/providers/data/**/*"));
 		});

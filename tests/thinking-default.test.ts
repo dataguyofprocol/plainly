@@ -1,11 +1,3 @@
-/**
- * The default-order resolution, client-side (chunk 2): the UI populates a
- * fresh model pick's thinking level with the SAME level the engine build
- * runs for an unset record — first DEFAULT_THINKING_ORDER entry the model
- * supports (Platform's interlude bd68486 moved the ordering into the core
- * barrel exactly for this). These tests pin the helper against the
- * server's defaultThinkingLevel semantics (src/agent/models.ts).
- */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { DEFAULT_THINKING_ORDER } from "../src/core/settings.ts";
@@ -20,7 +12,6 @@ describe("defaultOrderLevel — the ordering's first supported", () => {
 	});
 
 	it("a model without medium falls to the NEXT order entry it supports", () => {
-		// order: medium, low, high, minimal, xhigh, max — low wins here
 		assert.equal(defaultOrderLevel(tl(["minimal", "low", "high"])), "low");
 		assert.equal(defaultOrderLevel(tl(["high", "xhigh", "max"])), "high");
 	});
@@ -45,7 +36,6 @@ describe("populateLevel — an explicit pick always rides; absence populates", (
 	});
 
 	it("an UNSUPPORTED explicit level STILL rides — the write clamps server-side (bd68486), the signal re-reads the clamped truth", () => {
-		// xhigh rides even though unsupported here; never re-populated client-side
 		assert.equal(populateLevel("xhigh", tl(["minimal", "medium", "high"])), "xhigh");
 	});
 

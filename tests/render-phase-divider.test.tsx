@@ -1,11 +1,3 @@
-/**
- * Phase presentation render tests — the in-session face (components/
- * phase-divider.tsx), monochrome since the minimal-color round: the header
- * chip (label + the braille spinner in the old dot slot while a turn is in
- * flight) and the dotted transcript boundary rules. Same tsx classic-JSX
- * shim as render-cards.test.tsx. (Replaces the old part-level PlanDivider
- * tests.)
- */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
 
@@ -87,9 +79,6 @@ describe("teachStepIndex (WHERE teaching begins inside the flipping message — 
 	});
 
 	it("a later step: the boundary's step-start index — between plan presentation and teaching", () => {
-		// The stacked-dividers bug shape: plan_init + plan text, then a NEW
-		// step that poses the first tagged quiz. The seam is the SECOND
-		// step-start (index 3), not before the message.
 		const parts = [
 			{ type: "step-start" },
 			{ type: "tool-plan_init", state: "output-available" },

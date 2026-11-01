@@ -1,18 +1,3 @@
-/**
- * THE POKER SESSION PINS (owner, 2026-10-28): glm-5.3 double-escaped every
- * probe `explanation` — the record holds the two characters `\` + `n` where
- * a paragraph break was meant, so the Why block showed a literal `\n\n`;
- * gpt-5.6-luna copied the pattern later in the same session.
- *
- * The fixes these pins hold:
- *  1. decodeOverescapedNewlines — only strings with no real newline, only
- *     unescaped `\n` outside math and code spans.
- *  2. healProseEscapes — opt-in per field (question-core's prose lists),
- *     never schema-wide.
- *  3. Both seams — the question tools' prepareArguments and the display
- *     parses (the tool-parts law).
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { decodeOverescapedNewlines } from "../src/core/math-delims.ts";
@@ -21,7 +6,6 @@ import { ASK_PROSE_FIELDS, QUIZ_PROSE_FIELDS } from "../src/core/question-core.t
 import { parseAskInput, parseExplainInput, parseQuizInput } from "../src/core/tool-parts.ts";
 import { askUserQuestionTool, probeQuizTool } from "../src/agent/tools.ts";
 
-/** The session's exact shape (shortened): literal backslash-n, no real newline. */
 const POKER = "Calling has exactly one way to win: hit your hand.\\n\\nThe distractors: betting does not change the card.";
 
 describe("decodeOverescapedNewlines", () => {

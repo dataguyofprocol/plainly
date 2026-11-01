@@ -1,6 +1,4 @@
-/** Execute the installed signing helper with fake security commands and fake
- * certificates. Never touch a real keychain, credential, or certificate file.
- * Regression: electron-builder #10066 used the p12 password to unlock a
+/** Regression: electron-builder #10066 used the p12 password to unlock a
  * temporary keychain that had been created with a different random password. */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";

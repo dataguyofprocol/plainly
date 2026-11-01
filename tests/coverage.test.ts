@@ -16,14 +16,6 @@ import {
 } from "../src/core/coverage.ts";
 import type { CoverageEntry } from "../src/core/contracts/graph.ts";
 
-/**
- * Extraction coverage — the pure core under the TEACHER-PROSE ruling
- * (owner, 2026-09-28): the extractor sees only the teacher's text
- * blocks; fingerprints, slots, tokens, and batching all derive from that
- * one selection. Everything else is invisible — it neither opens nor
- * joins a run.
- */
-
 function user(id: string, text: string): LhMessage {
 	return { ...newUserMessage(text), id };
 }
@@ -36,7 +28,6 @@ function teacher(id: string, text: string): LhMessage {
 	} as unknown as LhMessage;
 }
 
-/** An assistant message calling `calls` (each {id,name}) — the bond anchor. */
 function assistantWithCalls(
 	id: string,
 	calls: Array<{ id: string; name: string; args?: unknown }>,
@@ -65,25 +56,15 @@ describe("messageFingerprint — what changes it, what never does", () => {
 		const same = messageFingerprint(teacher("m1", "hello world"));
 		assert.notEqual(a, b);
 		assert.equal(a, same);
-		// Role is hashed too — the same words from a LEARNER have no view
-		// lines at all (teacher prose only), so the fingerprints differ.
 		assert.notEqual(a, messageFingerprint(user("m1", "hello world")));
 	});
 
 	it("the message id is the provenance tag — part of exactly what the extractor saw", () => {
-		// The view lines carry the [id] tag, so identical content under a
-		// different id is a DIFFERENT fingerprint: coverage matches the
-		// extraction view byte-for-byte. (Ids are stable in practice — the
-		// write-ahead persist owns them.)
 		assert.notEqual(messageFingerprint(teacher("m1", "same")), messageFingerprint(teacher("m2", "same")));
-		// The same id + content re-fingerprints equal.
 		assert.equal(messageFingerprint(teacher("m1", "same")), messageFingerprint(teacher("m1", "same")));
 	});
 
 	it("marker messages are invisible — a plan-block attach never re-opens anything", () => {
-		// Wave D: the marker is its OWN message (not a part on another one);
-		// its view is empty, so it neither re-opens others nor itself
-		// carries any learning evidence.
 		const marker = newPlanBlockMessage("call_p1", {
 			kind: "full",
 			at: "2026-09-26T00:00:00.000Z",
@@ -92,7 +73,6 @@ describe("messageFingerprint — what changes it, what never does", () => {
 			edges: [],
 		}) as LhMessage;
 		assert.deepEqual(messageViewLines(marker, marker.id), []);
-		// And the message it rides beside keeps its fingerprint untouched:
 		const before = messageFingerprint(teacher("t1", "the chain rule"));
 		const withMarker = [teacher("t1", "the chain rule"), marker];
 		assert.equal(
@@ -103,8 +83,6 @@ describe("messageFingerprint — what changes it, what never does", () => {
 	});
 
 	it("quiz Q&A is INVISIBLE under the teacher-prose ruling (owner, 2026-09-28)", () => {
-		// Neither the asking message nor the graded answer produces view
-		// lines — a quiz exchange can never open or join an extraction run.
 		const asking = assistantWithCalls("a1", [{ id: "q1", name: "quiz", args: { question: "Q?" } }]);
 		const answer = result("r1", "q1", "quiz", { questionText: "Q?", correct: true });
 		assert.deepEqual(messageViewLines(asking, "a1"), []);
@@ -143,11 +121,9 @@ describe("coverageOf — uncovered is DERIVED, never dual-tracked", () => {
 		const entries: CoverageEntry[] = [
 			{ chatId: "c1", fp: fp1, tokens: 1, foldedAt: "2026-09-15T00:00:00.000Z" },
 			{ chatId: "c1", fp: fp2, tokens: 1, foldedAt: "2026-09-15T00:00:00.000Z" },
-			// Another chat's entries are irrelevant to c1's coverage.
 			{ chatId: "c2", fp: slot(messages, "m3").fp, tokens: 1, foldedAt: "2026-09-15T00:00:00.000Z" },
 		];
 		const cov = coverageOf(messages, entries, "c1");
-		// `uncovered` is INDEXES (the batcher needs positions for bonding):
 		assert.deepEqual(cov.uncovered, [2]);
 		assert.deepEqual(cov.slots[cov.uncovered[0]!]!.message.id, "m3");
 		assert.equal(cov.coveredCount, 2);
@@ -174,8 +150,6 @@ describe("coverageOf — uncovered is DERIVED, never dual-tracked", () => {
 
 describe("batchRuns — token-budgeted, consecutive, never splits a message", () => {
 	it("greedy oldest-first fill; the overflowing message starts the next run", () => {
-		// Each message's view line is ~14 tok (chars/4) → budget 45 fits
-		// three, the fourth overflows: [m1,m2,m3] + [m4].
 		const slots = coverageSlots([
 			teacher("m1", "a".repeat(40)),
 			teacher("m2", "b".repeat(40)),
@@ -203,9 +177,6 @@ describe("batchRuns — token-budgeted, consecutive, never splits a message", ()
 	});
 
 	it("learner messages and tool results never join a batch — teacher prose only (owner, 2026-09-28)", () => {
-		// The inseparability bond died with the ruling: tool results are
-		// invisible, so nothing needs keeping together. Batches are pure
-		// greedy runs over the TEACHER slots alone.
 		const messages = [
 			user("u1", "learner asks"),
 			teacher("t1", "x".repeat(40)),
@@ -240,13 +211,7 @@ describe("batchTag — deterministic, ref-stable, mutation-sensitive", () => {
 
 describe("the all-sessions coverage GET is dead (extraction-UX close-out, 2026-09-24)", () => {
 	it("the route file is gone — the only coverage endpoint is the Extract POST", () => {
-		// UI confirmation (ff1ec7a): nothing client-side consumes the
-		// all-sessions list anymore — the sidebar block and the ring both
-		// read GET /api/chats/[id]'s coverage block. This pin guards against
-		// a merge resurrecting the dead surface.
 		assert.equal(fs.existsSync("app/api/graph/coverage/route.ts"), false, "the all-sessions GET route is deleted");
-		// stays by design: the manual-extract front door (sidebar block's
-		// Extract affordance) lives on.
 		assert.equal(fs.existsSync("app/api/graph/coverage/extract/route.ts"), true, "the Extract POST survives");
 	});
 });

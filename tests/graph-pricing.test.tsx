@@ -14,7 +14,7 @@ const summary = (runs: ExtractionRunUsage[]) => graphCostSummary({ chats: [{ tit
 const headline = (runs: ExtractionRunUsage[]) => renderToStaticMarkup(<GraphCostControl costs={summary(runs)} />);
 
 test("wholly unpriced historical graph costs render unknown, not known-zero dollars", () => {
-	const historical = run([usage()]); // missing long-cache split
+	const historical = run([usage()]);
 	const costs = summary([historical]);
 	assert.equal(costs.totalDollars, 0);
 	assert.equal(costs.unpricedRuns, 1);

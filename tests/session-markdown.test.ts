@@ -1,12 +1,3 @@
-/**
- * The shared session-markdown engine (core/session-markdown.ts, owner ruling
- * 2026-09-27): ONE renderer for the extractor's source view and the future
- * user-facing session export — id-anchored speaker blocks, readable
- * quiz/recall/question blocks, one-line notes for other tools. Pinned here:
- * block shapes, anchor handling (on/off), title header, empty-message
- * skipping, and content parity with the coverage line builder.
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { LhMessage } from "../src/core/native-messages.ts";
@@ -51,8 +42,6 @@ function result(
 	} as never;
 }
 
-/** An assistant message carrying one toolCall part (the practice join's
- *  call side — args live HERE, the results are bare acks). */
 function callMsg(id: string, callId: string, name: string, args: unknown): LhMessage {
 	return {
 		id,
@@ -204,11 +193,6 @@ describe("sessionMarkdown", () => {
 	});
 
 	it("the seam split (owner, 2026-09-28): teacher prose renders in BOTH; the rest renders ONLY here", () => {
-		// The extraction view became TEACHER-PROSE-ONLY: its line builder
-		// yields lines for teacher text alone. This engine keeps the FULL
-		// session format for the future user-facing export — so parity now
-		// holds exactly for teacher prose, and everything else (learner,
-		// quiz, tool results) is markdown-only.
 		const messages: LhMessage[] = [
 			user("u1", "teach me"),
 			teacher("a1", "The chain rule multiplies local rates."),

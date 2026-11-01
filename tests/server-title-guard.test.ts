@@ -1,4 +1,3 @@
-/** Backend title isolation without launching Electron or touching a user profile. */
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";

@@ -1,11 +1,3 @@
-/**
- * Custom OpenAI-compatible providers, the pure layer (custom-endpoint
- * wave, 2026-10-26): the settings sanitizer (lenient — invalid entries
- * drop), the id minting (slug + -2/-3 de-duplication inside the 40-char
- * budget), the key env-var mapping, and the strict write-side parsers the
- * routes answer 400 from.
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
@@ -36,9 +28,9 @@ describe("sanitizeCustomProviders", () => {
 		const out = sanitizeCustomProviders([
 			valid,
 			{ ...valid, name: "duplicate" },
-			{ ...valid, id: "vllm" }, // missing prefix
-			{ ...valid, id: "custom-Bad" }, // uppercase
-			{ ...valid, id: `custom-${"a".repeat(41)}` }, // slug over 40
+			{ ...valid, id: "vllm" },
+			{ ...valid, id: "custom-Bad" },
+			{ ...valid, id: `custom-${"a".repeat(41)}` },
 			{ ...valid, id: "custom-a", name: "" },
 			{ ...valid, id: "custom-b", name: "x".repeat(61) },
 			{ ...valid, id: "custom-c", baseUrl: "ftp://host" },

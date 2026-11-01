@@ -1,12 +1,3 @@
-/**
- * THE PRACTICE AGENT (practice sessions, owner design 2026-10-04): the
- * tool gating law (an agent cannot pose while a problem is active, cannot
- * conclude with nothing active), the registry shape (problem + conclude
- * ONLY — no question, plan, or job tools), and the prompt composition
- * (practice composes its own directory alone — no teaching base, no
- * shared fragments).
- */
-
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
@@ -23,8 +14,6 @@ import { concludeInputObject, concludeTool, createPracticeGate, problemTool, pra
 import { composeInstructions, createPracticeAgent } from "../src/agent/teacher-agent.ts";
 import { allSegmentPaths } from "../src/agent/prompt-segments.ts";
 
-// ── fixtures ─────────────────────────────────────────────────────────────────
-
 const STAMPS = {
 	api: "faux",
 	provider: "test",
@@ -40,7 +29,6 @@ const STAMPS = {
 	stopReason: "toolUse",
 } as const;
 
-/** A record whose latest problem call is ACTIVE (pose + ack, nothing after). */
 function activeProblemRecord(): LhMessage[] {
 	const pose: LhMessage & AssistantMessage = {
 		id: "msg_a1",
@@ -88,8 +76,6 @@ const CONCLUDE_INPUT = {
 	retest: false,
 } as const;
 
-// ── the gating law ───────────────────────────────────────────────────────────
-
 describe("the practice tool gating law", () => {
 	it("problem acks on a quiet record and ends the turn (terminate)", async () => {
 		const result = await problemTool(createPracticeGate(ctxOf([]))).execute("call_x", PROBLEM_INPUT as never);
@@ -121,11 +107,6 @@ describe("the practice tool gating law", () => {
 	});
 
 	it("THE BKT INCIDENT — a mid-turn conclude → pose pair works (the gate is turn-scoped, not record-frozen)", async () => {
-		// One turn, one toolset: the record froze at the write-ahead with
-		// the old problem active. The gates used to re-read that frozen
-		// record per execute, so the pose after a successful conclude
-		// always died on "a problem is already active" until the model
-		// gave up ("the problem slot is stuck").
 		const gate = createPracticeGate(ctxOf(activeProblemRecord()));
 		const tools = { problem: problemTool(gate), conclude: concludeTool(gate) };
 		const conclude = await tools.conclude.execute("call_c1", CONCLUDE_INPUT as never);
@@ -136,8 +117,6 @@ describe("the practice tool gating law", () => {
 		assert.equal(greedy.isError, true, "the gate re-arms on the successful pose");
 	});
 });
-
-// ── target validation (the mastery-trace contract, owner round 9) ──────────
 
 describe("target validation — names normalize to ids, unknowns reject", () => {
 	const NODES = [
@@ -169,10 +148,7 @@ describe("target validation — names normalize to ids, unknowns reject", () => 
 		assert.equal(rejected.isError, true);
 		assert.match((rejected.details as { problems: string[] }).problems[0]!, /ghost-prop/);
 		assert.match((rejected.details as { problems: string[] }).problems[0]!, /proposition ids from the session context/);
-		// the message teaches the exit (round 12): omitting always works
 		assert.match((rejected.details as { problems: string[] }).problems[0]!, /omit target entirely/);
-		// honest activation (the BKT law): a rejected pose frees the slot —
-		// the next, valid pose goes through.
 		const valid = await tool.execute("call_y", { ...PROBLEM_INPUT, target: ["n_parity"] } as never);
 		assert.equal(valid.isError, undefined);
 	});
@@ -193,8 +169,6 @@ describe("target validation — names normalize to ids, unknowns reject", () => 
 	});
 });
 
-// ── the registry + the agent ────────────────────────────────────────────────
-
 describe("the practice agent", () => {
 	it("bare registry: the session pair + the learner-filesystem set — no question, plan, or lesson tools", () => {
 		const tools = practiceTools(ctxOf([]));
@@ -208,9 +182,6 @@ describe("the practice agent", () => {
 		const jobs = { chatId: "c1", jobStore: null as never, spawn: (() => {}) as never, searchAvailable: () => false };
 		const graph = { chatStore: null as never, graphStore: null as never };
 		const tools = practiceTools({ ...ctxOf([]), jobs, graph });
-		// Both jobs remain available keylessly; the prober's two map
-		// readers stay behind their existing settings gate. Practice does
-		// not apply the teacher/prober user tool-toggle filter.
 		assert.deepEqual(
 			Object.keys(tools).sort(),
 			["conclude", "find", "grep", "list_propositions", "list_sessions", "ls", "pdf", "problem", "read", "research"],
@@ -220,8 +191,6 @@ describe("the practice agent", () => {
 	});
 
 	it("constructs with exactly the two practice tools", () => {
-		// baseAgentOptions needs an engine (the BYOK thrower is the only
-		// fallback) — inject a never-streamed faux engine for the smoke.
 		const agent = createPracticeAgent(ctxOf([]), {
 			engine: {
 				model: { api: "faux", provider: "faux", id: "faux-model", contextWindow: 8192 } as never,
@@ -230,15 +199,11 @@ describe("the practice agent", () => {
 				}) as never,
 			},
 		});
-		// The agent built with the live turn API (the registry itself is
-		// pinned above; pi's Agent exposes no state getter).
 		assert.equal(typeof agent.prompt, "function");
 		assert.equal(typeof agent.steer, "function");
 		assert.equal(typeof agent.waitForIdle, "function");
 	});
 });
-
-// ── persistent nudges (shipped defaults, no model calls) ──────────────────────
 
 describe("persistent practice nudges", () => {
 	const doctrine = readFileSync(new URL("../src/agent/prompts/practice/10-doctrine.md", import.meta.url), "utf8");
@@ -250,7 +215,6 @@ describe("persistent practice nudges", () => {
 	];
 
 	it("preserves the approved paragraphs in source and the effective default prompt", () => {
-		// Pin approved wording and Markdown, but allow incidental line wrapping.
 		for (const text of [doctrine, composeInstructions("practice")]) {
 			const paragraphs = text.split(/\n\s*\n|\n(?=- )/).map(normalizeWhitespace);
 			for (const approved of approvedParagraphs) {
@@ -337,48 +301,32 @@ describe("persistent practice nudges", () => {
 	});
 });
 
-// ── the prompt composition ──────────────────────────────────────────────────
-
 describe("practice prompt composition (own directory + the formatting appendix)", () => {
 	it("composes base + doctrine — never the teaching base or question/confidence mechanics", () => {
 		const prompt = composeInstructions("practice");
-		// The base's voice section and the doctrine's spine are present…
 		assert.match(prompt, /Everything in this section deletes a default/);
 		assert.match(prompt, /You run practice sessions\./);
 		assert.match(prompt, /## Standing prohibitions/);
-		// …and nothing from the teaching system prompt or shared fragments.
 		assert.doesNotMatch(prompt, /install understanding/);
-		// The shared 20-question-tools doctrine (predict/check) must not
-		// compose — practice has its own demand theory.
 		assert.doesNotMatch(prompt, /predict/i);
 	});
 
 	it("the SHARED voice + accuracy compose (owner round 13): ONE law across every agent, and the stale line is dead", () => {
 		const prompt = composeInstructions("practice");
-		// accuracy (prompt-refinement round, 2026-10-07): the felt-doubt bar —
-		// one law across every agent; the old round-10 pointer lived in the
-		// accuracy chunk, the mechanics now live in each agent's own sections
 		assert.match(prompt, /one confidently-delivered hallucination poisons that/);
 		assert.match(prompt, /The bar is the doubt itself/);
-		// practice's own fact-check law (the rarely-needed framing is dead)
 		assert.match(prompt, /grades the learner against a lie/);
 		assert.ok(!prompt.includes("exceptions, not habits"), "the rarely-needed framing is gone");
 		assert.ok(!prompt.includes("no research tool here"), "the stale line is gone");
-		// the thinking-fields doctrine composes into practice too (one law)
 		assert.match(prompt, /primary data/);
-		// the teacher composes the same shared chunks (one law)
 		const teacher = composeInstructions("teacher");
 		assert.match(teacher, /one confidently-delivered hallucination poisons that/);
 		assert.match(teacher, /Everything in this section deletes a default/);
 		assert.match(teacher, /The bar is the doubt itself/);
 		assert.match(teacher, /primary data/);
-		// the no-double-plan rule (owner-reported: plan drawn twice)
 		assert.match(teacher, /Never draw the plan again in your prose/);
-		// plan rewriting is normal, not exceptional (continuous adaptation)
 		assert.match(teacher, /Rewriting is a normal, common event/);
-		// planning is the natural verification moment
 		assert.match(teacher, /planning is the natural moment for verification/);
-		// no size ceilings, and the detour keeps the pace (owner round, 2026-10-07)
 		assert.ok(!teacher.includes("Typically 5–15 nodes"), "the node-count cap is dead");
 		assert.match(teacher, /No size ceiling/);
 		assert.match(teacher, /never rush the repair/);
@@ -391,13 +339,11 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 		assert.match(prober, /Enter near the top, not the bottom/);
 		assert.match(prober, /Strands inform each other/);
 		assert.match(prober, /never descending into already-bracketed territory/);
-		// the confidence + thinking signals are wired into question selection
 		assert.match(prober, /the verdict, his confidence, and his thinking field together set where the next question should sit/);
 	});
 
 	it("the SHARED formatting guide composes (owner, 2026-10-04 late): LaTeX delimiters in every setting", () => {
 		const prompt = composeInstructions("practice");
-		// The standard delimiter law is shared by all three authoring agents.
 		for (const agent of ["practice", "prober", "teacher"] as const) {
 			const instructions = composeInstructions(agent);
 			assert.ok(instructions.includes("Inline `$f(x)$`, display `$$` fenced on its own lines."));

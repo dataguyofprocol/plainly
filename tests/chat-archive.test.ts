@@ -1,12 +1,3 @@
-/**
- * ARCHIVE (owner, 2026-10-26: one uniform flow — old sessions stay for
- * resumption, the learner archives what they're done with). Pins the
- * store's flag (round-trip, unarchive deletes the field, updatedAt never
- * moves, chats-changed announces), the list summary carrying it, and the
- * PUT route's body rules. Runs under an isolated LH_DATA_DIR (the seam is
- * set before any config-loading import, so app imports are dynamic).
- */
-
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import * as os from "node:os";

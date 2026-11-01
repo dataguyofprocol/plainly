@@ -1,9 +1,3 @@
-/**
- * The lesson panel's plan list (v4 redesign, 2026-10-26): POSITION, never
- * mastery — statuses come from which node the latest tagged check was
- * about, so the counts read "visited", and the current step is the last
- * tagged call's node.
- */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { planProgress, practiceSet, stepFold } from "../components/lesson-panel.tsx";
@@ -106,8 +100,6 @@ describe("stepFold — Lesson4's reading mode", () => {
 		assert.equal(fold.steps, 0);
 	});
 
-	// Answers arrive as toolResults, so one teacher run holds every check
-	// until the learner types: the step can change mid-group.
 	const check = (nodeId: string, correct: boolean) => ({ type: "tool-quiz", state: "output-available", input: { nodeId }, output: { correct } });
 
 	it("the step changes inside one group: it starts at the part after the last check on another node", () => {

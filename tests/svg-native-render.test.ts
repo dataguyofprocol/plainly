@@ -1,10 +1,3 @@
-/**
- * Wave E stage 2 (owner 2026-10-10): renderSvg is NATIVE FIRST — resvg
- * rasterizes in-process; the old Chrome path stays as fallback for
- * exotic-SVG parse failures. These tests pin the native path against real
- * SVGs: attribute-sized, viewBox-only (the 900px default), text-bearing
- * (system fonts), and the canonical single-IDAT PNG form.
- */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { realHeadless } from "../src/agent/subagents/headless.ts";
@@ -36,9 +29,6 @@ describe("native renderSvg (resvg in-process, browser fallback)", () => {
 	});
 
 	it("viewBox-only SVG gets the 900px-wide default", async () => {
-		// No width attr anywhere (svgViewport grabs the FIRST width= in the
-		// document — children included — a pre-existing quirk kept for
-		// parity; use a circle so the default branch is exercised).
 		const svg =
 			'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200"><circle cx="150" cy="100" r="90" fill="#aa5533"/></svg>';
 		const png = await realHeadless.renderSvg(svg);
@@ -63,7 +53,6 @@ describe("native renderSvg (resvg in-process, browser fallback)", () => {
 		const png = await realHeadless.renderSvg(svg);
 		const f = pngFacts(png);
 		assert.equal(f.w, 300);
-		// A blank 300x100 white PNG is ~300 bytes; glyphs push it well past.
 		assert.ok(png.length > 1000, `text rendered (png ${png.length} bytes > 1000)`);
 	});
 });

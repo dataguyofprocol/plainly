@@ -1,26 +1,12 @@
-/**
- * phases — the event-driven phase chain (docs/probe-teach-split.md §4).
- *
- * probe ends at the first CONCLUDED probe_done (output-available); teaching
- * begins at the FIRST nodeId-tagged quiz CALL (the inferred seam, owner
- * ruling 2026-09-26 — the verdict death: presenting the plan ends the
- * teacher's turn, the learner's reply is natural text, and nothing flips
- * the phase until a question ABOUT a plan node is actually posed). No
- * stored-tree seam: the phase is a pure fold over the transcript, so it can
- * never stick (the old currentNodeId-based phaseOfTree read a field nothing
- * ever set).
- */
 import assert from "node:assert";
 import test from "node:test";
 import type { LhViewMessage } from "../src/core/view.ts";
 import { phaseAt3, phaseTimeline, type Phase3 } from "../src/core/phases.ts";
 
-/** Text-only user message. */
 function user(text: string): LhViewMessage {
 	return { id: `u_${text}`, role: "user", parts: [{ type: "text", text }] };
 }
 
-/** An assistant message carrying a tool part in the given state. */
 function assistantTool(
 	name: string,
 	state: "input-available" | "output-available" | "output-error",
@@ -33,7 +19,6 @@ function assistantTool(
 	};
 }
 
-/** A quiz call with its parsed input — `nodeId` present iff tagged. */
 function assistantQuiz(input: Record<string, unknown> | undefined): LhViewMessage {
 	return {
 		id: `a_quiz_${Math.random().toString(36).slice(2, 6)}`,
@@ -86,14 +71,14 @@ test("phaseAt3: the tag is the seam — natural text and untagged questions neve
 		user("teach me"),
 		assistantTool("probe_done", "output-available", DONE_ASSESSMENT),
 		assistantTool("plan_init", "output-available", PLAN_OK),
-		user("The plan is accepted — begin teaching."), // words alone
-		assistantQuiz({ question: "ad-hoc check", correctAnswer: "a" }), // untagged
+		user("The plan is accepted — begin teaching."),
+		assistantQuiz({ question: "ad-hoc check", correctAnswer: "a" }),
 	]);
 	assert.equal(plainText, "plan", "only a nodeId-tagged quiz flips the seam — text and ad-hoc checks never do");
 
 	const taggedOutOfOrder = phaseAt3([
 		user("teach me"),
-		assistantQuiz({ question: "q", nodeId: "n1", correctAnswer: "a" }), // before probe_done
+		assistantQuiz({ question: "q", nodeId: "n1", correctAnswer: "a" }),
 	]);
 	assert.equal(taggedOutOfOrder, "probe", "the chain never skips");
 });
@@ -114,7 +99,7 @@ test("phaseTimeline: folds messages into phase spans for the dividers", () => {
 		assistantTool("quiz", "output-available"),
 		assistantTool("probe_done", "output-available", DONE_ASSESSMENT),
 		assistantTool("plan_init", "output-available", PLAN_OK),
-		user("what does node 1 mean?"), // side question — still planning
+		user("what does node 1 mean?"),
 		user("go on"),
 		assistantQuiz({ question: "q", nodeId: "n1", correctAnswer: "a" }),
 		assistantQuiz({ question: "q2", nodeId: "n2", correctAnswer: "a" }),
@@ -127,12 +112,9 @@ test("phaseAt3: empty transcript is probe", () => {
 	assert.equal(phaseAt3([]), "probe");
 });
 
-// ─── the native fold (phaseAt3Lh over LhMessage[]) ──────────────────────────
-
 import type { LhMessage } from "../src/core/native-messages.ts";
 import { phaseAt3Lh } from "../src/core/phases.ts";
 
-/** A native toolResult (the probe_done conclusion). */
 function toolResult(toolName: string, isError = false): LhMessage {
 	return {
 		id: `tr_${toolName}_${Math.random().toString(36).slice(2, 6)}`,
@@ -145,8 +127,6 @@ function toolResult(toolName: string, isError = false): LhMessage {
 	} as LhMessage;
 }
 
-/** A native assistant message carrying a quiz toolCall — arguments carry
- *  `nodeId` iff tagged (exactly what the wire would persist). */
 function assistantQuizCall(arguments_: Record<string, unknown>): LhMessage {
 	return {
 		id: `a_${Math.random().toString(36).slice(2, 6)}`,
@@ -171,8 +151,6 @@ test("phaseAt3Lh (native fold): probe→plan at the clean probe_done result; pla
 		"probe",
 		"an ERRORED probe_done concludes nothing",
 	);
-	// The two folds agree on the same settled transcript (the view projection
-	// of the tagged call carries its arguments as the part input).
 	assert.equal(
 		phaseAt3Lh([done, tagged]),
 		phaseAt3([
@@ -181,10 +159,6 @@ test("phaseAt3Lh (native fold): probe→plan at the clean probe_done result; pla
 		]),
 	);
 });
-
-// ─── the explain mechanic at the seam (owner 2026-09-27) ───────────────────
-// Both quizzing tools (quiz OR explain, whichever the settings armed) open
-// teaching — the seam is structural, not name-bound to the MC tool.
 
 test("phaseAt3 + phaseAt3Lh: a tagged explain CALL is the plan→teach seam too", () => {
 	const done = toolResult("probe_done");

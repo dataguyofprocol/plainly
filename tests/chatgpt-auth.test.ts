@@ -179,7 +179,6 @@ test("rotated-token persistence failure invalidates existing leases and never re
 		const catalog = await f.service.models();
 		const expected = { expectedAccountId: catalog.accountId, expectedAuthorityRevision: catalog.authorityRevision, selectedModelId: "gpt-5" };
 		await f.rawLease(false, expected);
-		// Advance time rather than mutating the service's private state.
 		const now = Date.now; Date.now = () => now() + 3600000;
 		try {
 			failWrite = true;
@@ -308,12 +307,10 @@ for (const holdVerification of [false, true]) test(`invalid rotating replacement
 			await restarted.service.logout(restricted.id);
 			assert.equal(restarted.requests.find((r) => r.form?.has("token_type_hint"))!.form!.get("token"), "likely-latest-revoke-handle");
 			assert.equal(restarted.saved.registrations[0].reconnectRequired, true);
-			// Earlier select/consent/logout notifications have already settled changed.
-			// Arm before this login and await its pending -> terminal transition instead.
 			reconnectArmed = true;
 			await restarted.service.login(restricted.id);
 			assert.equal(sawPending, true);
-			await restarted.callback(); // HTTP acknowledgement precedes verification/save.
+			await restarted.callback();
 			if (holdVerification) {
 				await verificationEntered.promise;
 				assert.equal(completed, false, "the current attempt cannot complete before identity verification");
@@ -368,7 +365,6 @@ for (const holdVerification of [false, true]) test(`observed file write failure 
 		assert.equal((await f.service.status()).accounts[0].connected, false);
 		assert.equal(reads, 1, "a recovered disk never causes a stale credential reload");
 		const writesBeforeReconnect = f.writeCount;
-		// The initial login already settled fixture.changed; observe this attempt instead.
 		reconnectArmed = true;
 		await f.service.login(f.saved.activeId); assert.equal(sawPending, true); await f.callback();
 		if (holdVerification) {

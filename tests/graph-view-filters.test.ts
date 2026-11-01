@@ -1,8 +1,3 @@
-/**
- * Legend/filters predicate tests — the pure half of the graph-view filters
- * panel (isNodeVisible); the sigma reducers just consume its verdict.
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { displayCostTotals, isNodeVisible } from "../components/graph-view.tsx";
@@ -55,7 +50,7 @@ describe("displayCostTotals (naming-free cost fold)", () => {
 		stages: {
 			extraction: stage(1.25, 1),
 			audit: stage(0.75),
-			naming: stage(9.99, 2), // dead channel — must never reach the display
+			naming: stage(9.99, 2),
 		},
 	} as const;
 

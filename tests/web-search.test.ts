@@ -1,8 +1,3 @@
-/** Keyless research availability + the injected search port.
- * No network, no shared data files — the jobStore fake below is in-memory.
- * A missing search key is a recoverable tool result, not a dispatch gate.
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { createWebTools } from "../src/agent/tools/web.ts";
@@ -74,18 +69,11 @@ describe("web_search on the injected port (web.ts)", () => {
 	it("web_fetch needs no search engine — it stays independent", async () => {
 		const { web_fetch } = createWebTools(() => null);
 		assert.ok(web_fetch, "web_fetch present with no provider");
-		// (Full fetch behavior is out of scope here — no network in tests.)
 		const out = await web_fetch!.execute!("c1", { url: "not a url" });
 		assert.match(String(out.details), /web_fetch failed: invalid URL/);
 	});
 
 	it("web_fetch ACCEPTS a valid http(s) URL — the protocol gate must not reject everything (the colon bug, 2026-10-07)", async () => {
-		// URL.protocol is \"https:\" WITH the colon; the colon-less comparison
-		// ported from the py harness (urlparse().scheme has none) made the
-		// gate throw for every valid URL — the tool never fetched a page in
-		// its life (owner-reported via OpenRouter logs). This pin stubs fetch
-		// so the happy path runs hermetically: a VALID url must REACH the
-		// fetch stage.
 		const { web_fetch } = createWebTools(() => null);
 		const realFetch = globalThis.fetch;
 		globalThis.fetch = (async () =>
@@ -129,7 +117,6 @@ describe("keyless researcher loop", () => {
 		}), "Prompt verified; no model behavior inferred.");
 	});
 
-	// These scripts prove tool/loop mechanics, not real-model compliance.
 	for (const searchFirst of [true, false]) {
 		it(searchFirst ? "recovers from missing search keys by fetching a supplied URL" : "fetch-only research needs no search credentials", async () => {
 			const url = "https://example.com/supplied-source";
@@ -173,7 +160,6 @@ describe("keyless researcher loop", () => {
 			try {
 				assert.equal(await runResearcherAgent(`Verify ${url}`, {
 					engine: { model: faux.getModel(), streamFn: faux.streamSimple },
-					// No search seam: this is the keyless backstop, not a search stub.
 				}), brief);
 				assert.deepEqual(fetched, [url]);
 			} finally {
@@ -183,7 +169,6 @@ describe("keyless researcher loop", () => {
 	}
 });
 
-/** Minimal in-memory JobStore — registry tests never touch the fs. */
 function fakeJobStore(): JobStore {
 	const jobs = new Map<string, JobRecord>();
 	return {
@@ -209,7 +194,7 @@ function fakeJobStore(): JobStore {
 		},
 		listJobs: () => [...jobs.values()],
 		findJobByToolCallId: () => null,
-		deleteJobsForChat: () => 0, // the drop tests never delete
+		deleteJobsForChat: () => 0,
 	};
 }
 
@@ -255,14 +240,9 @@ describe("keyless research dispatch (jobTools)", () => {
 	});
 });
 
-// Exercise live registry factories too: search status must not override
-// the existing per-role/user-toggle policy.
-
 import { createProberTools, createTeacherTools } from "../src/agent/tools.ts";
 import type { ChatStore } from "../src/core/ports.ts";
 
-/** A chat-store stub — the registry factories only CLOSE OVER it at build
- *  time (quiz/plan superRefines read it at execute time, never here). */
 const fakeChatStore = {
 	getChat: () => null,
 	saveMessages: () => {},

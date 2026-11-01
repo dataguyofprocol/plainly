@@ -1,9 +1,3 @@
-/**
- * The v4 shell's pure layers (rebuild, 2026-10-26): the session state and
- * row line the sidebar shows, the grouping, the formatting helpers, the
- * stable topic colours, the chain neighbourhood the Knowledge canvas
- * lights up, the omnibar's result model and the graph index.
- */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {

@@ -1,13 +1,3 @@
-/**
- * The LH_DATA_DIR seam (Electron contract, 2026-09-17): when set, every
- * mutable record relocates under it; when unset, byte-for-byte the old
- * repo-data/ behavior. The desktop shell's whole data story rests on this,
- * so pin both directions.
- *
- * The seam is evaluated at MODULE LOAD, so the "set" case must set the env
- * BEFORE the first import of config.ts in this process (dynamic import,
- * below) and the "unset" case needs a fresh child process.
- */
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -38,9 +28,6 @@ describe("LH_DATA_DIR seam", () => {
 	});
 
 	it("unset = the repo data/ exactly as before (fresh child process, no env)", () => {
-		// The child runs as the APP does — no NODE_ENV=test and no data env —
-		// because under tests the sandbox owns the unset case
-		// (tests/test-sandbox.test.ts).
 		const env: Record<string, string | undefined> = { ...process.env };
 		delete env.NODE_ENV;
 		delete env.LH_DATA_DIR;

@@ -78,8 +78,6 @@ class SkillFolderTest(unittest.TestCase):
             for filename, arguments in commands:
                 for output_format in ("markdown", "json"):
                     with self.subTest(script=filename, arguments=arguments, format=output_format):
-                        # Deliberately omit -B here: the entrypoints must disable
-                        # bytecode before importing their helper on their own.
                         completed = subprocess.run(
                             [sys.executable, str(skill / "scripts" / filename), "--data-dir", str(data), "--format", output_format, *arguments],
                             cwd=elsewhere, env=env, capture_output=True, text=True, encoding="utf-8", timeout=30,

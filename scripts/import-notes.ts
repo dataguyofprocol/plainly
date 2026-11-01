@@ -1,16 +1,10 @@
 /**
- * Import raw notes files through the format-agnostic front door (vision §1,
- * 2026-09-13) — every *.md / *.txt file in a directory becomes one
- * extraction run (extractor → auditor → merger) over its raw text. Run
- * from this worktree only — data never crosses trees:
+ * Every *.md / *.txt file in a directory becomes one extraction run over
+ * its raw text.
  *
  *   npx tsx --env-file=.env.local scripts/import-notes.ts <dir> [concurrency]
  *
- * Default dir: real-data-extraction/learn-sessions (the prototype
- * learning-session exports — deliberately NOT imported as chats: they run
- * through the notes path, raw). Runs in this process: the dev server's
- * status chips do NOT see them (registry is per-process) — the dev server
- * sees runs triggered through /api/graph/import.
+ * Default dir: real-data-extraction/learn-sessions.
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -29,7 +23,6 @@ async function main() {
 
 	const pipeline = createExtractionPipeline({
 		...stores,
-		// Live budget: the graph section's setting, same as the app's trigger
 		getChunkTokens: () => effectiveSettings().graph.extractionChunkTokens,
 	});
 	const queue = [...files];

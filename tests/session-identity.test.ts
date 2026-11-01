@@ -27,8 +27,6 @@ function recordingEngine() {
 }
 const again = { name: "again", label: "again", description: "Continue", parameters: Type.Object({}), execute: async () => ({ content: [{ type: "text" as const, text: "ok" }], details: {} }) };
 
-// Whole-process replacement isolates native auth/profile discovery; fetch never
-// delegates. No real credentials, .env, OAuth accounts, or model inference.
 async function closed<T>(run: () => Promise<T>): Promise<T> {
 	const env = process.env;
 	const fetch = globalThis.fetch;
@@ -65,7 +63,6 @@ describe("native app and conversation identity", { concurrency: false }, () => {
 
 	it("separate extractor/auditor/compaction invocations own distinct stable unsaved conversations", async () => {
 		const ids = new Set<unknown>();
-		// Compaction uses the shared runner with the researcher role.
 		for (const role of ["extractor", "auditor", "researcher"] as const) {
 			const { engine, requests } = recordingEngine();
 			let usage = 0;
@@ -129,8 +126,6 @@ describe("native app and conversation identity", { concurrency: false }, () => {
 		const engine = piEngineForSpec({ provider: "openai", id: "gpt-4o-mini", thinkingLevel: "off" });
 		const sessionId = "chat_" + "😀".repeat(70);
 		let payload: unknown;
-		// HTTP affinity headers cannot encode emoji. Observe native payload
-		// serialization before transport, then stop deliberately (no accounts).
 		await engine.streamFn(engine.model, normalizeContext({ messages: [{ role: "user", content: "offline", timestamp: 1 }] }), {
 			sessionId,
 			onPayload: (value) => { payload = value; throw new Error("CLOSED: payload captured"); },
@@ -140,14 +135,10 @@ describe("native app and conversation identity", { concurrency: false }, () => {
 
 	it("native Codex serialization shares the 64-code-point clamp without an account or OAuth flow", async () => closed(async () => {
 		const engine = piEngineForSpec({ provider: "openai-codex", id: "gpt-6-luna", thinkingLevel: "off" });
-		// Synthetic, unsigned fixture token solely satisfies native local claim
-		// decoding. Stop at payload capture: no account, OAuth, or fetch.
 		const claims = { "https://api.openai.com/auth": { chatgpt_account_id: "offline-fixture" } };
 		const apiKey = `dummy.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.dummy`;
 		for (const sessionId of ["chat_" + "a".repeat(70), "chat_" + "😀".repeat(70)]) {
 			let payload: unknown;
-			// The app intentionally has no Codex auth row: exercise the native
-			// serializer directly rather than adding an OAuth configuration path.
 			assert.equal(engine.model.api, "openai-codex-responses");
 			const result = await streamCodex(engine.model as Model<"openai-codex-responses">, normalizeContext({ messages: [{ role: "user", content: "offline", timestamp: 1 }] }), {
 				apiKey, sessionId, identity: APP_IDENTITY,
@@ -166,7 +157,6 @@ describe("native app and conversation identity", { concurrency: false }, () => {
 		await engine.streamFn(engine.model, normalizeContext({ messages: [{ role: "user", content: "offline", timestamp: 1 }] }), { sessionId: "chat_cache_off", cacheRetention: "none", headers: { "user-agent": "explicit-sdk-override", "x-opencode-client": null } }).result();
 		assert.equal(headers.get("user-agent"), "explicit-sdk-override");
 		assert.equal(headers.get("x-opencode-client"), null);
-		// Native OpenCode routing identity remains even with cache retention off.
 		assert.equal(headers.get("x-opencode-session"), "chat_cache_off");
 		assert.equal(body.prompt_cache_key, undefined);
 	}));

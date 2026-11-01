@@ -1,27 +1,9 @@
-/**
- * THE WEAK-MODEL ARGUMENT HEAL (owner, 2026-10-04 — the GLM practice-loop
- * incident): glm-5.3 sent `"mode": "\"recall\""` — a JSON-string-encoded
- * enum — on 19 consecutive `problem` calls; TypeBox's "must be equal to
- * constant" error never named the expected values, so the model re-emitted
- * the identical payload until the dev server was killed.
- *
- * These pins hold the heal that runs at pi's prepareArguments seam (BEFORE
- * validation): string values where the schema expects a literal union /
- * boolean / null / number / array are JSON.parse-d and kept when the
- * parsed value satisfies the schema. Well-formed args pass through
- * untouched (same reference); unhealable values stay for validation to
- * reject honestly — the END-TO-END pins drive pi-ai's own
- * validateToolArguments: the healed args pass where the raw ones threw.
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { concludeInputObject, problemInputObject } from "../src/agent/tools/practice.ts";
 import { healEncodedArguments } from "../src/core/argument-heal.ts";
 import { validateToolArguments } from "@earendil-works/pi-ai";
 
-/** The incident's exact mode spelling: the string  "recall"  INCLUDING
- *  its quote characters (what JSON.parse turns back into recall). */
 const QUOTED = (s: string) => `"${s}"`;
 
 describe("healEncodedArguments — the GLM incident", () => {
@@ -35,11 +17,10 @@ describe("healEncodedArguments — the GLM incident", () => {
 	it("END-TO-END: the healed args pass pi-ai validation where the raw threw", () => {
 		const raw = {
 			statement: "Prove that every finite group of prime order is cyclic.",
-			mode: QUOTED("recall"), // the incident: every field valid BUT mode
+			mode: QUOTED("recall"),
 			target: ["group-order"],
 			modelSolution: "Let |G| = p. Any x ≠ e generates a subgroup whose order divides p…",
 		};
-		// The raw shape is the incident: validation throws.
 		assert.throws(() => {
 			validateToolArguments({ name: "problem", parameters: problemInputObject } as never, {
 				id: "call_x",
@@ -49,7 +30,6 @@ describe("healEncodedArguments — the GLM incident", () => {
 			} as never);
 		});
 		const healed = healEncodedArguments(raw, problemInputObject);
-		// The healed shape is valid — the loop never starts.
 		const validated = validateToolArguments(
 			{ name: "problem", parameters: problemInputObject } as never,
 			{ id: "call_x", type: "toolCall", name: "problem", arguments: healed } as never,
@@ -100,8 +80,6 @@ describe("healEncodedArguments — the sibling encodings", () => {
 	it("leaves plain string properties alone (statement is a string schema)", () => {
 		const args = { statement: '"not JSON-healed"' };
 		const healed = healEncodedArguments(args, problemInputObject) as { statement: unknown };
-		// A Type.String property has no literals and no scalar type match —
-		// the string passes through as-is (same reference, nothing cloned).
 		assert.equal(healed, args);
 	});
 

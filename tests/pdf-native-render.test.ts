@@ -1,11 +1,3 @@
-/**
- * Wave E stage 1 (owner 2026-10-10): pdf_render is NATIVE — pdfjs paints
- * into @napi-rs/canvas in-process, no browser anywhere. These tests pin
- * the real renderer against the real fixture: valid canonical PNGs, dpi
- * scaling arithmetic (scale = dpi/72), out-of-range page skipping, and the
- * Skia canvas actually being exercised (not a DOM canvas — none exists in
- * this process).
- */
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -15,7 +7,6 @@ import { standardFontsDir } from "../src/agent/subagents/pdf-ops.ts";
 
 const FIXTURE = path.join(import.meta.dirname, "fixtures", "sample-3page.pdf");
 
-/** Minimal PNG chunk walk — returns IHDR dims and the IDAT chunk count. */
 function pngFacts(buf: Buffer): { w: number; h: number; idats: number } {
 	assert.equal(buf.subarray(0, 8).toString("hex"), "89504e470d0a1a0a", "PNG signature");
 	const w = buf.readUInt32BE(16);
@@ -26,7 +17,7 @@ function pngFacts(buf: Buffer): { w: number; h: number; idats: number } {
 		const len = buf.readUInt32BE(off);
 		const type = buf.subarray(off + 4, off + 8).toString("ascii");
 		if (type === "IDAT") idats++;
-		off += 12 + len; // len + type + data + crc
+		off += 12 + len;
 	}
 	return { w, h, idats };
 }
@@ -48,7 +39,6 @@ describe("native pdf_render (pdfjs paints, @napi-rs/canvas hosts)", () => {
 		for (const p of pages) {
 			const facts = pngFacts(p.png);
 			assert.ok(facts.w > 0 && facts.h > 0, "non-empty raster");
-			// providerSafePng canonical form: exactly one IDAT.
 			assert.equal(facts.idats, 1, "single-IDAT canonical PNG");
 		}
 	});
@@ -73,11 +63,6 @@ describe("native pdf_render (pdfjs paints, @napi-rs/canvas hosts)", () => {
 	});
 
 	it("renders with NO browser present (available() may be false)", async () => {
-		// The whole point of stage 1: rendering must not consult any Chrome.
-		// realHeadless.available() reflects system Chrome only; on this
-		// machine it may well be true — the assertion that matters is that
-		// the render path never launches one, pinned by the import graph:
-		// renderPdfPages touches pdfjs + @napi-rs/canvas and nothing else.
 		const pages = await realHeadless.renderPdfPages(FIXTURE, [1], { dpi: 72 });
 		assert.equal(pages.length, 1);
 	});

@@ -1,9 +1,3 @@
-/**
- * The v4 activity folds (core/activity.ts, redesign 2026-10-26): time
- * ledger aggregation, session progress + state, period stats, topics.
- * Dates are built with LOCAL constructors so the suite is time-zone
- * independent (the folds bucket by the process's local zone).
- */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
@@ -33,8 +27,6 @@ import {
 	type PlanTree,
 	type TimeBeat,
 } from "../src/core/index.ts";
-
-// ── record builders ─────────────────────────────────────────────────────────
 
 let seq = 0;
 const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
@@ -66,8 +58,6 @@ const TREE: PlanTree = {
 	version: 1,
 };
 
-// ── time ledger ─────────────────────────────────────────────────────────────
-
 describe("time ledger folds", () => {
 	it("clamps a beat to 0..60", () => {
 		assert.equal(clampBeatSeconds(30), 30);
@@ -78,7 +68,7 @@ describe("time ledger folds", () => {
 	});
 
 	it("local keys and week/month starts", () => {
-		const d = new Date(2026, 9, 28, 15, 30); // Wed 28 Oct 2026
+		const d = new Date(2026, 9, 28, 15, 30);
 		assert.equal(localDateKey(d), "2026-10-28");
 		assert.equal(localMonthKey(d), "2026-10");
 		assert.equal(weekStartOf(d).getTime(), new Date(2026, 9, 26).getTime(), "Monday 00:00");
@@ -86,12 +76,12 @@ describe("time ledger folds", () => {
 	});
 
 	it("the previous equal period spans the same elapsed time", () => {
-		const now = new Date(2026, 9, 28, 12); // Wed noon
+		const now = new Date(2026, 9, 28, 12);
 		const w = periodWindow("week", now);
 		assert.equal(w.start.getTime(), new Date(2026, 9, 26).getTime());
 		assert.equal(w.prevStart.getTime(), new Date(2026, 9, 19).getTime());
 		assert.equal(w.prevEnd.getTime(), new Date(2026, 9, 21, 12).getTime(), "last Wed noon");
-		const m = periodWindow("month", new Date(2026, 2, 31, 12)); // 31 Mar
+		const m = periodWindow("month", new Date(2026, 2, 31, 12));
 		assert.equal(m.start.getTime(), new Date(2026, 2, 1).getTime());
 		assert.equal(m.prevStart.getTime(), new Date(2026, 1, 1).getTime());
 		assert.ok(m.prevEnd.getTime() <= m.start.getTime(), "capped at this month's start");
@@ -109,15 +99,15 @@ describe("time ledger folds", () => {
 	});
 
 	it("daily: Mon..Sun, rounded minutes, today flag, future zero, met days", () => {
-		const now = new Date(2026, 9, 28, 20); // Wed
+		const now = new Date(2026, 9, 28, 20);
 		const beats: TimeBeat[] = [];
 		const add = (day: number, minutes: number) => {
 			for (let i = 0; i < minutes * 2; i++) beats.push({ chatId: "c", at: new Date(2026, 9, day, 10, 0, i * 30).toISOString(), seconds: 30 });
 		};
-		add(26, 31); // Mon — met
-		add(27, 10); // Tue — not met
-		add(28, 30); // Wed (today) — met
-		beats.push({ chatId: "c", at: new Date(2026, 9, 30, 10).toISOString(), seconds: 60 }); // future (clock skew) — ignored
+		add(26, 31);
+		add(27, 10);
+		add(28, 30);
+		beats.push({ chatId: "c", at: new Date(2026, 9, 30, 10).toISOString(), seconds: 60 });
 		const d = dailyStats(beats, now, 30);
 		assert.equal(d.goalMinutes, 30);
 		assert.deepEqual(d.days.map((x) => x.label), ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
@@ -127,8 +117,6 @@ describe("time ledger folds", () => {
 		assert.equal(d.metDays, 2);
 	});
 });
-
-// ── session progress ────────────────────────────────────────────────────────
 
 describe("plainText", () => {
 	it("strips markdown, collapses whitespace, caps on a word boundary", () => {
@@ -248,8 +236,6 @@ describe("chatProgressOf — practice", () => {
 	});
 });
 
-// ── stats ───────────────────────────────────────────────────────────────────
-
 describe("usage + stats", () => {
 	it("tokens = input + output + cache read + cache write", () => {
 		assert.equal(callTokens({ inputTokens: 10, outputTokens: 5, cacheReadTokens: 100, cacheWriteTokens: 1, reasoningTokens: 3 }), 116);
@@ -295,7 +281,7 @@ describe("usage + stats", () => {
 				beats: [
 					{ chatId: "c", at: inWeek, seconds: 60 },
 					{ chatId: "c", at: new Date(2026, 9, 20).toISOString(), seconds: 30 },
-					{ chatId: "c", at: new Date(2026, 9, 22).toISOString(), seconds: 30 }, // after last Wed noon — outside prev window
+					{ chatId: "c", at: new Date(2026, 9, 22).toISOString(), seconds: 30 },
 				],
 				usage: [{ at: inWeek, tokens: 1000, dollars: 0.01 }],
 			},
@@ -312,8 +298,6 @@ describe("usage + stats", () => {
 		});
 	});
 });
-
-// ── topics ──────────────────────────────────────────────────────────────────
 
 describe("topics", () => {
 	it("graph-context picks are read off the marker", () => {

@@ -19,7 +19,6 @@ const MESSAGES = {
 	interaction: "This sign-in action is no longer available.",
 };
 function publicError(error) { return MESSAGES[error?.code] ?? MESSAGES.unavailable; }
-/** Resolve the SAME SDK installation as the standalone server, through public exports. */
 async function loadSubscriptionSDK(baseDirectory) {
 	const resolve = createRequire(path.join(baseDirectory, "package.json"));
 	const load = (id) => {
@@ -45,7 +44,6 @@ function validEndpoint(providerId, auth, credential) {
 	const domain = credential?.enterpriseUrl;
 	return !url.search && !url.hash && url.pathname === "/" && (!url.port || url.port === "443") && (url.hostname.endsWith(".githubcopilot.com") || (domain && (url.hostname === domain || url.hostname.endsWith(`.${domain}`))));
 }
-/** Main owns durable credentials and refresh. Everything returned by status/snapshot is explicitly projected. */
 function createSubscriptions(options) {
 	let sdk;
 	let closed = false, paused = false;
@@ -69,7 +67,7 @@ function createSubscriptions(options) {
 	function snapshotNow() {
 		return { statuses: [...entries.values()].map(statusOf), models: Object.fromEntries([...entries.values()].map((entry) => [entry.providerId, statusOf(entry).connected ? clone(entry.catalog) : []])) };
 	}
-	function changed(entry) { entry.revision++; try { options.onChange?.(snapshotNow()); } catch { /* observer cannot break credential writes */ } }
+	function changed(entry) { entry.revision++; try { options.onChange?.(snapshotNow()); } catch { } }
 	function catalog(entry) {
 		let models = entry.provider?.getModels().filter((model) => APIS.has(model.api)) ?? [];
 		if (!entry.state.credential) models = [];
@@ -100,7 +98,6 @@ function createSubscriptions(options) {
 			try {
 				entry.state = clone(await entry.disk.read());
 				const native = entry.providerId === "github-copilot" ? sdk.githubCopilotProvider() : sdk.xaiProvider();
-				// No API-key auth method exists in this collection: ambient keys cannot become a fallback.
 				entry.provider = { ...native, auth: { oauth: native.auth.oauth } };
 				const store = {
 					read: async (id) => id === entry.providerId ? clone(entry.state.credential) : undefined,
@@ -156,7 +153,6 @@ function createSubscriptions(options) {
 					if (!active()) return;
 					if (event.type === "auth_url") addBrowser(event.url);
 					if (event.type === "device_code") { addBrowser(event.verificationUri); attempt.public.userCode = event.userCode; }
-					// Native provider diagnostics are never forwarded. Public prompt wording comes from SDK-owned prompts.
 					attempt.public.progress = event.type === "device_code" || event.type === "auth_url" ? "Complete sign-in in your browser." : "Waiting for the provider…";
 					changed(entry);
 				},

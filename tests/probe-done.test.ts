@@ -1,12 +1,3 @@
-/**
- * probe_done — the probe→planning seam tool (docs/probe-teach-split.md §2).
- * Server-side; three outcomes: refusal while a question is open, refusal
- * after the probe is already concluded, ok + handoff queued. The handoff
- * rides the wake pipeline (deliver injected here — no server seam import).
- * Wave B: the record is native history — fixtures are pi messages, the
- * pending-question gate is the dangling-question scan, and the handoff is
- * a native marker (customType probe-handoff, HANDOFF_TEXT content).
- */
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -27,7 +18,6 @@ after(() => {
 		try {
 			fs.unlinkSync(path.join(PATHS.chats, `${id}.json`));
 		} catch {
-			/* scratch cleanup, best effort */
 		}
 	}
 });
@@ -45,8 +35,6 @@ const ASSESSMENT = {
 	summary: "Enter at the formal definition.",
 };
 
-/** A native assistant message carrying one tool call (the minimal fixture
- *  shape the scans read — role assistant, content blocks). */
 function assistantWithCall(id: string, toolName: string, args: unknown): LhMessage {
 	return {
 		id,
@@ -78,8 +66,6 @@ describe("probe_done: the probe→planning seam", () => {
 		assert.equal(res.error, undefined);
 		assert.equal(delivered.length, 1, "the handoff is queued exactly once");
 		assert.equal(delivered[0]!.id, `steer_probe_${chatId}`);
-		// Native marker (Wave B): the model-facing HANDOFF_TEXT rides content;
-		// the UI keys off customType; the chat id rides details.
 		assert.equal(delivered[0]!.customType, "probe-handoff");
 		assert.equal(delivered[0]!.content, HANDOFF_TEXT);
 		assert.equal((delivered[0]!.details as { chatId: string }).chatId, chatId);

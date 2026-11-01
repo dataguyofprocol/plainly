@@ -6,8 +6,6 @@ import type { AgentEvent, AgentMessage } from "@earendil-works/pi-agent-core";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-// The data seam is set BEFORE any app module loads (config.ts resolves the
-// data dir at import time), so every app import below is dynamic.
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "lh-chatgpt-native-"));
 process.env.LH_DATA_DIR = path.join(scratch, "data");
 process.env.LH_AUTH_FILE = path.join(scratch, "auth.json");

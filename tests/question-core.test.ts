@@ -1,7 +1,3 @@
-/**
- * Unit tests — question-core (pure logic, no server, no LLM).
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { Value } from "typebox/value";
@@ -38,30 +34,11 @@ import {
 import { toolQuestionKind } from "../src/core/pending.ts";
 import { parseQuizInput } from "../src/core/tool-parts.ts";
 
-// ─── the authoring contract (TypeBox schemas + execute-time refinements) ──
-// Schema-valid ⇔ gradeable: a quiz whose correctAnswer can't be resolved
-// dies at the tool-call boundary (structural TypeBox check in pi's loop +
-// the refinement problems in the tool's execute — a ToolInputError the
-// model retries on), and never reaches the learner's dock. The boundary
-// predicate is BOTH: structural check AND zero authoring problems.
 const boundaryOk = (schema: TSchema, input: unknown, problems: string[]): boolean =>
 	Value.Check(schema, input) && problems.length === 0;
 
 describe("the schema's argument order (reasoning before the pick)", () => {
-	// Argument-order ruling (owner, 2026-09-25): the explanation is
-	// reasoning, and reasoning happens BEFORE the answer is chosen — models
-	// emit tool args in schema order, so explanation sits immediately before
-	// correctAnswer. The TypeBox authoring order IS the model-facing JSON
-	// Schema property order, so this pin guards the emission end to end.
-	// All consumers read by key — the order is authoring guidance.
 	it("emits explanation immediately before correctAnswer (both agents' schemas)", () => {
-		// The 2026-09-25 ruling stands for the CONTENT fields (reasoning
-		// before the pick); the 2026-10-09 reorder adds its mirror for the
-		// teach schema — the required pair (`type`, `nodeId`) LEADS the
-		// object, because glm-5.3 dropped exactly those fields when they
-		// trailed every long content field (the tools_fails_2 drops).
-		// Models emit tool args in schema order: commit to the role and the
-		// target first, reason, then pick.
 		for (const schema of [quizInputSchema, probeQuizInputSchema]) {
 			const keys = Object.keys((schema as { properties: Record<string, unknown> }).properties);
 			assert.ok(
@@ -102,14 +79,12 @@ describe("quizInputSchema / quizInputProblems (the authoring contract)", () => {
 			multiSelect: true,
 		};
 		assert.equal(boundaryOk(quizInputSchema, multi, quizInputProblems(multi)), true);
-		// The union lists String first, so providers sometimes stringify arrays.
 		const stringified = { ...multi, correctAnswer: JSON.stringify(multi.correctAnswer) };
 		assert.equal(boundaryOk(quizInputSchema, stringified, quizInputProblems(stringified)), true);
 		assert.deepEqual(quizInputProblems(stringified), []);
 	});
 
 	it("rejects the observed failure: a correctAnswer slug matching no option value, listing the valid values", () => {
-		// The exact class GLM produced live (Gate 3 + live verification).
 		const bad = {
 			question: "What is Nietzsche's genealogical claim about religion?",
 			options: [
@@ -124,7 +99,7 @@ describe("quizInputSchema / quizInputProblems (the authoring contract)", () => {
 		const problems = quizInputProblems(bad);
 		assert.equal(problems.length, 1);
 		assert.match(problems[0]!, /does not match any option value/);
-		assert.match(problems[0]!, /"A cultural diagnosis"/); // the valid values are listed for the retry
+		assert.match(problems[0]!, /"A cultural diagnosis"/);
 	});
 
 	it("rejects multiple correct answers without multiSelect (ungradeable single-select)", () => {
@@ -177,8 +152,6 @@ describe("askInputSchema / askOptionProblems", () => {
 	});
 });
 
-// ─── normalizeOptions ───────────────────────────────────────────────────────
-
 describe("normalizeOptions", () => {
 	it("trims labels and defaults value to label", () => {
 		const opts = normalizeOptions([{ label: "  Mercury  " }, { label: "Venus", value: " v " }]);
@@ -196,27 +169,16 @@ describe("normalizeOptions", () => {
 	it("throws on duplicate option values", () => {
 		assert.throws(() => normalizeOptions([{ label: "a", value: "x" }, { label: "b", value: "x" }]), /duplicate/);
 
-		// GLM wobble guard (2026-09-26 gradient-descent session): the model
-		// sometimes emits `options` as a JSON-encoded string — 6 of 7 quiz
-		// validation failures in that session. The dock (and grading) coerce
-		// via the same parseOptionsIfString the server's prepareArguments
-		// runs pre-validation.
 		const asString = JSON.stringify([{ label: "Slope", value: "slope" }, { label: "Value", value: "value" }]);
 		const coerced = normalizeOptions(asString);
 		assert.deepEqual(coerced, [
 			{ label: "Slope", value: "slope", description: undefined },
 			{ label: "Value", value: "value", description: undefined },
 		], "a JSON-encoded string coerces to the same normalized options");
-		// Non-JSON strings pass through and behave like no options (the
-		// server's schema validation reports the honest error instead).
 		assert.deepEqual(normalizeOptions("not json"), []);
 	});
 
 it("quiz options carry NO description field; ask keeps it (owner nuke, 2026-09-26)", () => {
-	// The model used quiz option descriptions to telegraph correctness
-	// ("that's not the gradient") in every quiz of the gradient-descent
-	// session — the field is gone from BOTH quiz schemas; ask (ungraded,
-	// nothing to leak) keeps it.
 	const quizOption = (quizInputBase.properties.options as { items?: { properties?: Record<string, unknown> } })
 		.items!.properties!;
 	assert.ok(!("description" in quizOption), "quiz option schema has no description");
@@ -230,15 +192,13 @@ it("quiz options carry NO description field; ask keeps it (owner nuke, 2026-09-2
 	});
 });
 
-// ─── shuffleOptions ─────────────────────────────────────────────────────────
-
 describe("shuffleOptions", () => {
 	it("permutes without adding, removing, or mutating options", () => {
 		const input = Array.from({ length: 20 }, (_, i) => ({ label: `o${i}`, value: `o${i}` }));
 		const shuffled = shuffleOptions(input);
 		assert.equal(shuffled.length, input.length);
 		assert.deepEqual([...shuffled].sort((a, b) => Number(a.label.slice(1)) - Number(b.label.slice(1))), input);
-		assert.notEqual(input, shuffled); // a copy
+		assert.notEqual(input, shuffled);
 	});
 
 	it("is stable for single/empty inputs", () => {
@@ -246,8 +206,6 @@ describe("shuffleOptions", () => {
 		assert.deepEqual(shuffleOptions([{ label: "only", value: "only" }]), [{ label: "only", value: "only" }]);
 	});
 });
-
-// ─── coerceCorrectAnswer ────────────────────────────────────────────────────
 
 describe("coerceCorrectAnswer", () => {
 	const values = ["mercury", "a", "b"];
@@ -274,8 +232,6 @@ describe("coerceCorrectAnswer", () => {
 		assert.deepEqual(coerceCorrectAnswer("[]", ["[]"]), ["[]"]);
 	});
 });
-
-// ─── resolveCorrect ─────────────────────────────────────────────────────────
 
 describe("resolveCorrect", () => {
 	const options = normalizeOptions([
@@ -396,8 +352,6 @@ describe("exact answer membership precedes debris cleanup", () => {
 	});
 });
 
-// ─── isCorrect (exact-set match) ────────────────────────────────────────────
-
 describe("isCorrect", () => {
 	it("matches identical sets regardless of order", () => {
 		assert.ok(isCorrect([3, 1], [1, 3]));
@@ -416,8 +370,6 @@ describe("isCorrect", () => {
 		assert.ok(!isCorrect([], [1]));
 	});
 });
-
-// ─── buildAnswer + formatAnswerMessage ──────────────────────────────────────
 
 function quizData(overrides?: Partial<QuestionData>): QuestionData {
 	return {
@@ -474,9 +426,6 @@ describe("buildAnswer", () => {
 		assert.deepEqual(ad.answers.map((a) => a.value), ["mercury"]);
 	});
 
-	// Confidence (owner, 2026-10-01): the slider's raw probability rides on
-	// real quiz answers only — never on "I don't know" (no answer, no
-	// probability), never on ask/explain. Clamped defensively.
 	it("carries confidence on quiz answers and clamps out-of-range values", () => {
 		assert.equal(buildAnswer(quizData(), { values: ["mercury"], confidence: 90 }).confidence, 90);
 		assert.equal(buildAnswer(quizData(), { values: ["mercury"], confidence: 150 }).confidence, 100);
@@ -513,8 +462,6 @@ describe("buildAnswer", () => {
 });
 
 
-// ─── compactAnswerForModel (the model-visible diet, owner 2026-10-02) ──────
-
 describe("compactAnswerForModel", () => {
 	it("quiz: the learner's selection, verdict, confidence, note — NOTHING the model authored", () => {
 		const ad = buildAnswer(quizData(), { values: ["mercury"], confidence: 70, thinking: "guessed" });
@@ -527,7 +474,6 @@ describe("compactAnswerForModel", () => {
 			thinking: "guessed",
 		});
 		const raw = JSON.stringify(compact);
-		// every one of these lives in the tool CALL's arguments already
 		assert.ok(!raw.includes("Which planet"), "no questionText");
 		assert.ok(!raw.includes("Venus"), "no option-list restatement");
 		assert.ok(!raw.includes("Mercury orbits closest"), "no explanation");
@@ -559,15 +505,13 @@ describe("compactAnswerForModel", () => {
 	});
 });
 
-// ─── dismissedAnswer / toolQuestionKind (ESC-abort dismissal, 2026-10-02) ──
-
 describe("dismissedAnswer (the ESC-abort record)", () => {
 	it("the minimum honest answer: kind, questionText, dismissed — nothing else claimed", () => {
 		const ad = dismissedAnswer("ask", "What drives you?");
 		assert.equal(ad.kind, "ask");
 		assert.equal(ad.questionText, "What drives you?");
 		assert.equal(ad.dismissed, true);
-		assert.equal(ad.dontKnow, false); // a skip is not a gap claim
+		assert.equal(ad.dontKnow, false);
 		assert.deepEqual(ad.answers, []);
 		assert.ok(ad.answeredAt);
 	});
@@ -589,8 +533,6 @@ describe("toolQuestionKind (tool→kind parity with the dock)", () => {
 	});
 });
 
-// ─── toClientQuestion (leak safety) ─────────────────────────────────────────
-
 describe("toClientQuestion", () => {
 	it("NEVER exposes correctIndices or explanation", () => {
 		const cq = toClientQuestion(quizData());
@@ -604,28 +546,20 @@ describe("toClientQuestion", () => {
 });
 
 
-// ─── the dock selection state machine (multi-select Other coexistence) ──
-// The live bug: in a multi-select ask, picking the custom "Other…" row
-// cleared every already-picked option (single-select displacement logic
-// applied to both modes). The machine lives here, pure and pinned.
 describe("dock selection (toggleOption / toggleOther)", () => {
 	it("multi-select: options and Other coexist — neither clears the other", () => {
 		let sel = emptyDockSelection();
 		sel = toggleOption("multi-select", sel, 0);
 		sel = toggleOption("multi-select", sel, 1);
 		assert.deepEqual([...sel.selected], [0, 1]);
-		// Picking Other keeps the sibling selections.
 		sel = toggleOther("multi-select", sel);
 		assert.deepEqual([...sel.selected], [0, 1], "Other never clears picked options");
 		assert.equal(sel.otherSelected, true);
-		// Picking another option keeps Other selected.
 		sel = toggleOption("multi-select", sel, 2);
 		assert.equal(sel.otherSelected, true, "options never clear a typed custom answer");
 		assert.deepEqual([...sel.selected], [0, 1, 2]);
-		// Deselecting an option toggles it alone.
 		sel = toggleOption("multi-select", sel, 0);
 		assert.deepEqual([...sel.selected], [1, 2]);
-		// Other toggles off alone; the siblings survive.
 		sel = toggleOther("multi-select", sel);
 		assert.equal(sel.otherSelected, false);
 		assert.deepEqual([...sel.selected], [1, 2]);
@@ -651,21 +585,13 @@ describe("dock selection (toggleOption / toggleOther)", () => {
 	});
 });
 
-// ─── the explain tool: free-recall quizzing (owner 2026-09-27) ─────────────
-
 describe("explainInputBase / explainInputProblems (the commitment contract)", () => {
 	it("has ONE authoring field — no explanation remnant (owner ruling 2026-09-27)", () => {
-		// The MC quiz's explanation/answer split was quiz baggage: free
-		// recall commits a single correctAnswer, reasoning included.
 		const keys = Object.keys(explainInputBase.properties);
 		assert.deepEqual(keys, ["question", "correctAnswer", "details"]);
 	});
 
 	it("the teach object LEADS with the required pair (type, nodeId) — base fields follow", () => {
-		// Owner, 2026-10-09: glm-5.3 dropped `type`/`nodeId` when they trailed
-		// the content fields — required fields generated FIRST get dropped
-		// least, and the order doubles as the authoring order (role, target,
-		// then the question). Mirrors the quiz reorder (see above).
 		const keys = Object.keys(explainInputObject.properties);
 		assert.deepEqual(keys, ["type", "nodeId", ...Object.keys(explainInputBase.properties)]);
 	});
@@ -699,8 +625,6 @@ describe("buildAnswer / formatAnswerMessage: explain", () => {
 	});
 
 	it("dontKnow records the gap with no attempted text", () => {
-		// The DOCK never sends text alongside dontKnow (its submit gates it);
-		// buildAnswer stays a pure mapping of the request it receives.
 		const ad = buildAnswer(explainQD(), { dontKnow: true });
 		assert.equal(ad.dontKnow, true);
 		assert.equal(ad.text, undefined);
@@ -711,7 +635,6 @@ describe("buildAnswer / formatAnswerMessage: explain", () => {
 		const raw = JSON.stringify(compact);
 		assert.equal(compact.text, "No idea about aether.");
 		assert.equal(compact.kind, "explain");
-		// the commitment is the model's own call argument — NEVER restated
 		assert.ok(!raw.includes("luminiferous"), "the commitment must not ride the result");
 		assert.ok(!("committed" in compact));
 		assert.ok(!("questionText" in compact));
@@ -719,11 +642,6 @@ describe("buildAnswer / formatAnswerMessage: explain", () => {
 
 });
 
-// ─── the question's role: predict vs check (owner 2026-10-03) ─────────────
-// Teaching units are a predict → teach → check cycle. The teach quiz schema
-// carries a REQUIRED `type` declaring the role; the prober's quiz never does
-// (probing questions are role-less). The reveal law keys off it: only CHECKS
-// collapse behind "Check your understanding" — predictions arrive open.
 describe("the quiz role field (predict | check)", () => {
 	const valid = {
 		question: "Which planet is closest to the Sun?",
@@ -770,8 +688,6 @@ describe("the quiz role field (predict | check)", () => {
 		assert.equal(questionNeedsReveal("quiz", { type: "predict" }, "probe"), false);
 		assert.equal(questionNeedsReveal("quiz", { type: "check" }, "probe"), false);
 		assert.equal(questionNeedsReveal("ask_user_question", {}, "teach"), false);
-		// Explain joined the law 2026-10-09: teach checks collapse, predictions
-		// don't, old no-type records render check-style — mirroring quiz exactly.
 		assert.equal(questionNeedsReveal("explain", { type: "check" }, "teach"), true);
 		assert.equal(questionNeedsReveal("explain", { type: "predict" }, "teach"), false);
 		assert.equal(questionNeedsReveal("explain", undefined, "teach"), true, "pre-type explain records render check-style");

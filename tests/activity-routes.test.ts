@@ -1,11 +1,3 @@
-/**
- * The v4 activity routes end-to-end over a real (temp) data dir (redesign,
- * 2026-10-26): POST /api/activity/time, GET /api/chats (progress fields),
- * GET /api/stats, GET /api/stats/daily, GET /api/suggestions, GET
- * /api/topics. The LH_DATA_DIR seam is set BEFORE any config-loading
- * import, so every app-module import is dynamic. No network: under
- * NODE_ENV=test the suggestions service never resolves a generator.
- */
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import * as os from "node:os";
@@ -57,7 +49,6 @@ before(() => {
 		result("q1", "quiz", { kind: "quiz", questionText: "First?", dontKnow: false, answers: [], correct: true, answeredAt: "x" }),
 		call("q2", "quiz", { question: "What is **B**?", nodeId: "b" }),
 	]);
-	// the graph: three propositions born in the teach session (a cluster)
 	for (const [i, id] of ["n_1", "n_2", "n_3"].entries()) {
 		stores.graphStore.appendNode({
 			id,

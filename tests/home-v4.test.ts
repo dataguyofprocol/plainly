@@ -1,8 +1,3 @@
-/**
- * Home4's pure layers (rebuild, 2026-10-26): the greeting, Continue's
- * model, the learning strip's cells, the minutes chart's bar heights, and
- * the ideas a topic mix practises.
- */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { barHeights, continueModel, greeting, homeGreeting, kpiCells, mixPicks } from "../components/home.tsx";
@@ -109,7 +104,6 @@ describe("mixPicks", () => {
 });
 
 describe("homeGreeting", () => {
-	// Local-time dates: the buckets follow the learner's clock.
 	const at = (h: number, m = 0, day = 26) => new Date(2026, 9, day, h, m);
 	const leads = (h: number, m = 0) => [26, 27].map((d) => homeGreeting(at(h, m, d)).lead);
 

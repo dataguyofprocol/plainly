@@ -1,26 +1,3 @@
-/**
- * THE CHAIN TABLE — SSR render pins (the render-suite discipline: pure
- * bodies, renderToStaticMarkup, testids). The owner redesign
- * (2026-09-29 evening): full-bleed table (blur + translucency IS the
- * surface), cluster → chain → statement hierarchy (a chain lives in its
- * CONCLUSION's birth cluster; expanding a chain reveals statements
- * directly — names live in the line, never twice), proposition CHIPS +
- * ∧/⟹ LaTeX connectives (premises join by land, the conclusion
- * separates by implication — REAL KaTeX renders, prominent white; a
- * lonely chip = a standalone proposition; the "(no
- * premises)" annotation is dead), rotating chevrons, folder/waypoints
- * icons, a floating bottom selection bar that never shifts layout, and
- * a fuzzy search that auto-expands matching clusters.
- *
- * ROUND 2 (owner refinements, 2026-09-29 late): the top bar is THE
- * shared TopBar (h-15, lh-drag + select-none, standard
- * title size); PROMINENT indentation carries the hierarchy — the ONLY
- * lines left are the separators between cluster groups (vertical column
- * hairlines and per-row lines are gone); statement rows are PLAIN (no
- * conclusion marker); ALL THREE columns sort (Props too — consistency)
- * with a SMALL chevron on the active header.
- */
-
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
 
@@ -31,11 +8,6 @@ import { ChainTableBody, ChainTableOverlay } from "../components/chain-table.tsx
 import type { ChainSort } from "../components/chain-table.tsx";
 import type { GraphChain, GraphNode } from "../src/core/contracts.ts";
 
-/** The fixture graph — two follows-chains + one standalone:
- *  a → c1 ← b  (chain one, conclusion born chat1), d → e (chain two,
- *  conclusion born notes1), solo (singleton born chat1). b is born
- *  chat2 — a PREMISE-only birth: no chain concludes there, so chat2
- *  never appears as a group (the conclusion's-cluster law). */
 function node(id: string, name: string, statement: string, chatId: string | null): GraphNode {
 	return {
 		id,
@@ -109,15 +81,12 @@ describe("ChainTableBody — clusters (the outermost layer)", () => {
 	it("an unnameable CONCLUSION birth forms one honest muted unlabeled group", () => {
 		const html = render();
 		assert.ok(html.includes("unlabeled"), "the muted label");
-		// orphan (birth null) concludes its own singleton chain → the group exists;
-		// d (also birth null) is a premise of e and never forms one
 		assert.ok(html.includes('data-testid="chain-row-orphan"') === false, "collapsed, like every group");
 	});
 
 	it("cluster rows carry checkbox + counts + newest date; notes kind marked", () => {
 		const html = render();
 		assert.ok(html.includes('data-testid="cluster-checkbox-chat1"'));
-		// chat1: chains c1 (a, b, c1) + solo (solo) → 4 member ids
 		assert.ok(html.includes(">4</span>"), "chat1's proposition count");
 		assert.ok(html.includes("2026-09-20"), "the newest-member date");
 		assert.ok(html.includes(">notes</span>"), "the notes kind tag");
@@ -138,13 +107,8 @@ describe("ChainTableBody — THE shared TopBar + the lines law (owner, round 2)"
 
 	it("the table is FRAMED: header rule + rules between groups + rule under the last group; rows stay lineless (owner round 5)", () => {
 		const html = render({ expandedClusters: new Set(["chat1"]) });
-		// every group wrapper carries the rule now — between groups AND under
-		// the last one; the header carries the TOP rule
 		const sep = html.split("border-b border-border/60").length - 1;
 		assert.ok(sep >= 4, "header + 3 group rules");
-		// chain rows themselves carry NO border — their entire class list is
-		// the staircase law (pl-12 = aligned with the cluster's FOLDER icon);
-		// the chip outlines' border-border/70 is an outline, not a row line
 		assert.ok(html.includes('class="flex items-center gap-1 py-1 pl-12 pr-3"'), "the chain row: staircase indent, no border");
 	});
 
@@ -154,12 +118,8 @@ describe("ChainTableBody — THE shared TopBar + the lines law (owner, round 2)"
 		const open = render({ expandedClusters: new Set(["chat1"]), expandedChains: new Set(["c1"]) });
 		assert.ok(open.includes('data-testid="cluster-thread-chat1"'), "the cluster thread");
 		assert.ok(open.includes('data-testid="chain-thread-c1"'), "the chain thread");
-		// the columns: the cluster arrow sits at 37px, the chain arrow at 73px
 		assert.ok(open.includes("left-[37px]"), "thread at the cluster arrow's column");
 		assert.ok(open.includes("left-[73px]"), "thread at the chain arrow's column");
-		// the BRACKET LAW (owner round 6): each thread runs from its parent
-		// row's checkbox bottom edge (a visible gap below the arrow's stroke)
-		// to the LAST child row's checkbox bottom edge — live-measured anchors
 		assert.ok(open.includes("bottom-[8px] left-[37px] top-[23px]"), "cluster thread bracketed by checkbox bottoms");
 		assert.ok(open.includes("top-[22px]") && open.includes("bottom-[8px]"), "chain thread bracketed by checkbox bottoms");
 	});
@@ -172,18 +132,12 @@ describe("ChainTableBody — chain rows (chips + connectors)", () => {
 		assert.ok(html.includes('data-testid="prop-chip-a"'), "premise chip");
 		assert.ok(html.includes('data-testid="prop-chip-c1"'), "conclusion chip");
 		assert.ok(html.includes("Premise one"), "chip text");
-		// the connectives (owner ruling, 2026-09-30): premises ∧, conclusion
-		// ⟹ — KaTeX renders (class katex present), PROMINENT foreground
 		assert.ok(html.includes('data-testid="chain-and-c1-1"'), "the land between premises");
 		assert.ok(html.includes('data-testid="chain-implies-c1"'), "the implication before the conclusion");
 		const and = html.match(/data-testid="chain-and-c1-1"[^>]*>/)?.[0] ?? "";
 		assert.match(and, /text-foreground/, "prominent — the theme's white, not dim gray");
 		assert.ok(html.includes("katex"), "a REAL KaTeX render, not a unicode arrow");
-		// the old arrow is dead as a VISIBLE connector — it survives only in
-		// the row's aria-label (formatChainLine, the plain-text form)
 		assert.doesNotMatch(html, />\s*→\s*</, "no textual arrow connector remains");
-		// owner ruling (round 3): the chain waypoints icons are GONE — the
-		// chips + connectors already read as chains; only folders keep icons
 		assert.ok(!html.includes("lucide-waypoints"), "no chain icon");
 	});
 
@@ -192,8 +146,6 @@ describe("ChainTableBody — chain rows (chips + connectors)", () => {
 		assert.ok(html.includes('data-testid="chain-row-solo"'));
 		assert.ok(html.includes('data-testid="prop-chip-solo"'));
 		assert.ok(!html.includes('data-testid="chain-arrow-solo-1"'), "no connector on a singleton");
-		// the visible line is the chip alone; "(no premises)" exists ONLY as the
-		// row's aria-label (the a11y one-liner) — exactly one occurrence
 		assert.equal(html.split("no premises").length - 1, 1, "aria-label only, never visible text");
 		assert.ok(html.includes('aria-label="Standalone (no premises)"'));
 	});
@@ -211,14 +163,7 @@ describe("ChainTableBody — chain rows (chips + connectors)", () => {
 		assert.ok(html.includes('data-testid="prop-row-a"'), "premise statement row");
 		assert.ok(html.includes("Statement A."), "the statement text, one click deep");
 		assert.ok(html.includes("Statement C."), "the conclusion statement");
-		// owner ruling: the derivation is already encoded in the chain line —
-		// no conclusion marker down here
 		assert.ok(!html.includes("prop-conclusion"), "no conclusion marker anywhere");
-		// THE ALIGNMENT STAIRCASE (owner ruling, round 4 — "double the
-		// indentation"): each level's checkbox sits under its parent's ICON
-		// slot, TWO columns (36px) past its own. Every column is 18px:
-		// clusters pl-3 (12) → chains pl-12 (48 = the folder icon) →
-		// statements pl-21 (84 = where a chain icon WOULD sit)
 		assert.ok(html.includes("pl-21"), "statements at the would-be chain-icon column");
 		assert.ok(html.includes("pl-12"), "chains aligned with the folder icon");
 		assert.ok(html.includes("h-5 w-3.5"), "the expander shares the checkbox's 14px width");
@@ -232,8 +177,6 @@ describe("ChainTableBody — the sortable table headers", () => {
 		assert.ok(html.includes('data-testid="sort-props"'));
 		assert.ok(html.includes('data-testid="sort-created"'));
 		assert.ok(html.includes('aria-sort="ascending"'), "default name A→Z");
-		// the small chevron (size-3 lucide) marks the ACTIVE header only —
-		// no giant text triangles (owner, round 2)
 		assert.ok(html.includes('lucide-chevron-up size-3'), "small up chevron on active name");
 		assert.ok(html.includes('lucide-chevron-down') === false, "no down chevron while ascending");
 	});
@@ -247,13 +190,12 @@ describe("ChainTableBody — the sortable table headers", () => {
 	});
 
 	it("Props sort orders cluster rows AND chains within (largest-first by default)", () => {
-		const html = render({ sort: { col: "props", dir: 1 }, expandedClusters: new Set(["chat1"]) }); // ascending: smallest first
+		const html = render({ sort: { col: "props", dir: 1 }, expandedClusters: new Set(["chat1"]) });
 		const unlabeled = html.indexOf("cluster-group-\0unlabeled");
 		const notes = html.indexOf('data-testid="cluster-group-notes1"');
 		const chat = html.indexOf('data-testid="cluster-group-chat1"');
 		assert.ok(unlabeled > 0 && notes > 0 && chat > 0, "all three groups render");
 		assert.ok(unlabeled < notes && notes < chat, "1 < 2 < 4 member ids ascending");
-		// within chat1: the singleton (1) sorts before the three-member chain
 		const soloRow = html.indexOf('data-testid="chain-row-solo"');
 		const c1Row = html.indexOf('data-testid="chain-row-c1"');
 		assert.ok(soloRow > 0 && c1Row > 0 && soloRow < c1Row, "chain sizes ascending within the cluster");
@@ -272,15 +214,11 @@ describe("ChainTableBody — the floating selection bar (never shifts layout)", 
 		assert.ok(html.includes('data-testid="chain-selected-summary"'));
 		assert.ok(html.includes("3 nodes → 1 chain"));
 		assert.ok(html.includes('data-testid="chain-clear"'));
-		// The danger fence (owner, 2026-09-29 night): a divider quarantines
-		// the destructive action at the bar's right end, red + trash icon,
-		// riding the same confirm dialog as the canvas delete.
 		assert.ok(html.includes('data-testid="chain-danger-divider"'));
 		const del = html.match(/<button[^>]*data-testid="chain-delete"[^>]*>/)?.[0] ?? "";
-		assert.match(del, /border-destructive\/50/); // the destructive pair
+		assert.match(del, /border-destructive\/50/);
 		assert.match(del, /aria-label="Delete 3 selected nodes"/);
 		assert.ok(html.includes("lucide-trash-2"), "the trash icon");
-		// the fence is before Delete in the DOM (right end of the bar)
 		assert.ok(html.indexOf('chain-danger-divider"') < html.indexOf('chain-delete"'));
 	});
 
@@ -302,15 +240,13 @@ describe("ChainTableBody — the fuzzy search (grouped + auto-expand)", () => {
 		const html = render({
 			nodes: aliased,
 			query: "zebra",
-			selection: new Set(["a", "b", "c1"]), // selection spans BOTH chains
+			selection: new Set(["a", "b", "c1"]),
 		});
-		// zebra hits: chain e (statement) + chain c1 (alias on b)
 		assert.ok(html.includes('data-testid="chain-row-c1"'), "auto-expanded cluster reveals the chain");
 		assert.ok(html.includes('data-testid="chain-row-e"'), "statement match");
 		assert.ok(!html.includes('data-testid="chain-row-solo"'), "non-matching chain hidden");
 		assert.ok(!html.includes("cluster-group-notes1") === false, "notes1 still renders (it has a match)");
 		assert.ok(!html.includes("Ethics lesson") === false, "chat1 still renders (it has a match)");
-		// the floating bar is never search-filtered
 		assert.ok(html.includes("3 nodes → 1 chain"));
 	});
 

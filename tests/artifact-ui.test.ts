@@ -1,23 +1,9 @@
-/**
- * THE ARTIFACT-UI ROUTE (owner, 2026-10-07): POST /api/chats/:id/artifact-ui
- * persists the learner's invert switch onto a demo/figure steer message
- * (details.ui.inverted) — the silent record-write route (no wake, no SSE).
- * The pure core (setSteerUiInverted) is pinned in tests/demos.test.tsx;
- * this file pins the ROUTE contract: 404 unknown chat, 400 for a bad body
- * or a non-artifact message id, and the record actually carrying the flag
- * after a write.
- *
- * Runs under an isolated LH_DATA_DIR (the chat-birth-stamp discipline:
- * the seam is set before any config-loading import, so every app-module
- * import is dynamic).
- */
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { after, before, describe, it } from "node:test";
 
-// ── the seam, BEFORE any config-loading import ──────────────────────────────
 const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-artifact-ui-"));
 process.env.LH_DATA_DIR = TMP_DATA;
 
