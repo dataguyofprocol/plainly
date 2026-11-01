@@ -36,7 +36,7 @@ For Windows/Linux packages and the three-OS CI/release flow, see [`desktop-relea
 
 ### Git hooks
 
-Lint and typecheck run on every commit; the test suite runs on every push. The hooks are managed by [pre-commit](https://pre-commit.com) (`.pre-commit-config.yaml`). Install it once per clone:
+Lint and typecheck run on every commit. Every push runs the test suite plus the rest of CI's Standalone job for this Mac: native renderer tests, `next build`, and the provider/server smokes (several minutes). The hooks are managed by [pre-commit](https://pre-commit.com) (`.pre-commit-config.yaml`). Install it once per clone:
 
 ```bash
 brew install pre-commit   # or: pipx install pre-commit

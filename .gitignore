@@ -1,6 +1,8 @@
 node_modules/
 data/
 .next/
+# managed by Next (dev and build write different contents); Next's docs say don't track it
+next-env.d.ts
 *.log
 .DS_Store
 *.tsbuildinfo

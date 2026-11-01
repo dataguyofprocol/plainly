@@ -48,15 +48,15 @@ Plainly has no Apple Developer ID yet, so it can't be notarized. macOS quarantin
 
 Both read the feed from `https://github.com/dataguyofprocol/plainly/releases/latest/download/`, which only serves the newest **published, non-prerelease** release. Both take `LH_UPDATE_FEED` to point at a local HTTP folder instead, for testing.
 
-Release steps (on an Apple Silicon Mac, with `package.json` at the new version `<v>`):
+Release steps (on an Apple Silicon Mac, with `package.json` at the new version `<v>` and the release's notes added as the top section of [CHANGELOG.md](../CHANGELOG.md)):
 
 ```sh
 npm run desktop:dist
-gh release create v<v> -R dataguyofprocol/plainly --draft --title "Plainly <v>" --notes-file <notes>
+gh release create v<v> -R dataguyofprocol/plainly --draft --target "$(git rev-parse HEAD)" --title "Plainly <v>" --notes-file <notes>
 gh release upload v<v> -R dataguyofprocol/plainly dist/Plainly-<v>-arm64-mac.zip dist/Plainly-<v>-arm64-mac.zip.blockmap dist/latest-mac.yml scripts/install.sh
 ```
 
-Then publish the draft. Installed copies pick it up within 24h, or at once from Plainly → Check for Updates….
+`--target` needs the full commit SHA; a short SHA is rejected. Then publish the draft. The `release-desktop` Claude Code skill (`.claude/skills/release-desktop/`) runs this whole procedure. Installed copies pick it up within 24h, or at once from Plainly → Check for Updates….
 
 ## CI vs release
 

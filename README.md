@@ -60,11 +60,11 @@ Plainly runs on your models. Connect OpenAI, Anthropic, OpenRouter, DeepSeek, Z.
 - Local storage doesn't mean offline. Model calls, web research, and dictation send what the task needs to those services.
 - Every system prompt is visible and editable, and the whole app is open source.
 
-## New in 0.1.0
+## What's new
 
-This is the first release under the Plainly name. Coming from LearnHarness 0.3.7, you get a redesigned interface with dark mode, the new Home screen, lessons with a side panel, rebuilt practice, the Knowledge page, and custom OpenAI-compatible providers.
+**0.1.6:** custom model servers work on the first try, and the opening check-in is shorter and clearer.
 
-On first launch, Plainly copies your LearnHarness data into its own folder and leaves the original untouched.
+See [CHANGELOG.md](CHANGELOG.md) for every release.
 
 ## Development
 

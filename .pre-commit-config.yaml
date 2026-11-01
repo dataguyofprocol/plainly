@@ -26,3 +26,40 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-push]
+      # The rest mirrors ci.yml's Standalone job (mac-arm64 leg), in order,
+      # so a push is gated locally while GitHub CI is unavailable.
+      - id: native-tests
+        name: native renderer tests (Electron Node)
+        entry: env NODE_ENV=test ELECTRON_RUN_AS_NODE=1 npx electron --import tsx --test tests/pdf-native-render.test.ts tests/pdf-ops.test.ts tests/svg-native-render.test.ts tests/browser-service.test.ts
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      - id: build
+        name: next build
+        entry: env NEXT_TELEMETRY_DISABLED=1 npm run build
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      - id: smoke-provider-runtime
+        name: smoke provider runtime
+        entry: node scripts/smoke-provider-runtime.mjs
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      - id: build-server
+        name: build standalone server
+        entry: node scripts/build-server.mjs
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      - id: smoke-server
+        name: smoke standalone server (Electron Node)
+        entry: node scripts/smoke-server.mjs --electron
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
