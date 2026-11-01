@@ -58,7 +58,8 @@ afterEach(async () => {
 
 describe("modelWithDetected", () => {
 	it("applies what the server described over the defaults", () => {
-		assert.deepEqual(modelWithDetected("m", undefined), { id: "m", vision: false, thinking: false, contextWindow: 128_000, maxTokens: 8192 });
+		assert.deepEqual(modelWithDetected("m", undefined), { id: "m", vision: true, thinking: true, thinkingFormat: "openai", contextWindow: 128_000, maxTokens: 8192 });
+		assert.deepEqual(modelWithDetected("t", { vision: false, thinking: false }), { id: "t", vision: false, thinking: false, contextWindow: 128_000, maxTokens: 8192 });
 		assert.deepEqual(modelWithDetected("v", { vision: true, thinking: true, contextWindow: 4096 }), {
 			id: "v",
 			vision: true,
@@ -80,7 +81,7 @@ describe("CustomModelsField", () => {
 		await click(host.querySelector('[data-testid="custom-models-find"]'));
 		assert.deepEqual(latest.map((m) => [m.id, m.vision, m.contextWindow]), [
 			["llava", true, 32_768],
-			["llama3", false, 128_000],
+			["llama3", true, 128_000],
 		]);
 		assert.ok(host.querySelector('[data-testid="custom-model-llava"]')?.textContent?.includes("Read from server"));
 		assert.ok(!host.querySelector('[data-testid="custom-model-llama3"]')?.textContent?.includes("Read from server"));
@@ -88,14 +89,16 @@ describe("CustomModelsField", () => {
 
 	it("toggles vision and thinking per model, the format select only while thinking", async () => {
 		const host = await mount([modelWithDetected("qwen", undefined)]);
-		assert.equal(host.querySelector('[data-testid="custom-model-qwen-format"]'), null);
+		assert.ok(host.querySelector('[data-testid="custom-model-qwen-format"]'));
 		await click(host.querySelector('[data-testid="toggle-qwen-vision"]'));
 		await click(host.querySelector('[data-testid="toggle-qwen-thinking"]'));
-		assert.deepEqual(latest[0], { id: "qwen", vision: true, thinking: true, thinkingFormat: "openai", contextWindow: 128_000, maxTokens: 8192 });
-		assert.ok(host.querySelector('[data-testid="custom-model-qwen-format"]'));
-		await click(host.querySelector('[data-testid="toggle-qwen-thinking"]'));
+		assert.equal(latest[0]!.vision, false);
 		assert.equal(latest[0]!.thinking, false);
 		assert.equal(latest[0]!.thinkingFormat, undefined);
+		assert.equal(host.querySelector('[data-testid="custom-model-qwen-format"]'), null);
+		await click(host.querySelector('[data-testid="toggle-qwen-thinking"]'));
+		assert.equal(latest[0]!.thinking, true);
+		assert.equal(latest[0]!.thinkingFormat, "openai");
 		await click(host.querySelector('[data-testid="custom-model-qwen-remove"]'));
 		assert.deepEqual(latest, []);
 	});
