@@ -10,6 +10,9 @@ export * from "./render-settings.ts";
 
 export * from "./question-core.ts";
 export * from "./events.ts";
+// clusters.ts (Louvain) and layout-settle.ts are deliberately NOT
+// re-exported: the shell never runs them, and exporting them pulls the heavy
+// clustering deps into the client bundle.
 export * from "./layout.ts";
 export * from "./plan-tree.ts";
 export * from "./phases.ts";

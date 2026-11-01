@@ -490,7 +490,7 @@ function setupAutoUpdater() {
 	autoUpdater.logger = {
 		info: (m) => log(`updater: ${m}`),
 		warn: (m) => log(`updater warn: ${m}`),
-		debug: (m) => {},
+		debug: (m) => {}, // too chatty for the persistent log
 		error: (m) => log(`updater error: ${m}`),
 	};
 	autoUpdater.on("update-downloaded", (info) => {

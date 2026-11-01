@@ -2,6 +2,9 @@ name: Desktop release
 
 on:
   # Releases are built locally, so a v* tag must not start this workflow.
+  # Restore this trigger when Windows/Linux release through CI again:
+  #   push:
+  #     tags: ["v*"]
   # Manual runs are artifact-only, unsigned, and never create a release.
   workflow_dispatch:
 

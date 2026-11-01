@@ -86,6 +86,9 @@ win:
       arch:
         - x64
   artifactName: "${productName}-${version}-${arch}-setup.${ext}"
+  # Unsigned Windows release: preserve icon/version metadata, skip signing,
+  # and do not require a publisher signature for updates. Flip both flags
+  # back together when Windows signing returns.
   signExecutable: false
   verifyUpdateCodeSignature: false
 nsis:

@@ -67,7 +67,7 @@ function createSubscriptions(options) {
 	function snapshotNow() {
 		return { statuses: [...entries.values()].map(statusOf), models: Object.fromEntries([...entries.values()].map((entry) => [entry.providerId, statusOf(entry).connected ? clone(entry.catalog) : []])) };
 	}
-	function changed(entry) { entry.revision++; try { options.onChange?.(snapshotNow()); } catch { } }
+	function changed(entry) { entry.revision++; try { options.onChange?.(snapshotNow()); } catch { /* observer cannot break credential writes */ } }
 	function catalog(entry) {
 		let models = entry.provider?.getModels().filter((model) => APIS.has(model.api)) ?? [];
 		if (!entry.state.credential) models = [];

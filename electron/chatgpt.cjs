@@ -118,6 +118,7 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 		return next;
 	};
 	const active = () => !storageDenied && !suspended && !closed && !paused ? state?.registrations.find((r) => r.id === state.activeId && r.tokens && !r.reconnectRequired) : undefined;
+	// These fields are validated/verified before storage. Email is never identity.
 	const sameAccount = (a, b) => a.issuer === b.issuer && a.subject === b.subject;
 	function accountGroups() {
 		const groups = [];
@@ -211,6 +212,7 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 	async function identity(idToken, clientId, nonce, expectedSubject) {
 		try {
 			const { jwtVerify, createLocalJWKSet } = await import("jose");
+			// Fixed, documented JWKS origin; never follow a discovery-supplied URL.
 			const keys = await json(JWKS);
 			const { payload } = await jwtVerify(idToken, createLocalJWKSet(keys), {
 				issuer: ISSUER, audience: clientId, algorithms: ["RS256"],
@@ -279,6 +281,7 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 				res.setHeader("Referrer-Policy", "no-referrer");
 				if (req.method !== "GET" || callback.origin !== new URL(redirectUri).origin || callback.pathname !== "/auth/callback" || req.headers.host !== new URL(redirectUri).host || consumed) { res.writeHead(404).end(); return; }
 				const params = callback.searchParams;
+				// Reject duplicate parameters and unsolicited callbacks without consuming a valid pending attempt.
 				if (["state", "code", "client_id", "error"].some((key) => params.getAll(key).length > 1) || params.get("state") !== expectedState) { res.writeHead(400).end("Sign-in could not be verified."); return; }
 				consumed = true;
 				res.writeHead(200, { "content-type": "text/plain; charset=utf-8" }).end("Return to Plainly to view the sign-in result. You may close this tab.");
@@ -305,7 +308,7 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 						next.registrations = next.registrations.filter((r) => r.id !== record.id).concat(record);
 						next.activeId = record.id;
 						const previous = structuredClone(state);
-						await save(next);
+						await save(next); // Active identity changes only AFTER validation and durable persistence.
 						if (closed || abort.signal.aborted || epoch !== attemptEpoch) {
 							await save(previous);
 							throw fail("cancelled");
@@ -331,7 +334,7 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 				state: expectedState, nonce, code_challenge_method: "S256",
 				code_challenge: crypto.createHash("sha256").update(verifier).digest("base64url"),
 			}).toString();
-			await openExternal(url.toString());
+			await openExternal(url.toString()); // Trusted main only. Never return this URL to the renderer.
 		} catch (err) { cancel(err.code || "network"); }
 		void completion;
 		return snapshot();
@@ -463,10 +466,10 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 						const response = await request(config.revocation_endpoint, { method: "POST", redirect: "error", signal: AbortSignal.timeout(5000), headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token: account.tokens.refreshToken, token_type_hint: "refresh_token", client_id: account.clientId }) });
 						revoked = response.status === 200;
 						if (revoked || response.status < 500) break;
-					} catch { }
+					} catch { /* retry only while the refresh token is still in memory */ }
 				}
 			}
-		} catch { }
+		} catch { /* local action is mandatory even when revocation is unavailable */ }
 		return revoked;
 	}
 	async function disconnect(id) {
@@ -486,7 +489,7 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 			for (const member of members) { const confirmed = await revoke(member); revoked = confirmed && revoked; }
 			const next = structuredClone(state);
 			next.registrations = next.registrations.filter((r) => !sameAccount(r, target));
-			if (activeGroup) next.activeId = null;
+			if (activeGroup) next.activeId = null; // Never silently select another account.
 			await save(next);
 			if (members.some((r) => r.clientId === retryRegistration?.clientId)) retryRegistration = undefined;
 			if (stopped && !closed && epoch === disconnectEpoch) suspended = false;

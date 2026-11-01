@@ -3,7 +3,7 @@ const { PROVIDERS } = require("./subscription-store.cjs");
 const { publicError } = require("./subscriptions.cjs");
 function attachSubscriptionChild(child, controller) {
 	let disposed = false;
-	const send = (packet) => { if (!disposed && child.connected) { try { child.send(packet, () => {}); } catch { } } };
+	const send = (packet) => { if (!disposed && child.connected) { try { child.send(packet, () => {}); } catch { /* child exited */ } } };
 	const listener = async (message) => {
 		if (disposed || !child.connected || message?.channel !== "lh:subscriptions" || typeof message.id !== "string") return;
 		const { id, op } = message;

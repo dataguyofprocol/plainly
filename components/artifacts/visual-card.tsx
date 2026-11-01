@@ -11,6 +11,13 @@ import { downloadFile } from "@/components/artifacts/download";
 import { DispatchCard } from "@/components/artifacts/dispatch-card";
 import type { ArtifactPartProps, VisualResult } from "@/src/core";
 
+/**
+ * Cheap SVG hygiene, NOT a full sanitizer: it strips only the obvious exec
+ * vectors (<script>, on* handlers, javascript:/data:text/html hrefs). The
+ * output still goes into dangerouslySetInnerHTML, which is acceptable only
+ * because the SVG is model-authored for the learner's own machine. Do not
+ * reuse this for untrusted input.
+ */
 export function sanitizeSvg(svg: string): string {
 	return svg
 		.replace(/<script[\s\S]*?<\/script\s*>/gi, "")

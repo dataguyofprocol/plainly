@@ -43,6 +43,9 @@ if (exists(leakedData)) {
 	process.exit(1);
 }
 
+// The trace sweep once shipped the repo-root auth.json (the dev BYOK key
+// store) byte-identical into the DMG. next.config.ts excludes it; this
+// guard makes a regression loud instead of silent.
 for (const secret of ["auth.json", ".env", ".env.local"]) {
 	if (exists(path.join(STANDALONE, secret))) {
 		console.error(`[build-server] REFUSING: standalone contains ${secret} — dev secrets would ship in the app.`);
@@ -53,6 +56,8 @@ for (const secret of ["auth.json", ".env", ".env.local"]) {
 
 // Remove ONLY these standalone-root paths AFTER tracing — excluding a
 // generic dist/** earlier broke pi-ai / pi-agent-core's runtime dist/.
+// Never touch ROOT/dist or ROOT/node_modules/electron (the running app
+// and the build runtime).
 for (const extra of ["dist", path.join("node_modules", "electron")]) {
 	const target = path.join(STANDALONE, extra);
 	if (exists(target)) {
