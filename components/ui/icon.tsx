@@ -1,13 +1,3 @@
-/**
- * THE ICON SYSTEM (finesse pass, 2026-10-26) — the ONLY module that imports
- * lucide-react. Every icon in the app is <Icon name="…" />: one stroke
- * weight (1.75), three sizes (sm 14 · md 16 · lg 20), decorative by
- * default (the control carrying it owns the label), and a semantic name
- * map so a concept always draws the same glyph (Practice is always a
- * target, Knowledge always a network). Need a glyph that isn't here?
- * Add a semantic name to ICONS — never import lucide-react elsewhere.
- */
-
 import type { CSSProperties } from "react";
 import {
 	Archive,
@@ -97,7 +87,6 @@ import {
 } from "lucide-react";
 
 export const ICONS = {
-	// Places
 	home: House,
 	knowledge: Waypoints,
 	graph: Waypoints,
@@ -111,7 +100,6 @@ export const ICONS = {
 	path: Milestone,
 	tree: Network,
 	library: Library,
-	// Actions
 	plus: Plus,
 	minus: Minus,
 	close: X,
@@ -145,7 +133,6 @@ export const ICONS = {
 	sidebar: PanelLeft,
 	panel: PanelRight,
 	command: Command,
-	// Direction
 	"arrow-right": ArrowRight,
 	"arrow-left": ArrowLeft,
 	"arrow-down": ArrowDown,
@@ -155,7 +142,6 @@ export const ICONS = {
 	"chevron-left": ChevronLeft,
 	"chevron-right": ChevronRight,
 	"chevrons-up-down": ChevronsUpDown,
-	// Status
 	"status-ok": CircleCheck,
 	"status-error": CircleX,
 	"status-warn": CircleAlert,
@@ -166,7 +152,6 @@ export const ICONS = {
 	loading: Loader,
 	time: Clock,
 	flag: Flag,
-	// Concepts
 	idea: Lightbulb,
 	thinking: Brain,
 	ask: MessageCircle,
@@ -183,7 +168,6 @@ export const ICONS = {
 	stats: ChartColumn,
 	learn: GraduationCap,
 	magic: Wand2,
-	// Settings sections
 	key: KeyRound,
 	provider: Plug,
 	model: Cpu,
@@ -210,7 +194,6 @@ export function Icon({
 	size?: IconSize;
 	className?: string;
 	style?: CSSProperties;
-	/** Only when the icon stands alone as content; controls label themselves. */
 	label?: string;
 	strokeWidth?: number;
 }) {
@@ -220,7 +203,6 @@ export function Icon({
 		<Glyph
 			width={px}
 			height={px}
-			// Optical weight: hairlines read thin at 12–14px, heavy at 20+.
 			strokeWidth={strokeWidth ?? (px <= 14 ? 2 : px >= 20 ? 1.6 : 1.75)}
 			absoluteStrokeWidth={false}
 			className={className ? `ic ${className}` : "ic"}
@@ -233,12 +215,6 @@ export function Icon({
 	);
 }
 
-/**
- * The Plainly mark: a tangled line above, the same idea said plainly below,
- * ending in an amber full stop. Drawn on a 24px grid; the line and dot sit
- * on whole pixels so they stay crisp from 16 to 32px. The amber is the
- * app icon's, not a theme token.
- */
 export function LogoMark({ size = 22 }: { size?: number }) {
 	return (
 		<svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ flex: "none" }}>

@@ -71,8 +71,6 @@ export const ConversationEmptyState = ({
 
 export type ConversationScrollButtonProps = ComponentProps<"button">;
 
-/** Back to the newest message: a round floating button, shown only while
- *  the reader has scrolled away from the bottom. */
 export const ConversationScrollButton = ({
   className,
   ...props

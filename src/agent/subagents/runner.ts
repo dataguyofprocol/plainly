@@ -30,37 +30,11 @@ import { runPdfReaderAgent } from "./pdf-reader.ts";
 import { runResearcherAgent } from "./researcher.ts";
 import { runVisualMaker } from "./visual-maker.ts";
 
-/**
- * The background job runner (contracts.ts "THE ASYNC PROTOCOL" §2–3), created
- * via createJobRunner({ chatStore, jobStore, deliver }) — the composition root
- * (chat-handler) injects the storage ports and the WAKE SEAM (the server-side
- * steer delivery, src/server/jobs.ts); this module never imports an adapter.
- *
- *   runJob(jobId) — runs the kind's sub-agent loop in the background
- *     (the job tools' execute fires this via the spawn seam, fire-and-forget),
- *     updating the job's activity line on every iteration. On completion the
- *     runner builds the STEER MESSAGE (buildSubagentSteer) and hands it to
- *     `deliver`; the wake pipeline fires the server-side teacher turn and
- *     flips the job to done/error when the lesson has actually resumed.
- *
- *   On failure the result is the failure shape (empty html/svg + "FAILED: …"
- *   notes; research: failure brief) — and it STILL steers, because the
- *   teacher must learn the outcome. If delivery itself fails, the job is
- *     marked error (the learner's activity card shows it).
- */
-
-/**
- * Test seam: the spawn wiring has no injection point at the tool layer, so
- * tests swap in a scripted pi engine here to keep job tests off the network.
- * Undefined in production. (The jobs spawn through the module-level KIND
- * runners, which read these at call time.)
- */
 export const researchModelOverride: { current?: PiEngine } = {};
 export const demoModelOverride: { current?: PiEngine } = {};
 export const visualModelOverride: { current?: PiEngine } = {};
 export const pdfModelOverride: { current?: PiEngine } = {};
 
-/** The dispatch-time tool input (from src/agent/tools/jobs.ts schemas). */
 type JobToolInput = ResearchToolInput | DemoToolInput | VisualToolInput | PdfToolInput;
 
 export interface JobRunnerDeps {
@@ -72,24 +46,8 @@ export interface JobRunnerDeps {
 	 * flipped); rejects when delivery fails unrecoverably.
 	 */
 	deliver: (steer: SteerMessage) => Promise<void>;
-	/** Settings-resolved engine per role (model slots wave, 2026-09-20):
-	 *  the role-override → slot chain, read FRESH per job (the server
-	 *  wiring passes effectiveSettings-based resolution). Test overrides
-	 *  (below) still win. BYOK (owner, 2026-09-22): the chain may end
-	 *  EMPTY → undefined; runJob then refuses the spawn honestly instead
-	 *  of guessing a model. */
 	engineFor?: (role: ModelRole) => PiEngine | undefined;
-	/** The search seam (search port wave, 2026-09-20): resolves the LIVE
-	 *  provider fresh per job — server/search.ts composition injected by
-	 *  the wiring; null = honestly unavailable (the researcher's web_search
-	 *  reports it as recoverable text). Absent seam (tests) reads the same;
-	 *  research dispatch and web_fetch do not require search credentials. */
 	searchProvider?: () => SearchProvider | null;
-	/** Key-presence gate (provider-key interlude, 2026-09-25): given the
-	 *  resolved engine's provider + the kind's slot tier, return the
-	 *  refusal envelope when the provider's key is missing (null = run).
-	 *  Injected because the agent layer may not read the key store; absent
-	 *  in tests that inject engines directly (test engines never owe a key). */
 	providerKeyMissing?: (provider: string, tier: ModelSlotName) => ProviderKeyMissing | null;
 }
 
@@ -101,22 +59,12 @@ export interface JobRunner {
 	runJob(jobId: string, input?: JobToolInput): Promise<void>;
 }
 
-/** One job loop's injected machinery: the kill switch (real abort, 2026-09
- * semantics) and the usage tap (money channel — every model call folds into
- * JobRecord.usage as it completes). */
 interface LoopContext {
-	/** Fires when abortJob kills the run; abortSignal is passed into every
-	 * model call so the spend stops mid-call, not at the next loop check. */
 	abortSignal: AbortSignal;
-	/** The job's chat (debug: raw provider-event recording under
-	 * LH_PROVIDER_EVENTS=1 — forwarded into every subagent run). */
 	chatId?: string;
-	/** Fold one model call's usage into the job record (progress write). */
 	onUsage: (step: UsageStepLike) => void;
 }
 
-/** The kind→role table (model slots wave, 2026-09-20): which ModelRole's
- * engine each sub-agent kind runs — the engineFor injection key. */
 const KIND_ROLE: Record<JobKind, ModelRole> = {
 	research: "researcher",
 	demo: "demoBuilder",
@@ -127,18 +75,11 @@ const KIND_ROLE: Record<JobKind, ModelRole> = {
 export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 	const { chatStore, jobStore, deliver } = deps;
 
-	/** Running usage totals per live job (the loop's onUsage folds here,
-	 * then writes through the job store so the poll sees progress). */
 	const usageTotals = new Map<string, JobUsage>();
 
 	function makeLoopContext(jobId: string, engine: PiEngine): LoopContext {
 		const chatId = jobStore.getJob(jobId)?.chatId;
-		// Provider-qualified stamp: the engine's actual model — the only
-		// thing that ran (BYOK: no config-pin fallback stamps exist).
 		const model = `${engine.model.provider}:${engine.model.id}`;
-		// Real-kill wiring (2026-09 abort semantics): the controller is what
-		// the abort endpoint fires (agent/subagents/aborts.ts registry); the
-		// signal rides into every model call of the loop.
 		const controller = new AbortController();
 		registerJobAbort(jobId, controller);
 		return {
@@ -152,21 +93,10 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 		};
 	}
 
-	/** True while the job may still write terminal state (result, error,
-	 * steer). False once abortJob has flipped it to error ("Aborted by learner") —
-	 * the runner then unwinds silently; the abort path owns the record and
-	 * the abort steer. */
 	function stillRunning(jobId: string): boolean {
 		return jobStore.getJob(jobId)?.status === "running";
 	}
 
-	/** The kind→runner map: one sub-agent loop per kind. Each kind's
-	 *  runner narrows the union input itself (dispatch-time inputs are
-	 *  kind-correct by construction; transcript fallbacks are cast after). */
-	/** The engine one job runs on: test override first (the old seam —
-	 *  tests swap scripted engines without touching deps), then the injected
-	 *  settings-resolved engineFor. undefined = the BYOK chain came up
-	 *  empty (owner, 2026-09-22) — runJob refuses below, honestly. */
 	function pickEngine(kind: JobKind): PiEngine | undefined {
 		const testOverride: Record<string, { current?: PiEngine } | undefined> = {
 			researcher: researchModelOverride,
@@ -193,7 +123,7 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 			console.error(`[job ${jobId}] not found — nothing to run`);
 			return;
 		}
-		if (job.status !== "running") return; // already finished / re-run after crash recovery
+		if (job.status !== "running") return;
 		const run = KIND_RUNNERS[job.kind];
 		if (!run) {
 			console.error(`[job ${jobId}] unknown kind: ${job.kind}`);
@@ -201,14 +131,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 			return;
 		}
 		const engine = pickEngine(job.kind);
-		// The per-need refusal guards (BYOK 2026-09-22 / provider-key
-		// interlude 2026-09-25): no engine for the kind's tier, or the
-		// resolved engine's provider key gone — both refuse through the SAME
-		// convention as every other failed job: record the honest error (no
-		// status flip: finalizeJob owns the terminal flip after delivery),
-		// then steer the kind's failure shape through finishJob so the wake
-		// pipeline resumes the lesson and the teacher reads the refusal
-		// instead of waiting forever on a job it already dispatched.
 		const refuse = async (reason: string): Promise<void> => {
 			if (stillRunning(jobId)) jobStore.updateJob(jobId, { error: reason });
 			const resolved = resolveInput(job, input) as
@@ -246,10 +168,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 			await refuse(`${envelope.error} (missing: ${tier})`);
 			return;
 		}
-		// Key presence (2026-09-25): the engine exists, but its provider's
-		// key may be gone — refuse the spawn BEFORE the loop, same
-		// convention (the injected check reads the key store; absent in
-		// engine-injecting tests).
 		const keyRefusal =
 			deps.providerKeyMissing?.(engine.model.provider, ROLE_SLOT[KIND_ROLE[job.kind]]) ?? null;
 		if (keyRefusal) {
@@ -261,18 +179,12 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 			await run(jobId, engine, input, makeLoopContext(jobId, engine));
 		} finally {
 			unregisterJobAbort(jobId);
-			// The last usage write may have been mid-flight when the loop died;
-			// persist what was folded (the abort path patches only status, so
-			// this never resurrects an aborted job — merge patch).
 			const usage = usageTotals.get(jobId);
 			if (usage) jobStore.updateJob(jobId, { usage });
 			usageTotals.delete(jobId);
 		}
 	}
 
-	/** Resolve the job's tool input: dispatch passes it directly; only a
-	 *  crash-recovery re-spawn (no input) falls back to scanning the
-	 *  transcript (by then onFinish has long persisted the part). */
 	function resolveInput(
 		job: JobRecord,
 		input: JobToolInput | undefined,
@@ -280,8 +192,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 		if (input) return input;
 		const chat = chatStore.getChat(job.chatId);
 		if (!chat) return undefined;
-		// Wave D: the record is native history — the scan reads the native
-		// assistant blocks directly (a toolCall's arguments are the input).
 		for (const m of chat.messages) {
 			if ((m as { role?: string }).role !== "assistant") continue;
 			const content = (m as { content?: unknown }).content;
@@ -294,18 +204,9 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 		return undefined;
 	}
 
-	/**
-	 * The tail of every job: store the result, build the steer, hand it to
-	 * the wake pipeline. The pipeline flips the status when the lesson has
-	 * actually resumed — until then the job reads "running" so the client's
-	 * activity card keeps polling and re-syncs once, at the end.
-	 */
 	async function finishJob(jobId: string, result: ResearchResult | DemoResult | VisualResult | PdfResult): Promise<void> {
 		const job = jobStore.getJob(jobId);
 		if (!job) return;
-		// Aborted mid-run or mid-delivery (abortJob flips the record before
-		// the loop unwinds): no result write, no steer — the abort path owns
-		// the record and queues the abort steer itself.
 		if (job.status !== "running") return;
 		jobStore.updateJob(jobId, { result, activity: "delivering result" });
 		const steer = buildSubagentSteer(job, result);
@@ -318,7 +219,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 		}
 	}
 
-	/** Chat-record + input resolution shared by all three runners. */
 	function jobContext(jobId: string): { job: JobRecord; chatId: string } | null {
 		const job = jobStore.getJob(jobId);
 		if (!job || job.status !== "running") return null;
@@ -329,8 +229,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 		}
 		return { job, chatId: job.chatId };
 	}
-
-	// ─── research ───────────────────────────────────────────────────────────
 
 	async function runResearchJob(
 		jobId: string,
@@ -355,9 +253,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 			.join("\n\n");
 
 		const fetchedUrls: string[] = [];
-		// Per-job PDF dir (researcher PDF wave, 2026-10-07): web_fetch_pdf
-		// downloads land here; every pdf tool is scoped to it; it dies with
-		// the job (never enters the record).
 		const pdfDir = await fs.mkdtemp(path.join(os.tmpdir(), "lh-research-"));
 
 		try {
@@ -368,8 +263,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 				pdfDir,
 				abortSignal: loop.abortSignal,
 				chatId: loop.chatId,
-				// Money channel: each agent step is one model call — fold its
-				// usage into the record as it completes (progress write).
 				onUsage: (usage) => loop.onUsage(piUsageToStep(usage)),
 					onToolStart: (toolName, args) => {
 					const input = args as { query?: string; url?: string } | undefined;
@@ -383,9 +276,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 			const research: ResearchResult = { brief: brief.trim(), sources: parseSources(brief.trim(), fetchedUrls) };
 			await finishJob(jobId, research);
 		} catch (err) {
-			// Real-kill abort (2026-09): the abort path flipped the record and
-			// queued the abort steer — unwind silently, keep the usage
-			// folded so far (flushed by runJob's finally).
 			if (loop.abortSignal.aborted) return;
 			const reason = err instanceof Error ? err.message : String(err);
 			if (stillRunning(jobId)) jobStore.updateJob(jobId, { error: reason });
@@ -394,8 +284,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 			await fs.rm(pdfDir, { recursive: true, force: true });
 		}
 	}
-
-	// ─── demo + visual ──────────────────────────────────────────────────────
 
 	async function runDemoJob(
 		jobId: string,
@@ -470,8 +358,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 		}
 	}
 
-	// ─── pdf reading (sources v0) ────────────────────────────────────────────
-
 	async function runPdfJob(
 		jobId: string,
 		model: PiEngine | undefined,
@@ -512,9 +398,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 	return { runJob };
 }
 
-// ─── module-level pure helpers ──────────────────────────────────────────────
-
-/** Failure shape (W6 brief): html === "" with "FAILED: …" notes. */
 function isDemoFailure(result: DemoResult): boolean {
 	return typeof result.html !== "string" || result.html.length === 0;
 }
@@ -523,12 +406,10 @@ function isVisualFailure(result: VisualResult): boolean {
 	return typeof result.svg !== "string" || result.svg.length === 0;
 }
 
-/** The pdf-reader's failure brief (mirrors the research failure shape). */
 function isPdfFailure(result: PdfResult): boolean {
 	return /^PDF failed:/i.test(result.brief);
 }
 
-/** The activity line shown in the UI: `web_search: "query"` / `web_fetch: host`. */
 function activityLine(toolName: string, input: { query?: string; url?: string } | undefined): string {
 	if (toolName === "web_search") return `web_search: "${input?.query ?? ""}"`;
 	if (toolName === "web_fetch") return `web_fetch: ${hostOf(input?.url)}`;
@@ -544,7 +425,6 @@ function hostOf(url: string | undefined): string {
 	}
 }
 
-/** Sources for the result: markdown links cited in the brief, else fetched URLs. */
 function parseSources(brief: string, fetchedUrls: string[]): ResearchResult["sources"] {
 	const sources: ResearchResult["sources"] = [];
 	const seen = new Set<string>();

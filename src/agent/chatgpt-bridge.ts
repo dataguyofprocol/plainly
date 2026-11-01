@@ -60,7 +60,6 @@ function acceptStatus(state: BridgeState, value: StatusValue) {
  if (value.epoch !== state.stamp.epoch || value.authorityRevision !== state.stamp.authorityRevision || value.status.activeId !== state.status.activeId) clearCatalog(state);
  state.status = value.status; state.stamp = { epoch: value.epoch, authorityRevision: value.authorityRevision, revision: value.revision };
 }
-/** Runtime-only inherited IPC. No HTTP credential route or renderer method. */
 export function chatGPTRequest<T>(op: "status" | "models" | "lease", fields: Record<string, unknown> = {}): Promise<T> {
  const state = bridge();
  if (!desktopIPCConnected()) return Promise.reject(new Error("ChatGPT sign-in is available only in the desktop app with a private server connection."));
@@ -94,7 +93,6 @@ export async function chatGPTLease(scope: AdmissionScope, background: boolean): 
  if (!validStamp(value) || !chatGPTScopeCurrent(scope) || value.epoch !== scope.epoch || value.authorityRevision !== scope.authorityRevision || value.accountId !== scope.accountId || typeof value.accessToken !== "string" || !value.accessToken || value.accessToken.startsWith("sk-")) throw new Error("ChatGPT lease is stale");
  return value;
 }
-/** Safe status confirmation can establish consent-only denial, never parse error text. */
 export async function chatGPTDenial(scope: AdmissionScope | undefined, controller: AbortController, callerAborted: boolean, background: boolean): Promise<NoDispatchKind> {
  if (callerAborted || controller.signal.reason === "all") return "all";
  if (!scope || !chatGPTScopeCurrent(scope)) return "other";
@@ -105,7 +103,6 @@ export async function chatGPTDenial(scope: AdmissionScope | undefined, controlle
  if (controller.signal.reason === "all" || !chatGPTScopeCurrent(scope)) return "all";
  return !chatGPTBackgroundAllowed() ? "background" : "other";
 }
-/** Preserve account order; unknown capabilities/windows are never fabricated. */
 export async function refreshChatGPTModels(supported: Model<"openai-responses">[]): Promise<void> {
  const state = bridge();
  if (!desktopIPCConnected()) { clearCatalog(state); return; }

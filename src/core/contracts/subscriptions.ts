@@ -1,6 +1,5 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 
-/** Native SDK IDs stay distinct from the app's persisted connection routes. */
 export type NativeSubscriptionProviderId = "github-copilot" | "xai";
 export type NativeSubscriptionLogicalId = "github-copilot-subscription" | "xai-subscription";
 
@@ -41,7 +40,6 @@ export interface NativeSubscriptionStatus {
 	interaction?: SubscriptionInteraction;
 }
 
-/** Private inherited IPC also carries safe, SDK-supported catalog metadata. */
 export interface NativeSubscriptionSnapshot {
 	statuses: NativeSubscriptionStatus[];
 	models: Partial<Record<NativeSubscriptionProviderId, Model<Api>[]>>;

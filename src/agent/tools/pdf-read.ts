@@ -5,37 +5,17 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
 import { pdfExtract, pdfInfo, pdfProbe, pdfSearch } from "../subagents/pdf-ops.ts";
 
-/**
- * PDF reading tools for the RESEARCHER sub-agent (owner design B,
- * 2026-10-07): PDFs from the web, with the pdf-reader agent's TEXT
- * capabilities — triage (pdf_info), page-level extraction (pdf_extract),
- * targeted lookup (pdf_search) — woven into the researcher's own loop so
- * page-cited content lands in the brief directly.
- *
- * web_fetch_pdf acquires the file (download, size-capped, probe-validated)
- * into a per-job temp dir; every path-taking tool is SCOPED to that dir
- * (the researcher can never read outside it). pdf_render is deliberately
- * absent: the researcher's model slot has no vision — visual reading of
- * math-heavy pages stays the pdf job's job.
- *
- * Tool contract (the web.ts law): NEVER throw into the agent loop — every
- * failure path returns a clear error STRING the researcher can adapt to.
- */
-
 const USER_AGENT =
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 const FETCH_TIMEOUT_MS = 60_000;
-/** PDFs run bigger than pages — arxiv papers routinely 5-20 MB. */
 const MAX_PDF_BYTES = 25 * 1024 * 1024;
 
-/** The pdf-reader doctrine's size classes, by page count. */
 function sizeClass(pageCount: number): "short" | "medium" | "long" {
 	if (pageCount <= 10) return "short";
 	if (pageCount <= 40) return "medium";
 	return "long";
 }
 
-/** Pages worth a look before any extraction — math- or image-heavy. */
 function flaggedPages(info: Awaited<ReturnType<typeof pdfInfo>>): number[] {
 	return info.pages
 		.filter((p) => p.math_density >= 0.03 || p.image_count > 0)
@@ -43,8 +23,6 @@ function flaggedPages(info: Awaited<ReturnType<typeof pdfInfo>>): number[] {
 		.map((p) => p.page);
 }
 
-/** Resolve a tool-supplied path and require it to live INSIDE the job's
- *  pdf dir — the researcher's filesystem ends at the temp dir's wall. */
 function scopedPath(dir: string, filePath: string): string | null {
 	const root = path.resolve(dir) + path.sep;
 	const resolved = path.resolve(dir, filePath);
@@ -52,8 +30,6 @@ function scopedPath(dir: string, filePath: string): string | null {
 	return resolved;
 }
 
-/** Filename for a downloaded PDF — slug from the URL's last segment plus a
- *  unique suffix (two PDFs from different URLs never collide). */
 function pdfFileName(url: string): string {
 	try {
 		const last = new URL(url).pathname.split("/").filter(Boolean).pop() ?? "document";
@@ -65,7 +41,6 @@ function pdfFileName(url: string): string {
 	}
 }
 
-/** The download + triage summary the researcher sees from web_fetch_pdf. */
 export interface PdfFetchSummary {
 	path: string;
 	url: string;

@@ -1,19 +1,3 @@
-/**
- * Custom OpenAI-compatible providers' server surface (custom-endpoint wave,
- * 2026-10-26): the CRUD behind /api/providers/custom and the /models probe.
- *
- * Entries live in the settings record (providers.custom — non-secret);
- * keys live in the auth store under LH_CUSTOM_<SLUG>_API_KEY, written only
- * through here (server/keys.ts saveCustomProviderKey — the generic keys
- * API refuses them). Every write re-syncs the engine registry
- * (agent/models.ts syncCustomProviders), so a new endpoint federates into
- * the pickers with no restart.
- *
- * Importing this module registers the settings record as the registry's
- * source — model-catalog.ts imports it, so every catalog/engine path sees
- * custom providers.
- */
-
 import {
 	CUSTOM_CONTEXT_MAX,
 	CUSTOM_CONTEXT_MIN,
@@ -32,7 +16,6 @@ import { setCustomProviderSource, syncCustomProviders } from "../agent/models.ts
 import { settingsStore } from "../store/settings.ts";
 import { deleteCustomProviderKey, keyValue, saveCustomProviderKey } from "./keys.ts";
 
-/** The stored entries (sanitized on read by the settings adapter). */
 export function customProviderEntries(): CustomProviderEntry[] {
 	const custom = settingsStore.readSettings()?.providers?.custom;
 	return Array.isArray(custom) ? custom : [];
@@ -40,7 +23,6 @@ export function customProviderEntries(): CustomProviderEntry[] {
 
 setCustomProviderSource(customProviderEntries);
 
-/** Whether a key is stored (env-first, the keys seam's own lookup). */
 export function customProviderKeyPresent(id: string): boolean {
 	return keyValue(customProviderEnvVar(id)) !== undefined;
 }
@@ -49,8 +31,6 @@ function view(entry: CustomProviderEntry): CustomProviderView {
 	return { ...entry, keyPresent: customProviderKeyPresent(entry.id) };
 }
 
-/** Read-modify-write the providers section; every other key rides along.
- *  Then patch the live registry. */
 function writeEntries(entries: CustomProviderEntry[]): void {
 	const record = settingsStore.readSettings() ?? { version: 1 };
 	const providers = record.providers && typeof record.providers === "object" ? record.providers : {};
@@ -62,8 +42,6 @@ export function listCustomProviders(): CustomProviderView[] {
 	return customProviderEntries().map(view);
 }
 
-/** Mint the id from the name, store the entry, then the key (or clear a
- *  stale one left under the same slot by a hand edit). */
 export function createCustomProvider(input: CustomProviderCreate): CustomProviderView {
 	const entries = customProviderEntries();
 	const id = mintCustomProviderId(input.name, entries.map((e) => e.id));
@@ -75,8 +53,6 @@ export function createCustomProvider(input: CustomProviderCreate): CustomProvide
 	return view(entry);
 }
 
-/** Partial update — the id never changes (a rename keeps every pin
- *  working). null = unknown id. */
 export function updateCustomProvider(id: string, patch: CustomProviderUpdate): CustomProviderView | null {
 	const entries = customProviderEntries();
 	const current = entries.find((e) => e.id === id);
@@ -94,8 +70,6 @@ export function updateCustomProvider(id: string, patch: CustomProviderUpdate): C
 	return view(entry);
 }
 
-/** Remove the entry and its key. Slots pinned to it are left as they are
- *  — the lapsed-pin handling downstream reports them. false = unknown id. */
 export function deleteCustomProvider(id: string): boolean {
 	const entries = customProviderEntries();
 	if (!entries.some((e) => e.id === id)) return false;
@@ -104,12 +78,8 @@ export function deleteCustomProvider(id: string): boolean {
 	return true;
 }
 
-// ─── The /models probe ─────────────────────────────────────────────────────
-
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
-/** The probe's network seam — tests swap `fetch` so they never touch the
- *  network (the extraction.importNotes precedent). */
 export const customProviderProbe: { fetch: FetchLike } = {
 	fetch: (input, init) => fetch(input, init),
 };
@@ -161,21 +131,12 @@ export async function probeCustomProvider(
 	return { ok: true, models, detected: await detectCapabilities(input.baseUrl, data, models, headers, fetchFn) };
 }
 
-// ─── Capability detection (per-model capabilities, owner 2026-10-28) ───────
-// The OpenAI list format says nothing about what a model can do, but some
-// servers add it. Three sources, merged per model id (server-specific
-// answers win over list fields): extra fields on the /models entries
-// (OpenRouter-style gateways, vLLM), Ollama's /api/show, and LM Studio's
-// /api/v0/models. Every extra call is best-effort — any failure just
-// detects less.
-
 type Fields = Record<string, unknown>;
 
 function asFields(raw: unknown): Fields | null {
 	return raw !== null && typeof raw === "object" && !Array.isArray(raw) ? (raw as Fields) : null;
 }
 
-/** A positive whole token count inside the stored bounds, else undefined. */
 function tokenCount(raw: unknown, min = 1): number | undefined {
 	return typeof raw === "number" && Number.isInteger(raw) && raw >= min && raw <= CUSTOM_CONTEXT_MAX ? raw : undefined;
 }
@@ -184,7 +145,6 @@ function strings(raw: unknown): string[] | undefined {
 	return Array.isArray(raw) && raw.every((s) => typeof s === "string") ? (raw as string[]) : undefined;
 }
 
-/** Drop undefined fields; null when nothing was found. */
 function found(d: CustomModelDetected): CustomModelDetected | null {
 	const out = Object.fromEntries(Object.entries(d).filter(([, v]) => v !== undefined)) as CustomModelDetected;
 	return Object.keys(out).length ? out : null;

@@ -1,46 +1,16 @@
 import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
-// The search-hit shape lives in the core port since the search wave
-// (2026-09-20); this alias keeps callers churn-free.
 import type { SearchHit as WebSearchResult, SearchProvider } from "../../core/search.ts";
 export type { WebSearchResult };
 import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import TurndownService from "turndown";
 
-/**
- * Server-side web tools for the researcher sub-agent — a minimal port of the
- * pi extensions (~/.pi/agent/extensions/web-search + web-fetch):
- *
- *   web_search(query, count?) → {title, url, snippet}[]   (injected search port)
- *   web_fetch(url)            → readable markdown text     (Readability + Turndown,
- *                                                          Jina Reader fallback for
- *                                                          JS-rendered pages)
- *
- * SEARCH REWIRING (search port wave, 2026-09-20): the Google CSE backend is
- * retired — web_search now runs on the injected search port (core/search.ts).
- * The live adapter (Tavily/Brave — server/search.ts) arrives as a DEPENDENCY
- * (import law: this tool depends on the core port, never server code). NO
- * silent fallback (owner decision): provider absent → search is honestly
- * unavailable, and the composition root drops the research dispatch tool on
- * the same signal (the jobTools seam, src/agent/tools/jobs.ts).
- *
- * Tool contract: NEVER throw into the agent loop — missing provider and
- * every failure path return a clear error STRING as the tool output, so the
- * researcher can adapt (or report) instead of crashing.
- */
-
-// ── web_search ───────────────────────────────────────────────────────────────
-// (WebSearchResult is the core SearchHit, re-exported above.)
-
-// ── web_fetch ────────────────────────────────────────────────────────────────
-
 const USER_AGENT =
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 const FETCH_TIMEOUT_MS = 30_000;
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
-/** Keep the researcher's context sane — long pages truncate with a marker. */
 const MAX_CONTENT_CHARS = 40_000;
 const MIN_USEFUL_CONTENT = 200;
 
@@ -51,7 +21,6 @@ function truncate(text: string): string {
 	return `${text.slice(0, MAX_CONTENT_CHARS)}\n\n[Truncated at ${MAX_CONTENT_CHARS} characters]`;
 }
 
-/** Jina Reader fallback for JS-rendered pages (no deps — plain fetch). */
 async function fetchViaJina(url: string): Promise<string | null> {
 	try {
 		const res = await fetch(`https://r.jina.ai/${url}`, {
@@ -91,15 +60,10 @@ async function fetchAndExtract(url: string): Promise<string> {
 	});
 	if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
 
-	// Final URL after redirects + status — the researcher's only way to
-	// tell a real page from a 200-served error body (owner-reported
-	// "ill-formed request" case: the SITE answered, we just relayed it).
 	const sourceLine = `Source: ${resp.url || url} (HTTP ${resp.status})`;
 
 	const contentType = resp.headers.get("content-type") ?? "";
 	if (contentType.includes("application/pdf")) {
-		// Pointer, not dead-end (researcher PDF wave, 2026-10-07): the
-		// researcher's web_fetch_pdf tool downloads + triages PDFs.
 		return `web_fetch: this URL is a PDF document — call web_fetch_pdf on it to download and read it.`;
 	}
 	if (/image\/|audio\/|video\/|zip|octet-stream/.test(contentType)) {
@@ -109,20 +73,17 @@ async function fetchAndExtract(url: string): Promise<string> {
 	if (length > MAX_RESPONSE_BYTES) throw new Error("Response too large");
 
 	const text = await resp.text();
-	if (!contentType.includes("html")) return `${sourceLine}\n\n${truncate(text)}`; // plain text / markdown / code
+	if (!contentType.includes("html")) return `${sourceLine}\n\n${truncate(text)}`;
 
 	const extracted = htmlToMarkdown(text);
 	if (extracted) {
 		const header = extracted.title ? `# ${extracted.title}\n\n${sourceLine}\n\n---\n\n` : `${sourceLine}\n\n---\n\n`;
 		return header + truncate(extracted.content);
 	}
-	// Readability failed — likely JS-rendered. Try Jina Reader.
 	const jina = await fetchViaJina(url);
 	if (jina) return truncate(jina);
 	throw new Error("Could not extract readable content (the page may be JavaScript-rendered)");
 }
-
-// ── tool registry ────────────────────────────────────────────────────────────
 
 const webSearchInput = Type.Object({
 	query: Type.String({ description: "The search query (a normal search string, phrases included)" }),
@@ -169,10 +130,6 @@ export function createWebTools(search: () => SearchProvider | null): Record<stri
 			execute: serverExecute("web_fetch", webFetchInput, async ({ url }): Promise<string> => {
 				try {
 					const parsed = new URL(url);
-					// URL.protocol carries a TRAILING COLON ("https:", WHATWG) — the
-					// colon-less comparison born from the py-harness port (urlparse's
-					// scheme has NO colon) rejected every valid URL ever fetched
-					// (owner-reported via OpenRouter logs, 2026-10-07).
 					if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
 						throw new Error("Only http(s) URLs are supported");
 				} catch {
@@ -188,7 +145,4 @@ export function createWebTools(search: () => SearchProvider | null): Record<stri
 	};
 }
 
-/** The provider-less backstop (tests pin the shape with it; the runner
- *  always injects the real seam — an absent seam reads as unavailable,
- *  never a crash and never a silent alternative engine). */
 export const webTools = createWebTools(() => null);

@@ -1,14 +1,5 @@
 "use client";
 
-/**
- * ATTACHMENTS (owner, 2026-10-31) — the paperclip and the composer drop
- * target. Desktop only: a picked or dropped File becomes its absolute disk
- * path through the preload seam (window.lh.pathForFile), and the send
- * carries that path on a marker line (src/core/attachments.ts). Nothing is
- * read, copied, or uploaded here — the agent reads the file on its own
- * terms. Browser builds have no seam: no paperclip, drops are ignored.
- */
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import {
@@ -21,8 +12,6 @@ import {
 
 const KIND_ICON = { pdf: "pdf", image: "figure", text: "file" } as const;
 
-/** Picked/dropped files → the paths to add and the refusal lines. Pure:
- *  readable types only, disk-backed only, no duplicates. */
 export function resolveAttachments(
 	files: readonly { name: string }[],
 	pathFor: (file: { name: string }) => string,
@@ -45,16 +34,12 @@ export function resolveAttachments(
 	return { paths, errors: [...new Set(errors)] };
 }
 
-/** Whether this shell can attach (the desktop preload's path seam).
- *  Post-mount only — server HTML and the first client render agree. */
 export function useCanAttach(): boolean {
 	const [can, setCan] = useState(false);
 	useEffect(() => setCan(typeof window.lh?.pathForFile === "function"), []);
 	return can;
 }
 
-/** The composer's pending attachments. `current()` reads the ref mirror so
- *  a send resuming after `await dictation.finish()` sees the live list. */
 export function useAttachments() {
 	const [paths, setPaths] = useState<string[]>([]);
 	const [errors, setErrors] = useState<string[]>([]);
@@ -78,13 +63,11 @@ export function useAttachments() {
 		commit([]);
 		setErrors([]);
 	}, [commit]);
-	/** Put a refused send's files back (the draft-restore seam). */
 	const restore = useCallback((next: readonly string[]) => commit([...next]), [commit]);
 	const current = useCallback(() => ref.current, []);
 	return { paths, errors, add, remove, clear, restore, current };
 }
 
-/** The hidden file input behind a paperclip button. */
 export function useFilePicker(onFiles: (files: File[]) => void) {
 	const ref = useRef<HTMLInputElement>(null);
 	const input = (
@@ -97,7 +80,7 @@ export function useFilePicker(onFiles: (files: File[]) => void) {
 			data-testid="attach-input"
 			onChange={(e) => {
 				onFiles(Array.from(e.target.files ?? []));
-				e.target.value = ""; // picking the same file again still fires
+				e.target.value = "";
 			}}
 		/>
 	);
@@ -106,8 +89,6 @@ export function useFilePicker(onFiles: (files: File[]) => void) {
 
 const carriesFiles = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes("Files");
 
-/** Drop handlers for a composer surface; `dropping` outlines it. Disabled
- *  (browser builds), a drag passes through to the shell's stray-drop guard. */
 export function useFileDrop(onFiles: ((files: File[]) => void) | undefined) {
 	const [dropping, setDropping] = useState(false);
 	const handlers = {
@@ -131,8 +112,6 @@ export function useFileDrop(onFiles: ((files: File[]) => void) | undefined) {
 	return { dropping, handlers };
 }
 
-/** One chip per attached file: kind icon + file name, full path on hover.
- *  `onRemove` adds the × (the composer); the transcript's chips are static. */
 export function AttachmentChips({ paths, onRemove }: { paths: readonly string[]; onRemove?: (path: string) => void }) {
 	if (paths.length === 0) return null;
 	return (

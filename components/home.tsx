@@ -1,24 +1,5 @@
 "use client";
 
-/**
- * HOME — "one next step" (owner, 2026-10-26). Home answers a single
- * question: what do I do next? One centred column:
- *
- *   setup callout   only while no provider/model is set
- *   greeting        + one field for what to learn or practise (search-as-
- *                   you-type for sessions and ideas), Practice and Learn,
- *                   the model chip, and "Next from your graph"
- *   Continue        the session waiting on you (else the latest one); more
- *                   waiting sessions fold behind one quiet line
- *   progress line   this week's minutes, the goal, the graph's size
- *
- * Lessons and practice start the same way — type a topic, pick the kind
- * (owner: one uniform flow). "New practice" (sidebar, rail, ⌘K, /practice)
- * makes Practice the field's primary action. The sidebar keeps the full
- * session list, so nothing here repeats it. Every number is the server's
- * (components/v4/data.ts). Styles: app/ui/home.css (classes prefixed hm-).
- */
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -54,18 +35,13 @@ import { MathLine } from "@/components/latex-glyph";
 
 type Mode = "teach" | "practice";
 
-/** Picks ride the practice create as graph context; a cap keeps the
- *  opening prompt bounded however many topics are mixed. */
 const PICK_CAP = 40;
 
-/** Pure: the time-of-day greeting. Exported for tests. */
 export function greeting(now: Date): string {
 	const h = now.getHours();
 	return h < 5 ? "Good evening." : h < 12 ? "Good morning." : h < 18 ? "Good afternoon." : "Good evening.";
 }
 
-/** Home's greeting lines by local time of day: [lead, tail] pairs per
- *  bucket (owner, 2026-10-26). An empty tail means the lead stands alone. */
 const GREETINGS: Array<{ from: number; lines: Array<[string, string]> }> = [
 	{ from: 1, lines: [["Burning the midnight oil?", ""], ["Quiet hours.", "What shall we explore?"]] },
 	{ from: 5, lines: [["Early start.", "What's on your mind?"], ["Up with the sun.", "What shall we learn?"]] },
@@ -77,13 +53,8 @@ const GREETINGS: Array<{ from: number; lines: Array<[string, string]> }> = [
 ];
 const PRACTICE_TAILS = ["What shall we sharpen?", "Ready for a few problems?"];
 
-/** Pure: today's greeting for this moment, as { lead, tail }. The bucket
- *  follows the local hour; the line within it follows the local date, so
- *  it holds all day and changes tomorrow. Practice swaps in a practice
- *  tail. Exported for tests. */
 export function homeGreeting(now: Date, mode: "teach" | "practice" = "teach"): { lead: string; tail: string } {
 	const h = now.getHours();
-	// 22:00–00:59 belongs to the late bucket; GREETINGS is ordered by start.
 	const bucket = h < 1 ? GREETINGS[GREETINGS.length - 1]! : [...GREETINGS].reverse().find((b) => h >= b.from)!;
 	const day = Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 86_400_000);
 	const [lead, tail] = bucket.lines[day % bucket.lines.length]!;
@@ -91,9 +62,6 @@ export function homeGreeting(now: Date, mode: "teach" | "practice" = "teach"): {
 	return { lead, tail };
 }
 
-/** Pure: Continue's hero (the first session waiting on you, else the most
- *  recent) and the other waiting sessions. Archived sessions never surface
- *  here. Exported for tests. */
 export function continueModel(chats: readonly V4Chat[]): { hero: V4Chat | null; waiting: V4Chat[] } {
 	const live = chats.filter((c) => !c.archived);
 	const waiting = live.filter((c) => sessionState(c) === "waiting");
@@ -101,9 +69,6 @@ export function continueModel(chats: readonly V4Chat[]): { hero: V4Chat | null; 
 	return { hero, waiting: waiting.filter((c) => c !== hero).slice(0, 3) };
 }
 
-/** Pure: the period's numbers as labelled cells (time, lessons, ideas,
- *  practice, tokens). Exported for tests; Home's progress line reads the
- *  time cell. */
 export function kpiCells(s: V4Stats): Array<{ label: string; value: string; delta: string; up: boolean; sub: string }> {
 	const deltaSec = s.time.seconds - s.time.prevSeconds;
 	const prev = s.period === "week" ? "vs last week" : "vs last month";
@@ -128,7 +93,6 @@ export function kpiCells(s: V4Stats): Array<{ label: string; value: string; delt
 	];
 }
 
-/** Pure: the ideas a topic mix practises (newest first, capped). */
 export function mixPicks(topics: readonly V4Topic[], picked: readonly string[], ideas: readonly IndexedIdea[]): StartPick[] {
 	const ids = new Set(topics.filter((t) => picked.includes(t.id)).flatMap((t) => t.ideaIds));
 	return ideas
@@ -137,8 +101,6 @@ export function mixPicks(topics: readonly V4Topic[], picked: readonly string[], 
 		.map((i) => ({ id: i.id, name: i.name, statement: i.statement }));
 }
 
-/** Pure: bar heights as % of the week's busiest day (min 1.5× the goal,
- *  so a light week doesn't fill a chart). Exported for tests. */
 export function barHeights(daily: V4Daily): number[] {
 	const top = Math.max(...daily.days.map((d) => d.minutes), daily.goalMinutes * 1.5, 1);
 	return daily.days.map((d) => Math.round((d.minutes / top) * 100));
@@ -152,9 +114,6 @@ export function Home({ initialConfigured, initialMode = "teach" }: { initialConf
 	const [now, setNow] = useState<Date | null>(null);
 	useEffect(() => setNow(new Date()), []);
 	const needSetup = useCallback(() => setSetupOpen(true), []);
-	// The session kind the composer starts — it also tints the page: teal
-	// for Learn, the warm register for Practice. Follows the URL (/practice,
-	// ⌘K "New practice set") and the New-session event.
 	const [mode, setMode] = useState<Mode>(initialMode);
 	useEffect(() => setMode(initialMode), [initialMode]);
 
@@ -197,8 +156,6 @@ export function Home({ initialConfigured, initialMode = "teach" }: { initialConf
 		</div>
 	);
 }
-
-// ─── The composer ─────────────────────────────────────────────────────────
 
 const ROW_ICON: Record<PaletteRow["icon"], IconName> = {
 	learn: "learn",
@@ -248,27 +205,19 @@ function LearnField({
 		setWalk(-1);
 	}, []);
 	const dictation = useDictation({ append: (t) => setQuery(joinDictation(qRef.current, t)) });
-	// Attachments (2026-10-31): desktop-only path references for turn 1.
-	// The words still start the session — they are its title.
 	const canAttach = useCanAttach();
 	const attachments = useAttachments();
 	const picker = useFilePicker(attachments.add);
 	const drop = useFileDrop(canAttach ? attachments.add : undefined);
 
-	// Query → matching sessions and ideas (the ⌘K model). Its "Start" rows
-	// are left out: the composer itself is the start, in the chosen kind.
 	const groups = useMemo(
 		() => (q.trim() ? paletteResults(q, mode, chats ?? [], ideas ?? []).filter((g) => g.name !== "Start") : []),
 		[q, mode, chats, ideas],
 	);
 	const rows = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
 	const open = focused && rows.length > 0;
-	// Nothing is preselected (-1): Enter starts a session until an arrow key
-	// picks a result.
 	const active = Math.min(walk, rows.length - 1);
 
-	// New lesson / New practice (sidebar, rail, ⌘N) land here: focus the
-	// field, ready for the kind the event names.
 	useEffect(() => {
 		const on = (e: Event) => {
 			const next = (e as CustomEvent<{ mode?: Mode } | null>).detail?.mode;
@@ -278,7 +227,6 @@ function LearnField({
 		window.addEventListener("lh:focus-omnibar", on);
 		return () => window.removeEventListener("lh:focus-omnibar", on);
 	}, [onMode]);
-	// Arriving to practise (/practice, ⌘K "New practice set"): focus the field.
 	useEffect(() => {
 		if (focusOnArrival) inputRef.current?.focus();
 	}, [focusOnArrival]);
@@ -351,7 +299,6 @@ function LearnField({
 						if ((e.key === "ArrowDown" || e.key === "ArrowUp") && open) {
 							e.preventDefault();
 							const n = rows.length;
-							// -1 (the field) → first/last row; past either end → back to the field.
 							setWalk((i) => {
 								const at = Math.min(i, n - 1);
 								const next = e.key === "ArrowDown" ? at + 1 : at === -1 ? n - 1 : at - 1;
@@ -368,8 +315,6 @@ function LearnField({
 				/>
 				<AttachmentChips paths={attachments.paths} onRemove={attachments.remove} />
 				<div className="hm-bar">
-					{/* The kind of session: Learn or Practice. A radio group —
-					    arrows move between the two, the whole page re-tints. */}
 					<div className="seg hm-mode" role="radiogroup" aria-label="Kind of session">
 						{MODES.map((m) => {
 							const on = mode === m.id;
@@ -470,7 +415,6 @@ function LearnField({
 				)}
 			</form>
 			<AttachmentErrors errors={attachments.errors} />
-			{/* Home has no claiming fields — the omnibar is always the target. */}
 			<DictationErrorLine show />
 			{suggestions.length > 0 && (
 				<div className="hm-next" aria-label="Next from your graph">
@@ -495,9 +439,6 @@ function LearnField({
 	);
 }
 
-// ─── Continue ─────────────────────────────────────────────────────────────
-
-/** "Step 6 of 14" / "Problem 1 of 5", or null when the session has no map. */
 function position(c: V4Chat): string | null {
 	if (c.plan && c.plan.current !== null) return `Step ${c.plan.current} of ${c.plan.total}`;
 	if (c.practiceSet) return `Problem ${Math.min(c.practiceSet.done + 1, c.practiceSet.size)} of ${c.practiceSet.size}`;
@@ -516,7 +457,6 @@ function ContinueCard({ chats, now }: { chats: V4Chat[] | null; now: Date | null
 			</section>
 		);
 	}
-	// No sessions yet: the Learn field is the whole invitation.
 	if (!hero) return null;
 	const isWaiting = sessionState(hero) === "waiting";
 	const practice = isPractice(hero);
@@ -577,15 +517,10 @@ function ContinueCard({ chats, now }: { chats: V4Chat[] | null; now: Date | null
 	);
 }
 
-// ─── This week ────────────────────────────────────────────────────────────
-
 function fmtMin(m: number): string {
 	return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60 ? `${m % 60} min` : ""}`.trim();
 }
 
-/** The week at a glance: minutes against the weekly goal with the seven
- *  days drawn, then lessons, ideas and practice. Zeros read as a next step,
- *  never as "+0". Every number is the server's (useStats / useDaily). */
 function WeekStrip({ ideaCount }: { ideaCount: number | null }) {
 	const stats = useStats("week");
 	const daily = useDaily();

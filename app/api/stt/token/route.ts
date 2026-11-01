@@ -1,17 +1,8 @@
 /**
- * POST-less BYOK mint: the renderer never holds the real Deepgram key.
- *
- * The key lives server-side only (auth.json → process.env in the desktop
- * app; .env.local in dev — same seam as OPENROUTER_API_KEY). A dictation
- * run starts here: mint a short-lived access token (TTL 300s — a run can
- * outlast the 30s default), the renderer opens its WebSocket to Deepgram
- * with it, and audio flows renderer → Deepgram directly, never through
- * this server. The token is only checked at the WebSocket handshake, so
- * long dictation sessions survive the TTL fine (Deepgram docs).
- *
- * NOTE: the key needs ≥ Member permission in the Deepgram console to call
- * /auth/grant (their docs, token-based auth FAQ) — plain read/transcribe
- * keys return FORBIDDEN here.
+ * Mints a short-lived Deepgram token so the renderer never holds the key.
+ * Deepgram checks the token only at the WebSocket handshake, so a dictation
+ * session outlives the 300s TTL. The key needs the Member role or higher to
+ * call /auth/grant (Deepgram token-based auth FAQ).
  */
 import { keyValue } from "@/src/server";
 
@@ -32,8 +23,6 @@ export async function GET() {
 		});
 		if (!res.ok) {
 			const detail = await res.text();
-			// 401/403: Deepgram refused the key itself (wrong key, or below
-			// Member) — the client offers "Fix key" for this reason only.
 			if (res.status === 401 || res.status === 403) {
 				return Response.json(
 					{

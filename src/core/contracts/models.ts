@@ -1,95 +1,57 @@
-/**
- * Model-catalog contracts (model-control wave, 2026-09-12) — the client-safe
- * shapes of GET /api/models and PUT /api/chats/[id]/settings responses.
- * Pure types; the server projection lives in src/server/model-catalog.ts
- * (which OWNS these shapes — the contract is defined here only so client
- * components never import from the server band).
- */
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import type { BackgroundModelRole, ModelSlotName } from "../settings.ts";
 
-/** One picker row: everything the UI shows about a model, projected from
- *  pi-ai's catalog. Costs are USD per 1M tokens (the same catalog, the same
- *  units as Pi's server-side pricing calculator). */
+/** Costs are USD per 1M tokens. */
 export interface ModelCatalogEntry {
 	id: string;
 	name: string;
 	provider: string;
 	reasoning: boolean;
 	input: ("text" | "image")[];
-	/** The thinking levels this model actually accepts (pi's
-	 * thinkingLevelMap — e.g. GLM-5.3-flash: low|high|max). The thinking
-	 * picker lists exactly these; anything else is a lie. */
+	/** The thinking levels this model accepts; the picker lists exactly these. */
 	supportedLevels: ThinkingLevel[];
 	cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
 	contextWindow: number;
 	maxTokens: number;
-	/** True when the price is UNKNOWN (custom OpenAI-compatible endpoints,
-	 *  custom-endpoint wave 2026-10-26): `cost` is then all zeros as a
-	 *  placeholder and must render as unknown, never as $0. */
+	/** Price unknown: `cost` is an all-zero placeholder and must render as unknown, never $0. */
 	unpriced?: true;
 }
 
-/** The conversation agents' resolved default (BYOK, owner 2026-09-22): the
- *  chat's model override over the STRONG slot — one controller, so one
- *  default. thinkingLevel is optional: unset resolves from the baked
- *  DEFAULT_THINKING_ORDER at engine build. */
+/** Unset thinkingLevel resolves from DEFAULT_THINKING_ORDER at engine build. */
 export interface CatalogDefaults {
 	model: { provider: string; id: string };
 	thinkingLevel?: ThinkingLevel;
 }
 
-/** One background role's RESOLVED pin (BYOK, owner 2026-09-22): what that
- *  role actually runs today — role override → tier slot → NOTHING. NULL
- *  = the role's chain is empty (the per-need gates refuse its work); the
- *  settings UI shows "not configured" from it. */
+/** Role override, then tier slot. Null = no model configured for the role. */
 export type RolePins = Record<
 	BackgroundModelRole,
 	{ model: { provider: string; id: string }; thinkingLevel?: ThinkingLevel } | null
 >;
 
-/** One slot tier's RESOLVED pin (BYOK, owner 2026-09-22): NULL = the tier
- *  holds no model. The settings UI captions each slot row with it and the
- *  picker pre-fills from it. */
+/** Null = the tier holds no model. */
 export type SlotPins = Record<
 	ModelSlotName,
 	{ model: { provider: string; id: string }; thinkingLevel?: ThinkingLevel } | null
 >;
 
-/** GET /api/models response. */
 export interface ModelCatalogResponse {
 	models: ModelCatalogEntry[];
-	/** The conversation agents' resolved default — NULL when the
-	 *  conversation chain is empty (no factory floor; the turn gate
-	 *  refuses with 503 models_not_configured). */
+	/** Null when no conversation model is configured. */
 	defaults: CatalogDefaults | null;
-	/** The six background roles' resolved pins (same resolution the agent
-	 *  factories use — src/server/stores.ts effectiveSettings); NULL per
-	 *  role = chain empty. */
 	rolePins: RolePins;
-	/** The three slot tiers' resolved pins: role override → slot at tier
-	 *  granularity; effectiveSettings().models verbatim, NULL per unset
-	 *  tier. */
 	slots: SlotPins;
-	/** Providers with a PRESENT key, and which env var gates each — the
-	 *  model slots wave's federation surface (2026-09-20): the picker lists
-	 *  models from these providers' pi-ai catalogs only. Keyless providers
-	 *  are simply absent (the Keys page is the discovery surface, same
-	 *  discipline as the search engines). */
+	/** The picker lists models from these providers only. */
 	providers: CatalogProvider[];
 }
 
-/** One row of the providers surface. */
 export interface CatalogProvider {
 	id: string;
-	/** The env var whose presence federates this provider in. */
 	envVar: string;
-	/** Whether that var is currently present (env or auth file). Custom
-	 *  providers are always usable: a stored key OR keyless by design. */
+	/** Present in env or the auth file. Custom providers are always usable. */
 	keyPresent: boolean;
-	/** Custom providers only (id "custom-…"): the user's display name. */
+	/** Custom providers only (id "custom-…"). */
 	name?: string;
-	/** Custom providers only: true when no key is stored — the endpoint is
-	 *  called without one (local servers). */
+	/** Custom providers only: no key stored, so the endpoint is called without one. */
 	keyless?: boolean;
 }

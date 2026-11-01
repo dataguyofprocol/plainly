@@ -1,18 +1,3 @@
-/*
- * LESSON — the reading column of Lesson and Practice: the frame, the
- * header, the transcript's blocks (turns, thinking, tool rows, cards,
- * answered records, dividers, markdown blocks) and the composer.
- *
- * Every class here is `ls-`-prefixed except the frame names chat.tsx has
- * always used (.lshell .center .top .scroll .col .composer .set .nudge).
- * Markdown prose (.lh-prose, streamdown chrome) is lead-owned in
- * app/globals.css; the reading-column refinements below override it with
- * more specific `.v4 .col …` selectors.
- */
-
-/* ── Frame ─────────────────────────────────────────────────────────── */
-/* The right panel is fluid (about 28% of the window, 340–520px) until the
-   learner drags its edge (--dock-w, set by DockResizer in chat.tsx). */
 .v4 .lshell { --dock-w-eff: var(--dock-w, clamp(340px, 28vw, 520px)); position: relative; z-index: 1; display: grid; grid-template-columns: 60px minmax(0, 1fr) var(--dock-w-eff); height: 100vh; }
 .v4 .ls-resize { position: absolute; z-index: 6; top: 12px; bottom: 12px; right: calc(var(--dock-w-eff) - 6px); width: 12px; cursor: col-resize; touch-action: none; display: flex; align-items: center; justify-content: center; }
 .v4 .ls-resize i { width: 3px; height: 40px; border-radius: 2px; background: var(--line-strong); opacity: 0; transition: opacity var(--dur-1), background var(--dur-1), height var(--dur-2) var(--ease-out); }
@@ -28,9 +13,6 @@
 .v4 .col { width: 100%; max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
 .v4 .scroll > .col { width: 100%; }
 
-/* ── Header ────────────────────────────────────────────────────────── */
-/* One calm line: the title takes what it needs and ellipsizes first; the
-   position group and the actions never wrap. */
 .v4 .top { display: flex; align-items: center; gap: 16px; height: 52px; padding: 0 16px 0 24px; flex: none; min-width: 0; }
 .v4 .ls-title { flex: 0 1 auto; min-width: 48px; display: flex; align-items: center; height: 30px; margin-left: -8px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; cursor: text; transition: background var(--dur-1); }
 .v4 .ls-title:hover { background: var(--hover); }
@@ -39,24 +21,19 @@
 .v4 .ls-pos { flex: none; display: flex; align-items: center; gap: 10px; color: var(--muted-foreground); font-size: 12px; line-height: 16px; white-space: nowrap; }
 .v4 .ls-pos .num { color: var(--muted-foreground); font-weight: 500; }
 .v4 .ls-actions { flex: none; margin-left: auto; display: flex; align-items: center; gap: 4px; }
-/* The model chip: one line, the model id truncates (the chip's own Hint
-   names the control). */
 .v4 .mchip { height: 28px; max-width: 240px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--muted-foreground); font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: background var(--dur-1), color var(--dur-1); }
 .v4 .mchip:hover { background: var(--hover); color: var(--ink); }
 .v4 .mchip > span { flex: none; }
 .v4 .mchip > span:nth-child(2) { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-/* The practice problem clock: a quiet time chip. */
 .v4 .ls-clock { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px 0 8px; border-radius: 999px; background: var(--hover); color: var(--muted-foreground); font-size: 12px; line-height: 16px; white-space: nowrap; }
 .v4 .ls-clock .ic { color: var(--faint); }
 .v4 .ls-clock .mono { font-size: 12px; color: var(--ink); font-weight: 500; }
-/* The practice set bar. */
 .v4 .set { display: flex; gap: 4px; }
 .v4 .set i { width: 20px; height: 4px; border-radius: 2px; background: var(--line-strong); transition: background 0.5s var(--ease-out), width 0.5s var(--ease-out); }
 .v4 .set i.solid { background: var(--good); }
 .v4 .set i.help { background: var(--practice); opacity: 0.7; }
 .v4 .set i.now { background: var(--brand); width: 26px; }
 
-/* ── Reading column: step fold + heading ───────────────────────────── */
 .v4 .ls-past { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 6px 6px 12px; border-radius: 12px; background: var(--glass); box-shadow: 0 0 0 1px var(--line) inset; color: var(--muted-foreground); font-size: 13px; line-height: 18px; }
 .v4 .ls-past > .ic { color: var(--good); }
 .v4 .ls-past .ls-past-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -70,9 +47,6 @@
 .v4 .ls-step-h .over { color: var(--brand); }
 .v4 .ls-step-h h2 { margin: 0; text-wrap: balance; }
 
-/* ── Turns ─────────────────────────────────────────────────────────── */
-/* An assistant turn: its parts stack with a 16px rhythm; consecutive
-   tool rows huddle; cards breathe. */
 .v4 .ls-turn { display: flex; flex-direction: column; min-width: 0; width: 100%; }
 .v4 .ls-turn > * + * { margin-top: 16px; }
 .v4 .ls-turn > .ls-tool + .ls-tool { margin-top: 4px; }
@@ -80,19 +54,13 @@
 .v4 .ls-turn > :is(.ls-card, .ls-figure, [data-testid="problem-card"], [data-testid="conclude-card"], [data-testid="plan-block-full"]),
 .v4 .ls-turn > :is(.ls-card, .ls-figure, [data-testid="problem-card"], [data-testid="conclude-card"], [data-testid="plan-block-full"]) + * { margin-top: 24px; }
 .v4 .ls-turn > :first-child { margin-top: 0; }
-/* A step boundary inside a turn: breathing room, no rule. */
 .v4 .ls-turn > .ls-stepgap { height: 0; margin-top: 8px; }
 .v4 .ls-turn > .ls-stepgap + * { margin-top: 16px; }
 
-/* The learner's own message: a right-aligned bubble in the UI voice. */
 .v4 .ls-user { align-self: flex-end; max-width: 80%; margin: 8px 0 4px; padding: 10px 16px; border-radius: 18px 18px 6px 18px; background: var(--surface); box-shadow: 0 0 0 1px var(--line), var(--e1); color: var(--ink); font-size: 15px; line-height: 22px; white-space: pre-wrap; overflow-wrap: anywhere; }
 
-/* The quiet system line (retrying, next problem). */
 .v4 .ls-sys { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 2px 0; color: var(--faint); font-size: 12px; line-height: 16px; }
 
-/* ── Thinking disclosures ──────────────────────────────────────────── */
-/* The agent's reasoning and the learner's own thinking share one quiet
-   disclosure: a small icon, a label, a turning chevron. */
 .v4 .ls-think { min-width: 0; }
 .v4 .ls-think-t { display: inline-flex; align-items: center; gap: 6px; height: 26px; margin-left: -8px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--faint); font-size: 13px; line-height: 18px; font-weight: 500; white-space: nowrap; transition: background var(--dur-1), color var(--dur-1); }
 .v4 .ls-think-t:hover { background: var(--hover); color: var(--muted-foreground); }
@@ -104,10 +72,8 @@
 .v4 .ls-well > :last-child { margin-bottom: 0; }
 .v4 .ls-well :where(p) { margin: 0 0 8px; }
 .v4 .ls-well :where(p:last-child) { margin-bottom: 0; }
-/* The learner's thinking reads as their inner voice: serif italic. */
 .v4 .ls-well.mine { font-family: var(--font-literata), Georgia, serif; font-style: italic; font-size: 15px; line-height: 24px; color: var(--muted-foreground); white-space: pre-wrap; }
 
-/* ── Tool rows (one grammar for every call and job line) ───────────── */
 .v4 .ls-tool { width: 100%; min-width: 0; }
 .v4 .ls-tool > summary { list-style: none; }
 .v4 .ls-tool > summary::-webkit-details-marker { display: none; }
@@ -125,17 +91,14 @@
 .v4 .ls-row .ls-time { flex: none; font-family: var(--font-jetbrains), monospace; font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
 .v4 .ls-row .ls-mini { flex: none; height: 24px; margin-left: 4px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong) inset; color: var(--ink); font-size: 12px; font-weight: 600; transition: box-shadow var(--dur-1); }
 .v4 .ls-row .ls-mini:hover { box-shadow: 0 0 0 1px var(--faint) inset; }
-/* The expanded detail: a tint well. */
 .v4 .ls-tool-body { margin-top: 6px; padding: 12px 14px; border-radius: 12px; background: var(--tint); font-size: 12px; line-height: 18px; display: flex; flex-direction: column; gap: 10px; }
 .v4 .ls-tool-body .over { display: block; margin-bottom: 4px; }
 .v4 .ls-tool-body pre { margin: 0; max-height: 256px; overflow: auto; white-space: pre-wrap; word-break: break-all; font-family: var(--font-jetbrains), monospace; font-size: 12px; line-height: 18px; color: var(--ink); }
 .v4 .ls-tool-body pre.err { color: var(--danger); }
 .v4 .ls-tool-body pre.short { max-height: 128px; }
-/* A brief card opened inside a row's well melts into it. */
 .v4 .ls-tool-body > .ls-card { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .v4 .ls-tool-body > .ls-card > .ls-card-h { display: none; }
 
-/* ── Cards (jobs, demos, briefs, assessments, answered records) ────── */
 .v4 .ls-card { min-width: 0; padding: 14px 16px 16px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--e1); animation: v4-settle 0.4s var(--ease-expo) both; }
 .v4 .ls-card-h { display: flex; align-items: center; gap: 8px; min-height: 24px; margin-bottom: 10px; color: var(--muted-foreground); font-size: 13px; line-height: 18px; }
 .v4 .ls-card-h > .ic { flex: none; color: var(--faint); }
@@ -150,7 +113,6 @@
 .v4 .ls-sources a { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; color: var(--brand); font-size: 13px; font-weight: 500; }
 .v4 .ls-sources a:hover { color: var(--brand-hover); text-decoration: underline; text-underline-offset: 2px; }
 .v4 .ls-sources a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* The demo's frame and its error line. */
 .v4 .ls-demo-frame { display: block; width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--figure-paper); }
 .v4 .ls-callout { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--danger-soft); color: var(--danger); font-size: 13px; line-height: 18px; }
 .v4 .ls-callout > .ic { flex: none; margin-top: 2px; }
@@ -158,7 +120,6 @@
 .v4 .ls-callout .ls-callout-b b { font-weight: 600; }
 .v4 .ls-callout .ls-callout-b .mono { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--danger); opacity: 0.85; }
 .v4 .ls-card .ls-callout { margin-bottom: 10px; }
-/* The probe's assessment: a hairline list, no inner boxes. */
 .v4 .ls-strands { margin: 0; padding: 0; list-style: none; }
 .v4 .ls-strands li { padding: 10px 0; border-top: 1px solid var(--line); }
 .v4 .ls-strands li:first-child { padding-top: 0; border-top: 0; }
@@ -166,7 +127,6 @@
 .v4 .ls-strands span { display: block; margin-top: 2px; font-size: 13px; line-height: 20px; color: var(--muted-foreground); }
 .v4 .ls-summary { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--brand-soft); color: var(--ink); font-size: 13px; line-height: 20px; }
 
-/* ── Figures ───────────────────────────────────────────────────────── */
 .v4 .ls-figure { display: flex; flex-direction: column; gap: 6px; }
 .v4 .ls-figure.hug { align-self: center; width: fit-content; max-width: 100%; }
 .v4 .ls-figure-img { overflow: hidden; border-radius: 12px; background: var(--figure-paper); box-shadow: 0 0 0 1px var(--line), var(--e1); }
@@ -174,7 +134,6 @@
 .v4 .ls-figure-cap > .ic { flex: none; }
 .v4 .ls-figure-cap .ls-card-x { margin-left: auto; display: flex; align-items: center; gap: 2px; }
 
-/* ── Answered records ──────────────────────────────────────────────── */
 .v4 .ls-ans-h { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .v4 .ls-ans-h .over { color: var(--muted-foreground); }
 .v4 .ls-ans-q { color: var(--ink); }
@@ -211,7 +170,6 @@
 .v4 .ls-skip { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; background: var(--tint); color: var(--muted-foreground); font-size: 13px; line-height: 18px; }
 .v4 .ls-skip .ls-skip-q { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ── Dividers ──────────────────────────────────────────────────────── */
 .v4 .ls-divider { display: flex; align-items: center; gap: 12px; width: 100%; margin: 12px 0; color: var(--faint); }
 .v4 .ls-divider > i { flex: 1; height: 1px; background: var(--line-strong); }
 .v4 .ls-divider > span { flex: none; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; font-weight: 500; white-space: nowrap; }
@@ -220,7 +178,6 @@
 
 .v4 .ls-divider-note { display: inline-flex; align-items: center; gap: 6px; }
 
-/* ── Working, error, nudge ─────────────────────────────────────────── */
 .v4 .ls-working { display: flex; align-items: center; gap: 8px; min-height: 26px; color: var(--faint); font-size: 13px; line-height: 18px; font-weight: 500; }
 .v4 .ls-working p { margin: 0; }
 .v4 .ls-error { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--danger-soft); box-shadow: 0 0 0 1px rgb(from var(--danger) r g b / 0.16) inset; color: var(--ink); font-size: 13px; line-height: 20px; }
@@ -236,12 +193,10 @@
 .v4 .nudge .ls-nudge-go { margin-left: auto; flex: none; color: var(--warn); animation: v4-nudge 1.6s var(--ease-in-out) infinite; }
 @keyframes v4-nudge { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
 
-/* ── Scroll-to-bottom ──────────────────────────────────────────────── */
 .v4 .ls-down { position: absolute; left: 50%; bottom: 16px; z-index: 5; width: 36px; height: 36px; margin-left: -18px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; color: var(--muted-foreground); animation: v4-fade 0.2s var(--ease-out) both; transition: color var(--dur-1), transform var(--dur-1) var(--ease-out); }
 .v4 .ls-down:hover { color: var(--ink); }
 .v4 .ls-down:active { transform: scale(0.94); }
 
-/* ── Find bar (⌘F) ─────────────────────────────────────────────────── */
 .v4 .ls-find { position: absolute; top: 56px; right: 24px; z-index: 30; width: min(380px, calc(100% - 48px)); height: 44px; display: flex; align-items: center; gap: 4px; padding: 0 6px 0 12px; border-radius: 12px; animation: v4-settle 0.25s var(--ease-expo) both; }
 .v4 .ls-find > .ic { flex: none; color: var(--faint); margin-right: 4px; }
 .v4 .ls-find input { flex: 1; min-width: 0; height: 32px; border: 0; background: transparent; outline: none; font-size: 14px; }
@@ -249,7 +204,6 @@
 .v4 .ls-find output { flex: none; min-width: 36px; padding: 0 6px; text-align: right; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
 .v4 .ls-find .sep { width: 1px; height: 18px; margin: 0 4px; }
 
-/* ── Composer ──────────────────────────────────────────────────────── */
 .v4 .composer { flex: none; padding: 8px 32px 16px; }
 .v4 .ls-dock { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
 .v4 .ls-setup { display: flex; justify-content: center; }
@@ -261,7 +215,6 @@
 .v4 .ls-composer textarea::placeholder { color: var(--faint); }
 .v4 .ls-composer .ls-hint { align-self: center; flex: none; display: inline-flex; align-items: center; gap: 6px; margin-right: 4px; color: var(--faint); font-size: 12px; line-height: 16px; white-space: nowrap; }
 .v4 .ls-composer .ib { width: 36px; height: 36px; border-radius: 10px; }
-/* Send / Stop: a round icon button; Next problem: a brand pill. */
 .v4 .ls-send { flex: none; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: var(--brand); color: var(--on-ink); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 1px 2px rgb(from var(--shadow-ink) r g b / 0.16); transition: background var(--dur-2), transform var(--dur-1) var(--ease-out), opacity var(--dur-2); }
 .v4 .ls-send:hover { background: var(--brand-hover); }
 .v4 .ls-send:active { transform: scale(0.94); }
@@ -271,24 +224,18 @@
 .v4 .ls-next { height: 36px; padding: 0 14px 0 16px; border-radius: 999px; }
 .v4 .ls-next .ic { transition: transform var(--dur-2) var(--ease-out); }
 .v4 .ls-next:hover .ic { transform: translateX(2px); }
-/* Queued steers: tidy chips, right-aligned above the field. */
 .v4 .ls-queued { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .v4 .ls-queued > span { display: inline-flex; align-items: center; gap: 6px; max-width: min(320px, 80%); height: 26px; padding: 0 10px 0 8px; border-radius: 999px; background: var(--glass-strong); box-shadow: 0 0 0 1px var(--line); color: var(--muted-foreground); font-size: 12px; line-height: 16px; }
 .v4 .ls-queued > span .ic { flex: none; color: var(--faint); }
 .v4 .ls-queued > span em { font-style: normal; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ── Markdown blocks in the reading column ─────────────────────────── */
-/* Inline code: a quiet tint, no border. */
 .v4 .lh-icode { padding: 0.1em 0.35em; border-radius: 4px; background: var(--hover); font-family: var(--font-jetbrains), monospace; font-size: 0.86em; color: var(--ink); overflow-wrap: anywhere; }
-/* Code blocks: ONE flat surface (overrides globals' card + inner panel). */
 .v4 .col [data-streamdown="code-block"] { margin: 16px 0; padding: 0; gap: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--e1); overflow: hidden; }
 .v4 .col [data-streamdown="code-block-header"] { display: none; }
 .v4 .col [data-streamdown="code-block-body"] { padding: 14px 16px; border: 0; border-radius: 0; background: transparent; font-size: 14px; line-height: 22px; }
 .v4 .col [data-streamdown="code-block-body"] pre, .v4 .col [data-streamdown="code-block-body"] code { font-family: var(--font-jetbrains), monospace; font-size: 14px; line-height: 22px; }
 .v4 .col [data-streamdown="code-block-body"] code > span::before { width: 1.75rem; margin-right: 14px; color: var(--faint); opacity: 0.55; font-size: 12px; }
-/* Inside a card the block becomes a well — never a box in a box. */
 .v4 .col :is(.ls-card, [data-testid="problem-card"]) [data-streamdown="code-block"] { background: var(--tint); border-color: transparent; box-shadow: none; }
-/* Tables: hairline rows in a rounded frame that hugs the table. */
 .v4 .ls-table { position: relative; width: fit-content; max-width: 100%; margin: 16px 0; border-radius: 12px; box-shadow: 0 0 0 1px var(--line); background: var(--glass-strong); }
 .v4 .ls-table > .ls-table-x { overflow-x: auto; border-radius: 12px; }
 .v4 .col [data-streamdown="table"] { border: 0; font-size: 15px; line-height: 22px; }
@@ -298,13 +245,11 @@
 .v4 .col [data-streamdown="table"] th { font-family: var(--font-manrope), system-ui, sans-serif; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--muted-foreground); text-align: left; }
 .v4 .col [data-streamdown="table-body"] [data-streamdown="table-row"] { border-bottom: 1px solid var(--line); }
 .v4 .col [data-streamdown="table-body"] [data-streamdown="table-row"]:last-child { border-bottom: 0; }
-/* The hover corner (copy / expand) — md-blocks' one affordance. */
 .v4 .ls-corner { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 0; border-radius: 8px; background: var(--glass-strong); box-shadow: 0 0 0 1px var(--line); color: var(--muted-foreground); transition: opacity var(--dur-1), background var(--dur-1), color var(--dur-1); }
 .v4 .ls-corner:hover { background: var(--surface); color: var(--ink); }
 .v4 .ls-mermaid-wait { display: flex; justify-content: center; padding: 24px 0; }
 .v4 .ls-mermaid-wait .skel { width: 60%; height: 120px; border-radius: 12px; }
 
-/* ── Responsive ────────────────────────────────────────────────────── */
 @media (max-width: 1180px) {
 	.v4 .ls-pos .ticks { display: none; }
 }
@@ -313,13 +258,10 @@
 	.v4 .composer { padding: 8px 24px 14px; }
 	.v4 .mchip { max-width: 180px; }
 }
-/* The dock slot: invisible to layout at ≥1024 (the dock is a grid item). */
 .v4 .ls-dockslot { display: contents; }
 .v4 .ls-dockscrim, .v4 .ls-dock-toggle, .v4 .ls-dockclose { display: none; }
 .v4 .ls-dock-toggle { position: relative; }
 .v4 .ls-dock-toggle .ping { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; }
-/* 800–1023: the rail stays, the reading column takes the width, and the
-   dock becomes a slide-over from the right edge (header toggle). */
 @media (max-width: 1023px) {
 	.v4 .ls-resize { display: none; }
 }
@@ -333,8 +275,6 @@
 	.v4 .ls-dockclose { display: inline-flex; position: absolute; z-index: 2; top: 10px; left: -44px; width: 36px; height: 36px; border-radius: 999px; }
 	.v4 .ls-dockscrim.open { display: block; position: fixed; inset: 0; z-index: 40; background: var(--scrim); animation: v4-fade 0.2s var(--ease-out) both; }
 }
-/* Below 800: the rail lies flat along the top (the shell's own register,
-   shell.css .side-rail) and everything stacks. */
 @media (max-width: 799px) {
 	.v4.ls-root { height: auto; overflow: visible; }
 	.v4 .lshell { display: block; height: auto; }
@@ -345,13 +285,10 @@
 	.v4 .lshell > .rail .tip { display: none; }
 	.v4 .lshell > .rail .fly { position: fixed; left: 12px; right: 12px; top: 60px; width: auto; max-height: calc(100vh - 72px); }
 	.v4 .center { height: calc(100vh - 56px); }
-	/* macOS: the flat rail holds the title bar (app/ui/shell.css). */
 	.lh-electron[data-lh-platform="darwin"] .v4 .lshell > .rail { padding-top: calc(var(--lh-bar) + 8px); }
 	.lh-electron[data-lh-platform="darwin"] .v4 .lshell > .rail .fly { top: calc(var(--lh-bar) + 60px); max-height: calc(100vh - var(--lh-bar) - 72px); }
 	.lh-electron[data-lh-platform="darwin"] .v4 .center { height: calc(100vh - 56px - var(--lh-bar)); }
 }
-/* macOS title bar (app/globals.css --lh-bar): the header IS the bar — its
-   title starts past the lights — and the dock starts below it. */
 @media (min-width: 800px) {
 	.lh-electron[data-lh-platform="darwin"] .v4 .top { height: var(--lh-bar); padding-left: max(24px, calc(var(--lh-lights-end) - 52px)); }
 }
@@ -367,8 +304,6 @@
 	.v4 .ls-user { max-width: 90%; }
 }
 
-/* The in-chat plan block: the monochrome DAG sits softer on the light
-   ground — surface boxes, graph-edge strokes (classes stay as pinned). */
 .v4 .col [data-testid="plan-block-full"] rect.stroke-foreground { fill: var(--surface); stroke: var(--graph-edge); }
 .v4 .col [data-testid="plan-block-full"] path.stroke-foreground { stroke: var(--graph-edge); }
 .v4 .col [data-testid="plan-block-full"] path.fill-foreground { fill: var(--graph-edge); }

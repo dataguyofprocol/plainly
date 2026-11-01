@@ -35,9 +35,6 @@ function displayedRoot(root: Element): boolean {
 	return true;
 }
 
-/** Preserve a source-point map while collapsing ordinary HTML whitespace.
- * This lets a phrase span inline markup, without concatenating separate cards
- * or paragraphs. Preformatted code/user text keeps its literal whitespace. */
 function displayRuns(root: Element): DisplayRun[] {
 	const runs: DisplayRun[] = [];
 	let text = "";
@@ -99,7 +96,6 @@ class StaticRangeLike {
 	toString(): string {
 		const text = (node: Node) => (node.nodeType === 3 ? (node as Text).data : "");
 		if (this.startContainer === this.endContainer) return text(this.startContainer).slice(this.startOffset, this.endOffset);
-		// Cross-node: gather the document-order text between the boundaries.
 		const texts: Text[] = [];
 		const walk = (node: Node | null): void => {
 			if (!node) return;
@@ -124,7 +120,6 @@ export function sessionFindRanges(scope: HTMLElement, query: string): Range[] {
 	];
 	const ranges: Range[] = [];
 	for (const root of roots) {
-		// A nested marker must not double-count its text.
 		if (roots.some((other) => other !== root && other.contains(root)) || !displayedRoot(root)) continue;
 		for (const run of displayRuns(root)) {
 			for (const match of findSessionTextMatches(run.text, query)) {
@@ -141,9 +136,6 @@ export function sessionFindRanges(scope: HTMLElement, query: string): Range[] {
 	return ranges;
 }
 
-/** Frozen boundary identity, rather than a mutable live Range, survives text
- * appends while Find is open. A re-render may replace nodes; then the caller
- * clamps the old index without pulling the reader to a different passage. */
 export interface SessionRangeIdentity {
 	start: Node; startOffset: number; end: Node; endOffset: number;
 }

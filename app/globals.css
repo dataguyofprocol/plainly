@@ -2,56 +2,15 @@
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/*
- * THE SKIN — wave 5. Design tokens, the single place to restyle the app.
- *
- * Mathematical soundness, per the owner's brief:
- *   - Tailwind's built-in 0.25rem (4px) spacing scale IS the rhythm — every
- *     padding/margin/gap in the app uses whole units of a 4px base.
- *   - The type scale below is a declared modular ladder (each --text-* token
- *     carries its own line-height); components never invent pixel sizes.
- *   - Radii ladder is 4 / 8 / 12 / 16 / 20px multiples of the 4px base.
- *   - Emphasis colors live in tokens (--lh-ink-strong / --lh-ink-italic) so a
- *     future settings UI reassigns them (configurable per the owner).
- */
-
-/* The no-ring law (owner, UI round 2026-10-01): the browser's default
-   focus/focus-visible outline appears NOWHERE in the app. Pointer focus
-   never showed it; any keypress while a clicked element still held focus
-   DID (:focus-visible re-evaluates on key input — a clicked sidebar
-   session lit up when the quiz's ←/→ were pressed). Surfaces carry their
-   own hover/active/selected affordances; the dock's keyboard walk uses
-   its own ring utilities, unaffected by an outline reset. */
+/* :focus-visible re-evaluates on key input, so a clicked element would show
+   the outline on the next keypress. The outline is off app-wide. */
 *:focus,
 *:focus-visible {
 	outline: none;
 }
 
-/* Palette — v4 redesign (owner, 2026-10-26). The v4 "arranged" design
-   is a warm off-white ground with ink text and one teal brand accent; its
-   dark counterpart is the :root[data-theme="dark"] block below (dark
-   mode wave, 2026-10-27). Every text/ground pair here passes WCAG 4.5:1
-   (faint on muted is the tightest, ~4.6).
-
-   shadcn semantics are kept so existing utilities keep working:
-     --accent      = the HOVER surface (not the brand color)
-     --primary     = ink buttons (v4's black "Continue"/"Submit")
-   The design's own vocabulary rides alongside:
-     --brand       = teal: selection, progress, focus, links
-     --warn        = amber: "waiting on you"
-     --good/--danger = outcome inks; each has a -soft tint for pills. */
-/* THE ONE TOKEN LAYER (finesse pass, 2026-10-26). Every color, surface,
-   shadow, duration and radius in the app resolves here — the v4 surface
-   (app/v4.css) ALIASES these names rather than redefining them, so legacy
-   utilities and v4 classes can never drift apart again. No component may
-   hard-code a hex: the dark theme is one more block of these values.
-
-   Ground:   --background (page) < --card (resting) < --surface (raised, white)
-   Ink:      --foreground > --muted-foreground > --faint
-   Lines:    --line (hairline, translucent) < --line-strong < --border (opaque)
-   Accent:   --brand teal; --practice amber (Practice's register only)
-   Status:   --good / --warn / --danger, each with a -soft tint
-   Depth:    --e1 resting card, --e2 popover/menu, --e3 modal */
+/* shadcn names kept: --accent = the hover surface (not the brand color),
+   --primary = ink buttons. */
 :root {
 	color-scheme: light;
 	--radius: 8px;
@@ -117,7 +76,6 @@
 	--dur-1: 120ms;
 	--dur-2: 200ms;
 	--dur-3: 320ms;
-	/* How sure — guessing (amber) through certain (green). */
 	--conf-1: #a2601f;
 	--conf-1-soft: rgb(214 145 66 / 0.16);
 	--conf-2: #8a6d1c;
@@ -126,41 +84,26 @@
 	--conf-3-soft: rgb(47 143 127 / 0.15);
 	--conf-4: #21633f;
 	--conf-4-soft: rgb(33 99 63 / 0.15);
-	/* The gradient field's washes (Home/Lesson cool; Practice warm). */
 	--blob-a: #b5ddd2;
 	--blob-b: #cdd9ef;
 	--blob-c: #dfe9d6;
 	--blob-warm-a: #f1d6b6;
 	--blob-warm-b: #cfe3dc;
 	--blob-warm-c: #ecdccf;
-	/* The graph canvas's edge ink: a quiet grey between the faint text and
-	   the borders, so the reasoning reads without the brand teal shouting. */
 	--graph-edge: #a3a8a3;
-	/* Emphasis inks default to the regular text color. */
 	--lh-ink-strong: var(--foreground);
 	--lh-ink-italic: var(--foreground);
-	/* THE READING SIZE = the ladder's 17px rung (--text-lg). Can't be
-	   var()-linked: @theme inline inlines literals into utilities without
-	   emitting runtime vars — so this is the one documented duplication:
-	   change one, change both. v4: 17px Literata at 28px leading. */
+	/* Same value as --text-lg: @theme inline inlines literals without emitting
+	   runtime vars, so this can't var()-link. Change both. */
 	--lh-prose-size: 17px;
 	--lh-prose-leading: 1.65;
-	/* Markdown heading weight (appearance settings). */
 	--lh-heading-weight: 600;
-	/* Practice's warm register ground (was a literal in app/v4.css). */
 	--background-warm: #f5f4f1;
-	/* A control's hairline on hover — one step past --line-strong. */
 	--line-hover: rgb(25 28 26 / 0.24);
-	/* The ink small control shadows mix from (alpha set at the use site
-	   via rgb(from var(--shadow-ink) r g b / a)). */
 	--shadow-ink: #191c1a;
-	/* The figure backing law: models draw figures and demos for a WHITE
-	   page, so their stage stays white in every theme (the per-figure
-	   invert switch is how a reader darkens one). */
+	/* Models draw figures and demos for a white page, so the stage stays white
+	   in every theme. */
 	--figure-paper: #ffffff;
-	/* Mermaid's literals that have no app token (components/mermaid-render.ts
-	   reads these plus --surface/--foreground/--background/--border/
-	   --muted-foreground/--graph-edge at render time). */
 	--chart-border: #c9ccc7;
 	--chart-secondary: #eef5f3;
 	--chart-cluster: #f7f8f6;
@@ -168,20 +111,6 @@
 	--chart-note-border: #e6cfa8;
 }
 
-/* DARK (owner-approved direction, 2026-10-27). Live when <html> carries
-   data-theme="dark" — set by components/theme.ts from the Theme setting
-   (System · Light · Dark). Same names as the light block; only the
-   values move.
-
-   Ground:   green-tinted charcoal, the light ground's hue carried over.
-   Depth:    raised = lighter (shadows barely read on dark), so
-             --background < --card < --surface < --popover step UP.
-   Ink:      off-white, never pure white; --on-ink flips to the ground so
-             ink buttons invert (light pill, dark label).
-   Accents:  teal, amber and the status inks are lifted until each clears
-             4.5:1 on the ground and on --surface.
-   Field:    the gradient blobs keep their hues, sunk deep so they read as
-             a faint glow rather than a wash. */
 :root[data-theme="dark"] {
 	color-scheme: dark;
 	--background: #121513;
@@ -266,26 +195,14 @@
 }
 
 @theme inline {
-	/* Fonts (v4): chrome = Manrope, prose + titles = Literata, numbers and
-	   code = JetBrains Mono. The variables attach in app/layout.tsx. The
-	   Tailwind defaults are ALIASED to the app fonts: `font-mono`/`font-sans`
-	   utilities would otherwise fall to the SYSTEM stacks — a fourth font the
-	   app never chose — and streamdown's code-block chrome uses them. */
+	/* Tailwind's font-sans/font-mono alias the app fonts; otherwise they fall to
+	   the system stacks, and streamdown's code-block chrome uses them. */
 	--font-ui: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
 	--font-prose: var(--font-literata), Georgia, serif;
 	--font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
 	--font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
-	/* The modular type ladder — each size carries its own line-height.
-	   Component sizes must pull from this ladder. (owner, typography
-	   round 4: quiet labels get their quiet from color, not a notch of
-	   size.) v4 polish: the design's 10.5–11.5px labels were too small for
-	   a study app — the floor is 12px for meta, 13px for UI text. Reading
-	   prose = the 17px rung via --lh-prose-size. */
-	/* --font-title lives in the NON-inline @theme below: inline tokens get
-	   their literal values baked into the utilities, which made the appearance "session names in serif"
-	   toggle write a runtime --font-title no consumer ever read (owner, fix
-	   wave: toggle looked dead). Non-inline emits :root { --font-title: … }
-	   and the utility reads var(--font-title) — appearance overrides win. */
+	/* --font-title lives in the non-inline @theme below: inline tokens bake
+	   their literal value into the utility, so a runtime override is never read. */
 	--text-xs: 12px;
 	--text-xs--line-height: 1.4;
 	--text-sm: 13px;
@@ -302,8 +219,6 @@
 	--text-2xl--line-height: 1.3;
 	--text-3xl: 32px;
 	--text-3xl--line-height: 1.25;
-	/* Radii ladder — 4/8/12/16/20 multiples of the 4px base (20 = v4's
-	   floating panels). */
 	--radius-xs: 4px;
 	--radius-sm: 6px;
 	--radius-md: 8px;
@@ -361,18 +276,12 @@ body {
 	font-family: var(--font-ui);
 }
 
-/* Teaching prose (the markdown renderer's container gets .lh-prose):
-   Literata with the size/leading tokens; emphasis color bound to
-   the settings-ready tokens. */
 .lh-prose {
 	font-family: var(--font-prose);
 	font-size: var(--lh-prose-size);
 	line-height: var(--lh-prose-leading);
 }
 
-/* The answered card (v4 compact record): a past answer is context, not
-   the lesson — the question at 14px, options and the tucked "why" in the
-   UI sans. Unlayered on purpose: .lh-prose above beats utilities. */
 .lh-answered .lh-prose {
 	font-size: 14px;
 	line-height: 1.5;
@@ -383,7 +292,6 @@ body {
 	line-height: 1.45;
 }
 
-
 .lh-prose :where(strong, b) {
 	color: var(--lh-ink-strong);
 	font-weight: 700;
@@ -393,28 +301,16 @@ body {
 	color: var(--lh-ink-italic);
 }
 
-/* Markdown lists indent from the prose edge (owner ask, 2026-09-24):
-   streamdown ships list-inside with no container padding (top-level
-   markers sit ON the text edge — nested lists get their pl-6 only via
-   [li_&]). 24px — the same measure as that nested-case pl-6 — pulls
-   the whole list right as a block. Unlayered CSS beats the utility
-   layer; :where keeps specificity zero. */
+/* streamdown ships list-inside with no container padding, so top-level
+   markers sit on the text edge. */
 .lh-prose :where(ul, ol) {
 	padding-left: 1.5rem;
 }
 
-/* Markdown headings render at the font's BLACK weight (owner ask,
-   2026-09-19) — 900, not streamdown's font-semibold 600. The variable
-   Source Sans 3 axis spans 200–900 (next/font loads the full range), so
-   900 draws the real Black cut. Unlayered CSS beats the utility layer;
-   :where keeps specificity zero. Chrome titles (CMU Serif) don't live
-   under .lh-prose and stay untouched. */
 .lh-prose :where(h1, h2, h3, h4, h5, h6) {
 	font-weight: var(--lh-heading-weight, 900);
 }
 
-
-/* Thin native scrollbar (app-wide): hairline thumb, transparent track. */
 * {
 	scrollbar-width: thin;
 	scrollbar-color: var(--color-border) transparent;
@@ -438,9 +334,6 @@ body {
 	background: var(--color-muted-foreground);
 }
 
-/* Dock variant swap — quick fade/rise on content change; the shell's HEIGHT
-   morph is separate (WAAPI in DockOverlay). Re-applied via class toggling, no
-   remount, so collapsed-question state survives. */
 @keyframes dock-variant-in {
 	from {
 		opacity: 0;
@@ -457,46 +350,26 @@ body {
 	animation: dock-variant-in 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* ============================================================
- * W3 — presentation fixes (appended 2026-08-22)
- * ============================================================ */
-
-/* Streamdown's internal UI chrome (code blocks, tables, mermaid containers,
-   copy/download buttons) is styled with Tailwind utilities living in its dist
- * bundle. Tailwind v4 never scans node_modules, so without this line those
- * classes are dead — code blocks and mermaid containers rendered unstyled.
- * (Streamdown README, "Tailwind CSS setup".) */
+/* Tailwind v4 never scans node_modules, and streamdown's chrome is styled
+   with utilities in its dist bundle (Streamdown README, "Tailwind CSS setup"). */
 @source "../node_modules/streamdown/dist/*.js";
 
-/* Token the streamdown utilities reference (code-block/mermaid chrome uses
- * bg-sidebar / border-sidebar): map it onto the app's card surface. */
+/* streamdown's code-block/mermaid chrome uses bg-sidebar / border-sidebar. */
 @theme inline {
 	--color-sidebar: var(--card);
 }
 
-/* Mermaid diagrams: keep wide charts inside the content column. Mermaid
- * inlines a px max-width on the svg, so !important is required to win. */
+/* Mermaid inlines a px max-width on the svg, so !important is required to win. */
 [data-streamdown="mermaid"] svg {
 	max-width: 100% !important;
 	height: auto !important;
 }
 
-/* Display math: long equations scroll instead of overflowing the column. */
 .katex-display {
 	overflow-x: auto;
 	overflow-y: hidden;
 }
 
-/* ============================================================
- * Chrome melt (owner wave, 2026-09-19) — tables and code blocks stop
- * being boxes: blocks read as part of the message. These rules override
- * streamdown's Tailwind utilities (utilities live in a cascade LAYER;
- * unlayered author CSS wins regardless of order).
- * ============================================================ */
-
-/* Code blocks: no header bar — one quiet rounded card surface so code
-   reads as a unit, plus a subtle hairline outline. (md-blocks renders its
-   own hover copy corner.) */
 [data-streamdown="code-block"] {
 	border: 1px solid var(--border);
 	background: var(--card);
@@ -512,31 +385,16 @@ body {
 	padding: 0.75rem 1rem;
 }
 
-/* Tables: hairline row rules + header underline, and a full outer border
-   — actual RECTANGLES outlined on all four sides (owner note, chrome-melt
-   tweaks 2026-09-19: the melt left the shape missing its left/right/top
-   edges). border-collapse merges the outer border with the row rules, so
-   no edge doubles. (md-blocks supplies the wrapper + the copy corner.) */
 [data-streamdown="table"] {
 	border: 1px solid var(--border);
-	/* Tables HUG their contents (owner, callout round 2026-10-07): no more
-	   full-width stretch with dead space. max-content sizes to the cells
-	   (width:auto would still stretch — the classic table trap). No
-	   max-width cap: a max-width would squish-wrap wide tables instead of
-	   letting the md-blocks overflow-x scroller carry them. */
+	/* width:auto would still stretch. No max-width: wide tables scroll in the
+	   md-blocks overflow-x scroller instead of wrapping. */
 	width: max-content;
-	/* Tables run at the SESSION prose size (owner note, 2026-09-19: they
-	   visibly lagged the 16px chat text at streamdown's 12.5px text-sm).
-	   Unlayered CSS beats the cells' own utility-layer text-sm, and the
-	   :where keeps specificity zero — the override wins on layering alone. */
 	font-size: var(--lh-prose-size);
 }
 [data-streamdown="table"] :where(th, td) {
 	font-size: inherit;
 }
-/* Column separators: a hairline left rule on every cell but the first in
-   its row (owner ask, 2026-09-19) — border-collapse merges it with the row
-   rules and the outer border, no doubled lines anywhere. */
 [data-streamdown="table"] :where(th, td):not(:first-child) {
 	border-left: 1px solid var(--border);
 }
@@ -548,32 +406,14 @@ body {
 	border-bottom: 1px solid var(--border);
 }
 
-/* The mermaid focus overlay's chart wrapper: the svg fills the wrapper
-   (which is sized to the chart's viewBox — pan-zoom.ts math centers on it),
-   overriding mermaid's inline max-width cap. Later + same-specificity
-   than the column rule above, so the !important tie breaks our way; the
-   overlay's svg never sits under [data-streamdown="mermaid"] anyway. */
+/* Overrides mermaid's inline max-width: the svg fills a wrapper sized to the
+   chart's viewBox. */
 [data-lh-overlay-chart] svg {
 	max-width: none !important;
 	width: 100% !important;
 	height: auto !important;
 }
 
-/* ============================================================
- * Session status — the braille spinner (the one working indicator)
- * ============================================================ */
-
-/* (owner, minimal-color round) Phase color-coding is RETIRED: phases only
-   advance (every session ends in Teaching), so phase-as-signal was
-   decoration; the --phase-* tokens and every phase-dot state are gone.
-   What state deserved — "a turn is in flight" — is carried by MOTION
-   alone: the terminal braille spinner (components/braille-spinner.tsx),
-   monochrome, existing only while true. */
-
-/* One keyframes, all ten frames: each frame <g> holds opacity 1 for its
-   10% slice of the 800ms cycle and 0 elsewhere; frames stagger via
-   positive animation-delay (frame k starts at k×80ms). Static contexts
-   (SSR, reduced motion) show frame 0 — see the base rules below. */
 @keyframes braille-frame {
 	0%,
 	10% {
@@ -591,7 +431,6 @@ body {
 	opacity: 0;
 }
 
-/* Static fallback: frame 0 (⠋) is the glyph a non-animated context shows. */
 .braille-frame[data-frame="0"] {
 	opacity: 1;
 }
@@ -602,13 +441,6 @@ body {
 	}
 }
 
-
-
-/* Graph chrome fade-in (empty-graph chrome wave, owner 2026-09-25): the
-   search + settings controls appear ONCE, as the first nodes land —
-   Import Notes always renders (the empty graph's entry point), the other
-   two mount only when the snapshot has nodes. Same understated register
-   as settings-pop (a plain fade); reduced-motion appears instantly. */
 @keyframes chrome-fade-in {
 	from {
 		opacity: 0;
@@ -628,67 +460,34 @@ body {
 	}
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   Electron merged chrome (owner, 2026-09-17). The system title bar is
-   hidden (macOS hiddenInset; Windows/Linux hidden + native controls
-   overlay in electron/main.cjs); the app's header bands are the drag
-   surface (the Lesson/Knowledge headers, the card's brand row, and on
-   macOS the full-width title bar).
-   Everything here is inert in the plain browser — it keys off <html class="lh-electron">, which
-   ShellProvider (components/sidebar.tsx) sets after mount when it detects the Electron shell.
-
-   - .lh-drag        window-drag region. Drag regions resolve by DOM order,
-                       not z-index: no-drag subtracts only regions added
-                       earlier in the tree, so the macOS .titlebar band
-                       (components/v4/shell.tsx) comes FIRST in each screen
-   - .lh-no-drag     carve-out for interactive elements inside a drag band
-                       (native interactive elements carve out AUTOMATICALLY —
-                       see the auto carve-out rule below; manual use is for
-                       clickable non-natives only)
-   ───────────────────────────────────────────────────────────────────────── */
+/* Electron only: keys off <html class="lh-electron">. Drag regions resolve by
+   DOM order, not z-index: no-drag subtracts only regions added earlier in
+   the tree. .lh-no-drag is for clickable non-native elements. */
 .lh-electron .lh-drag {
 	-webkit-app-region: drag;
 }
 .lh-electron .lh-no-drag {
 	-webkit-app-region: no-drag;
 }
-/* THE AUTO CARVE-OUT (owner standardization ruling, 2026-09-29 night):
-   inside a drag band, every NATIVE interactive element is automatically
-   a no-drag island — "draggable anywhere that is not a clickable
-   element" becomes structural, not per-child discipline. TopBar
-   contents can differ arbitrarily; buttons/inputs/links always stay
-   clickable with zero opt-out bookkeeping. Manual .lh-no-drag remains
-   only for clickable NON-native elements (spans/divs with onClick —
-   e.g. the graph chrome's control column). */
+/* Native interactive elements inside a drag band are no-drag automatically. */
 .lh-electron .lh-drag :is(button, input, textarea, select, a, summary, [contenteditable]) {
 	-webkit-app-region: no-drag;
 }
-/* PHYSICAL-CONSTANT under zoom (owner round 7, 2026-10-05): ⌘±/⌘0 scale
-   every CSS px by the zoomFactor while the native lights never move —
-   so lengths measured against the lights DIVIDE by --lh-zoom (published
-   by the renderer from the lh:zoom IPC) to render at the same physical
-   size at every zoom. Default 1 until the first push lands. */
+/* Zoom scales every CSS px while the native traffic lights never move, so
+   lengths measured against the lights divide by --lh-zoom. */
 .lh-electron {
 	--lh-zoom: 1;
 }
-/* THE macOS TITLE BAR (owner, 2026-10-27): a full-width band the lights
-   sit in (electron/main.cjs centers them at y 26). The sidebar card, the
-   rail and the dock start below it; the page title sits in it.
-   --lh-bar       52pt physical, floored at 36px so the title still fits
-                  zoomed in (then the lights ride a little above center)
-   --lh-lights-end  where content may start: the green light's right edge
-                  (~75pt) + 16pt of air */
+/* --lh-bar: 52pt physical, floored at 36px so the title still fits zoomed in.
+   --lh-lights-end: the green light's right edge (~75pt) + 16pt. */
 .lh-electron[data-lh-platform="darwin"] {
 	--lh-bar: max(calc(52px / var(--lh-zoom)), 36px);
 	--lh-lights-end: calc(91px / var(--lh-zoom));
 }
 
-/* Windows/Linux Window Controls Overlay: Chromium publishes the usable
-   titlebar rectangle in CSS coordinates (including resize/zoom changes).
-   Reserve the native buttons' actual right-side extent, no fixed width
-   and no second zoom division. The env fallbacks make fullscreen/absent
-   overlay a zero gutter. Keep this independent of .lh-drag: rename mode
-   still needs to clear the native buttons when dragging is disabled. */
+/* Chromium publishes the usable Window Controls Overlay titlebar rectangle
+   in CSS coordinates, including resize and zoom. The env fallbacks make a
+   fullscreen or absent overlay a zero gutter. */
 .lh-electron:is([data-lh-platform="win32"], [data-lh-platform="linux"]) {
 	--lh-wco-right: max(0px, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)));
 }
@@ -700,18 +499,10 @@ body {
 	max-width: max(0px, calc(100% - 5.5rem - var(--lh-wco-right, 0px)));
 }
 
-/* --font-title deliberately NOT @theme inline (see comment above): the
-   session-name-serif toggle overrides this var at runtime, so the
-   .font-title utility must read it through var(), not carry a baked copy. */
 @theme {
 	--font-title: var(--font-literata), Georgia, serif;
 }
 
-/* Card enter (owner round, 2026-10-05): the transcript cards' one-shot
-   mount — a subtle fade + 4px rise, the app's motion register (150ms,
-   dock-variant/settings-pop taste). Nothing on update, nothing on
-   unmount. Applied by the unified ThinkingBlock and the practice
-   cards; honors reduced-motion by appearing. */
 @keyframes lh-card-enter {
 	from {
 		opacity: 0;
@@ -733,7 +524,6 @@ body {
 	}
 }
 
-/* Source-message arrival: a brief, static theme-colored spotlight. */
 .lh-source-passage {
 	scroll-margin-top: 1rem;
 }
@@ -743,8 +533,6 @@ body {
 	border-radius: 0.25rem;
 }
 
-/* The key-idea callout (md-blocks MarkdownBlockquote, `> [!IMPORTANT]`):
-   a teal rule and a faint teal wash, no label, no icon, hugging its text. */
 .lh-callout {
 	margin: 1rem 0;
 	padding: 0.75rem 1rem;

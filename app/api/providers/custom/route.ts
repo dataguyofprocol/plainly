@@ -1,15 +1,11 @@
 /**
- * GET /api/providers/custom — the user's OpenAI-compatible endpoints
- * (custom-endpoint wave, 2026-10-26): {providers: [{id, name, baseUrl,
- * models, keyPresent}]}. Keys never leave the store — keyPresent only.
+ * GET: {providers: [{id, name, baseUrl, models, keyPresent}]}. Keys never
+ * leave the store.
  *
- * POST — add one. Body {name, baseUrl, apiKey?, models} — each model a
- * bare id or {id, vision?, thinking?, thinkingFormat?, contextWindow?,
- * maxTokens?}, absent fields at their defaults: strict parse
- * (core/custom-providers.ts; a bad field is a 400 with a user-facing
- * `error`). The id is minted from the name ("custom-" + slug, -2, -3 …
- * on collision) and never changes. A key is optional — local servers
- * need none. 201 {provider}; its models join the pickers immediately.
+ * POST {name, baseUrl, apiKey?, models}: each model is a bare id or
+ * {id, vision?, thinking?, thinkingFormat?, contextWindow?, maxTokens?}.
+ * The id is minted from the name and never changes. 201 {provider}; a bad
+ * field is 400 with a user-facing `error`.
  */
 import { parseCustomProviderCreate } from "@/src/core";
 import { createCustomProvider, listCustomProviders } from "@/src/server";

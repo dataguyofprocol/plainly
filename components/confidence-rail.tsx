@@ -3,26 +3,6 @@ import { cn } from "@/lib/utils";
 import { CONFIDENCE_LEVEL_COLORS } from "@/components/confidence-colors";
 import { CONFIDENCE_LEVELS, CONFIDENCE_STOPS } from "@/src/core";
 
-/**
- * The confidence RAIL — the slider's paint, shared by two surfaces so they
- * can never drift apart (owner, 2026-10-01):
- *
- *   - the dock's live slider (question-dock) — a transparent range input
- *     rides on top of this paint, disc and all;
- *   - the ANSWERED card (owner round 6) — the same rail with NO disc,
- *     which itself communicates "this is a record, not a control".
- *
- * Geometry law: the rail spans the thumb-CENTER range (inset half a 16px
- * disc per side) so the dock's 0/100 stops sit flush at the very ends.
- * The static card has no thumb, but keeps the identical shape.
- *
- * Stack law: the muted surface as base, SOLID stop ticks
- * as background layers UNDER the fill, and the fill itself TRANSPARENT
- * past the value — so ticks show only on the empty side, never over the
- * color. Ticks skip 0 and 100 (the rail's ends already say those).
- */
-
-/** The six-step ramp (owner ruling): 0 red → 100 emerald, indexed by stop. */
 export const CONFIDENCE_COLORS: readonly string[] = [
 	"#ef4444", // 0
 	"#f97316", // 30
@@ -32,7 +12,6 @@ export const CONFIDENCE_COLORS: readonly string[] = [
 	"#10b981", // 100
 ];
 
-/** The rail's paint for a stop value (0–100). */
 export function confidenceRailStyle(value: number): CSSProperties {
 	const color = CONFIDENCE_COLORS[CONFIDENCE_STOPS.indexOf(value)] ?? CONFIDENCE_COLORS[2]!;
 	return {
@@ -49,7 +28,6 @@ export function confidenceRailStyle(value: number): CSSProperties {
 	};
 }
 
-/** The static rail — the slider's look, disc removed. */
 export function ConfidenceRail({ value, className }: { value: number; className?: string }) {
 	return (
 		<div
@@ -61,14 +39,6 @@ export function ConfidenceRail({ value, className }: { value: number; className?
 	);
 }
 
-/**
- * HOW SURE (owner, 2026-10-27: the compact switch) — "How sure are you?"
- * as one slim four-way switch, shared by the question dock and the
- * practice dock so the two can never drift. The chosen level is a white
- * chip whose text wears that level's colour (confidence-colors.ts, passed
- * as --lvl). `value` is a level value (25/50/75/95) or null when nothing
- * is chosen yet.
- */
 export function ConfidenceLadder({
 	value,
 	onChange,
@@ -84,7 +54,6 @@ export function ConfidenceLadder({
 	labelledBy: string;
 	title?: string;
 	testid?: string;
-	/** The question dock's per-rung testids (confidence-stop-<value>). */
 	stopTestids?: boolean;
 }) {
 	const at = value === null || disabled ? -1 : CONFIDENCE_LEVELS.findIndex((l) => l.value === value);

@@ -1,16 +1,3 @@
-/**
- * The shared settings-PUT body parsers — one seam per settings surface.
- * Extracted verbatim from the per-chat route (default-settings wave,
- * 2026-09-18): identical parse, identical errors. The section parsers
- * (settings-storage wave, 2026-09-19) follow the same house rules.
- *
- * Replace-whole semantics: the client sends the complete desired SECTION;
- * absent fields are absent overrides ({} clears everything). No merges, so
- * a stale client can never resurrect a cleared override. Unknown body keys
- * are dropped (same tolerance as parseSettingsBody) — unknown DISK keys are
- * a different concern and are preserved by the sanitizer (core/settings.ts).
- */
-
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { isHexColor, type ChatSettings } from "../core";
 import type {
@@ -26,7 +13,6 @@ import type {
 import { BACKGROUND_MODEL_ROLES, COMPACTION_THRESHOLD_FLOOR, DAILY_GOAL_MAX, DAILY_GOAL_MIN, EXTRACTION_CHUNK_TOKENS_FLOOR, MODEL_SLOTS } from "../core/settings.ts";
 import { WRITABLE_TOOL_KEYS } from "../core/pending.ts";
 
-/** Parsed-or-rejected — `ok: false` carries the 400's error message. */
 export type SettingsBodyResult<T> =
 	| { ok: true; settings: T }
 	| { ok: false; error: string };
@@ -57,25 +43,14 @@ export function parseSettingsBody(body: unknown): SettingsBodyResult<ChatSetting
 		}
 		settings.thinkingLevel = raw.thinkingLevel as ThinkingLevel;
 	}
-	// Wave 7 killed the graph-context injection (owner: zero configuration
-	// beyond chat models — the prober reads its map through tools now); its
-	// budget dial is gone with it. A stale client sending the old key has
-	// it silently dropped here (forward-compatible, like any unknown key).
 	return { ok: true, settings };
 }
-
-// ─── Section parsers (settings-storage wave, 2026-09-19) ────────────────────
-// One parser per settings.json section; the route maps the URL section to
-// its parser via SETTINGS_SECTIONS below. Same discipline as
-// parseSettingsBody: strict on every known field (a bad type/shape is a
-// 400, never a silent clamp/drop), unknown keys dropped.
 
 function asRecord(body: unknown): Record<string, unknown> | null {
 	if (!body || typeof body !== "object" || Array.isArray(body)) return null;
 	return body as Record<string, unknown>;
 }
 
-/** general: { dailyGoalMinutes?: integer 5..240 } */
 export function parseGeneralSettingsBody(body: unknown): SettingsBodyResult<GeneralSettings> {
 	const raw = asRecord(body);
 	if (!raw) return { ok: false, error: "Invalid JSON body" };
@@ -90,8 +65,6 @@ export function parseGeneralSettingsBody(body: unknown): SettingsBodyResult<Gene
 	return { ok: true, settings };
 }
 
-/** agent.models: only the six known background roles; each override's
- *  fields mirror ChatSettings (model pair + independent thinkingLevel). */
 function parseRoleOverride(value: unknown, role: string): { ok: true; override: RoleModelOverride } | { ok: false; error: string } {
 	const raw = asRecord(value);
 	if (!raw) return { ok: false, error: `${role} must be an object` };
@@ -119,7 +92,6 @@ function parseRoleOverride(value: unknown, role: string): { ok: true; override: 
 	return { ok: true, override };
 }
 
-/** A boolean map (tools / prompts switches): every value must be boolean. */
 function parseBooleanMap(value: unknown, field: string): { map?: Record<string, boolean>; error?: string } {
 	if (value === undefined) return {};
 	const raw = asRecord(value);
@@ -132,9 +104,6 @@ function parseBooleanMap(value: unknown, field: string): { map?: Record<string, 
 	return { map: out };
 }
 
-/** agent: { models?, tools?, prompts? } — model/thinking validity against
- *  the catalog is checked by the route (validateChatSettings discipline);
- *  prompt switch-on membership is checked by the route (needs the store). */
 export function parseAgentSettingsBody(body: unknown): SettingsBodyResult<AgentSettings> {
 	const raw = asRecord(body);
 	if (!raw) return { ok: false, error: "Invalid JSON body" };
@@ -157,12 +126,6 @@ export function parseAgentSettingsBody(body: unknown): SettingsBodyResult<AgentS
 	const tools = parseBooleanMap(raw.tools, "tools");
 	if (tools.error) return { ok: false, error: tools.error };
 	if (tools.map) {
-		// Unknown tool keys are rejected at WRITE time (user decision
-		// 2026-09-19): the delta is inert while unread, but once the bridge
-		// honors it a persisted bogus key would drift. The writable set is
-		// the job tools + the quizzing-mechanics switch (explain, owner
-		// 2026-09-27). The read-side sanitizer stays lenient for
-		// forward-compat.
 		const supported = WRITABLE_TOOL_KEYS as readonly string[];
 		for (const key of Object.keys(tools.map)) {
 			if (!supported.includes(key)) {
@@ -184,10 +147,6 @@ export function parseAgentSettingsBody(body: unknown): SettingsBodyResult<AgentS
 			settings.search = { engine: search.engine };
 		}
 	}
-	// Prober graph tools (wave 7, owner ruling 2026-09-23): an agent-section
-	// subsection, not a tool-toggles key — the mechanism is agent capability
-	// (tool registration), the subject is the graph. Strict write side:
-	// object shape only; `enabled` boolean when present. Absent = ON.
 	if (raw.graphTools !== undefined) {
 		const graphTools = asRecord(raw.graphTools);
 		if (!graphTools) return { ok: false, error: "graphTools must be an object" };
@@ -199,7 +158,6 @@ export function parseAgentSettingsBody(body: unknown): SettingsBodyResult<AgentS
 	return { ok: true, settings };
 }
 
-/** A hex-or-null color field (appearance colors): null = default. */
 function parseHexOrNull(value: unknown, field: string): { color?: string | null; error?: string } {
 	if (value === null) return { color: null };
 	if (typeof value !== "string" || !isHexColor(value)) {
@@ -208,8 +166,6 @@ function parseHexOrNull(value: unknown, field: string): { color?: string | null;
 	return { color: value };
 }
 
-/** appearance: { mode?, background?, fontFamily?, proseFontSize?,
- *  sessionNameSerif?, mdRendering? } */
 export function parseAppearanceSettingsBody(body: unknown): SettingsBodyResult<AppearanceSettings> {
 	const raw = asRecord(body);
 	if (!raw) return { ok: false, error: "Invalid JSON body" };
@@ -278,20 +234,9 @@ export function parseAppearanceSettingsBody(body: unknown): SettingsBodyResult<A
 	return { ok: true, settings };
 }
 
-/** graph: the collapsed section { enabled? } (wave 7, owner ruling
- *  2026-09-23): the master switch ONLY — the embedding/clustering/labeling
- *  rungs and the BYOK embeddingModel died with the provider embedder
- *  (clustering is the free birth-session partition, labels are session
- *  names). Old-shape keys in a body are ignored, not rejected. */
 export function parseGraphSettingsBody(body: unknown): SettingsBodyResult<GraphSettings> {
 	const raw = asRecord(body);
 	if (!raw) return { ok: false, error: "Invalid JSON body" };
-	// Wave 7 collapse (owner ruling 2026-09-23) + the extraction-UX
-	// redesign (2026-09-24): the section is the master switch and the
-	// chunk budget. PUT is replace-whole — a body like {enabled: true} IS
-	// the whole section (extractionChunkTokens absent = factory default at
-	// resolution); the dead rungs' keys in old records are unread (the
-	// sanitizer drops them; see sanitizeGraph).
 	const settings: GraphSettings = {};
 	if (raw.enabled !== undefined) {
 		if (typeof raw.enabled !== "boolean") return { ok: false, error: "enabled must be a boolean" };
@@ -307,9 +252,6 @@ export function parseGraphSettingsBody(body: unknown): SettingsBodyResult<GraphS
 		}
 		const floored = Math.floor(raw.extractionChunkTokens);
 		if (floored < EXTRACTION_CHUNK_TOKENS_FLOOR) {
-			// the floor's rationale lives on GraphSettings.extractionChunkTokens:
-			// every run pays the graph-carrying prompt overhead — penny-batches
-			// cost more per extracted token than the content is worth.
 			return {
 				ok: false,
 				error: `extractionChunkTokens must be at least ${EXTRACTION_CHUNK_TOKENS_FLOOR} (smaller batches waste the per-run graph overhead)`,
@@ -320,11 +262,6 @@ export function parseGraphSettingsBody(body: unknown): SettingsBodyResult<GraphS
 	return { ok: true, settings };
 }
 
-/** models: { strong?, cheap?, vision? } — the slot tiers (model slots
- *  wave, 2026-09-20). Each slot is the same shape as a role override; a
- *  present-but-empty slot object is rejected (absent slot = unset; say
- *  what you mean). Catalog validity is checked by the route
- *  (validateChatSettings discipline). */
 export function parseModelsSettingsBody(body: unknown): SettingsBodyResult<ModelsSettings> {
 	const raw = asRecord(body);
 	if (!raw) return { ok: false, error: "Invalid JSON body" };
@@ -336,10 +273,6 @@ export function parseModelsSettingsBody(body: unknown): SettingsBodyResult<Model
 		}
 		const parsed = parseRoleOverride(raw[key], key);
 		if (!parsed.ok) return { ok: false, error: parsed.error };
-		// BYOK (owner, 2026-09-22): a slot IS a model choice — no factory
-		// floor exists, so a thinkingLevel alone can never run; every slot
-		// write must carry the model (the level is an optional rider). An
-		// absent slot key clears the tier (replace-whole section).
 		if (!parsed.override.model) {
 			return { ok: false, error: `slot "${key}" must set a model (thinkingLevel alone cannot run — absent slot = unset)` };
 		}
@@ -348,14 +281,6 @@ export function parseModelsSettingsBody(body: unknown): SettingsBodyResult<Model
 	return { ok: true, settings };
 }
 
-/** compaction (owner round 14): the context-compaction threshold — the
- *  projected-token budget over which a session summarizes its own history
- *  into the compaction marker. Strict write side: a present
- *  thresholdTokens must be a number at or above the floor (the floor is
- *  anti-churn: each compaction keeps a ~20k-token recent tail, so a
- *  smaller threshold would re-summarize the tail it just wrote). Absent =
- *  factory default 150k at resolution. Replace-whole, like every
- *  section. */
 export function parseCompactionSettingsBody(body: unknown): SettingsBodyResult<CompactionSettings> {
 	const raw = asRecord(body);
 	if (!raw) return { ok: false, error: "Invalid JSON body" };
@@ -376,8 +301,6 @@ export function parseCompactionSettingsBody(body: unknown): SettingsBodyResult<C
 	return { ok: true, settings };
 }
 
-/** The section→parser map for PUT /api/settings/[section] (the route also
- *  carries the special prompts sub-resource). */
 export const SETTINGS_SECTIONS = {
 	general: parseGeneralSettingsBody,
 	chat: parseSettingsBody,

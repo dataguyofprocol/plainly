@@ -1,13 +1,11 @@
 /**
- * PUT /api/providers/custom/:id — partial update (custom-endpoint wave,
- * 2026-10-26). Body any of {name, baseUrl, models, apiKey}: apiKey a
- * string replaces the key, null removes it, absent leaves it. The id
- * never changes, so slot pins survive a rename. {provider}; 404 unknown
- * id; 400 with a user-facing `error` on a bad field.
+ * PUT: partial update, body any of {name, baseUrl, models, apiKey}. apiKey
+ * as a string replaces the key, null removes it, absent leaves it. The id
+ * never changes. 200 {provider}; 404 unknown id; 400 with a user-facing
+ * `error` on a bad field.
  *
- * DELETE — remove the provider and its key. 204; 404 unknown id. Slots
- * pinned to it are left as they are — the lapsed-pin handling reports
- * them.
+ * DELETE: removes the provider and its key. 204; 404 unknown id. Slots
+ * pinned to it are left as they are.
  */
 import { parseCustomProviderUpdate } from "@/src/core";
 import { deleteCustomProvider, updateCustomProvider } from "@/src/server";

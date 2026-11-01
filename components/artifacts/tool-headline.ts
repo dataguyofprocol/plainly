@@ -1,18 +1,8 @@
-/**
- * What a tool call DID, in the learner's words (v4 polish, 2026-10-26) —
- * the transcript shows "Looked through your sessions", not
- * "list_sessions ›". Pure: tool name + input → a short past-tense
- * sentence and the icon that goes with it; unknown tools fall back to
- * their name, humanised.
- */
-
 export type ToolIcon = "sessions" | "ideas" | "file" | "folder" | "search";
 
 export interface ToolHeadline {
 	icon: ToolIcon;
-	/** Past tense, sentence case, no trailing period. */
 	label: string;
-	/** The call's subject (a path, a pattern), shown quietly after the label. */
 	detail: string | null;
 }
 

@@ -38,8 +38,6 @@ const Context = createContext({
 	dismissWarning: () => {},
 });
 
-/** UI lifetime spans setup's keys → models transition. Only existing safe controls
- * are used; account IDs remain control values, never displayed account labels. */
 export function ChatGPTUIProvider({ children }: { children: React.ReactNode }) {
 	const [status, setStatus] = useState<ChatGPTStatus>(empty);
 	const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -110,8 +108,6 @@ export function ChatGPTUIProvider({ children }: { children: React.ReactNode }) {
 			return;
 		}
 		if (next.pending) { attempt.pending = true; attempt.phase = "pending"; return; }
-		// login() normally acknowledges pending immediately; verified completion is
-		// a later status notification. The acknowledgement itself is not success.
 		if (attempt.pending || loginReply) void complete(attempt, next);
 	}
 	receive.current = (value) => {
@@ -158,7 +154,6 @@ export function ChatGPTUIProvider({ children }: { children: React.ReactNode }) {
 		setError(null);
 		setDismissedError(status.error);
 		if (cancel) {
-			// Keep cancellation serialized even after login's pending IPC reply.
 			operation.current = "cancel"; setBusy(true);
 			const request = ++statusSequence.current;
 			void window.lh?.chatgpt?.cancel().then(async (value: unknown) => {
@@ -172,7 +167,7 @@ export function ChatGPTUIProvider({ children }: { children: React.ReactNode }) {
 					next = refresh === statusSequence.current ? publishStatus(current) : statusRef.current;
 				} else next = publishStatus(value);
 				if (next && !next.pending) {
-					setDismissedError(value.error); // Dismiss only this cancellation's error, not a newer failure.
+					setDismissedError(value.error);
 					if (dialogRef.current === owner) showDialog(null);
 				} else if (next) setError(CONTROL_ERROR);
 			}).catch(() => { if (mounted.current && generation.current === intent) setError(CONTROL_ERROR); }).finally(() => {
@@ -200,8 +195,6 @@ export function ChatGPTUIProvider({ children }: { children: React.ReactNode }) {
 				next = refresh === statusSequence.current ? publishStatus(current) : statusRef.current;
 			} else next = publishStatus(value);
 			if (!next) return;
-			// Dismissed status warnings belong to an earlier action. Only a new
-			// disconnect outcome (or an explicit IPC error envelope above) reopens one.
 			const failure = [value.error, next.error].find((message) => message && (kind === "disconnect" || message !== dismissedError)) ?? null;
 			if (kind === "disconnect" && !next.accounts.some((a) => a.id === target)) {
 				if (dialogRef.current === owner) {
@@ -224,9 +217,6 @@ export function ChatGPTUIProvider({ children }: { children: React.ReactNode }) {
 		try {
 			let value: unknown = await bridge.login(registration || undefined);
 			if (!owns(attempt) || attempt.phase === "consent") return;
-			// Never publish an old acknowledgement over a newer event. If events
-			// coalesced past pending before the acknowledgement arrived, read the
-			// current backend state after it rather than losing that completion.
 			if (request !== statusSequence.current && isStatus(value)) {
 				if (value.error) { setError(value.error); finish(attempt); return; }
 				attempt.pending = true; attempt.phase = "pending";
@@ -315,7 +305,7 @@ export function ChatGPTUIProvider({ children }: { children: React.ReactNode }) {
 
 function ContinueButton({ onClick, disabled, testid = "chatgpt-login" }: { onClick: () => void; disabled: boolean; testid?: string }) {
 	return <Button type="button" variant="outline" size="sm" data-testid={testid} onClick={onClick} disabled={disabled} className="cursor-pointer disabled:cursor-not-allowed">
-		{/* Official unmodified mark (black variant for the light UI); existing secondary button hover/focus treatment. */}
+		{/* Official unmodified mark (black variant for the light UI). */}
 		{/* eslint-disable-next-line @next/next/no-img-element */}
 		<img src="/siwc/chatgpt-logo-black.svg" width="16" height="16" alt="" aria-hidden="true" />
 		Continue with ChatGPT
@@ -326,7 +316,6 @@ function AccountDialog({ children, onClose, busy }: { children: React.ReactNode;
 	return <ConnectionDialog label="ChatGPT account" testid="chatgpt-account-dialog" backdropTestid="chatgpt-dialog-backdrop" onClose={onClose} busy={busy}>{children}</ConnectionDialog>;
 }
 
-/** Shared compact settings/setup row; account selection precedes the quiet action. */
 export function ChatGPTConnection(_props: { setup?: boolean } = {}) {
 	const ui = useContext(Context);
 	const active = ui.status.accounts.find((a) => a.id === ui.status.activeId && a.connected);
@@ -342,7 +331,6 @@ export function ChatGPTConnection(_props: { setup?: boolean } = {}) {
 	</div>;
 }
 
-/** Contextual consent discovery belongs beside background model choices only. */
 export function ChatGPTBackgroundAccess({ provider }: { provider: string | undefined }) {
 	const ui = useContext(Context);
 	const account: Account | undefined = ui.status.accounts.find((a) => a.id === ui.status.activeId && a.connected);

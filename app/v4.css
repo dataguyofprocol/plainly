@@ -1,23 +1,7 @@
-/*
- * THE V4 SURFACE — base + primitives (finesse pass, 2026-10-26).
- *
- * The owner-approved v4 language ("LearnHarness Redesign", page "v4 ·
- * arranged"), rebuilt as one system. This file holds ONLY what every
- * screen shares: the alias layer onto app/globals.css's tokens, the type
- * ladder, the gradient field, surfaces, motion, and the control
- * primitives. Each screen's own rules live in app/ui/<area>.css.
- *
- * Everything is scoped under .v4 (the app root) so legacy utilities and
- * these never fight; unlayered CSS beats Tailwind's utility layer.
- *
- * Type ladder (px / line-height):
- *   .t-meta 12/16 · .t-title 20/26 · .t-h2 24/30 (serif)
- *   .t-display 32/38 (serif)
- * Nothing in the app sets a size off this ladder.
- */
+/* Scoped under .v4 so legacy utilities never fight these rules; unlayered
+   CSS beats Tailwind's utility layer. */
 
 .v4 {
-	/* Aliases — the v4 vocabulary resolves to the one token layer. */
 	--bg: var(--background);
 	--ink: var(--foreground);
 	--v-muted: var(--muted-foreground);
@@ -38,8 +22,6 @@
 	-webkit-font-smoothing: antialiased;
 	text-rendering: optimizeLegibility;
 }
-/* Practice's warm register: the field and the Practice marks turn warm;
-   controls, selection and focus stay brand teal (owner, finesse pass). */
 .v4.warm {
 	--bg: var(--background-warm);
 	--teal: var(--brand);
@@ -57,17 +39,13 @@
 .v4 .muted { color: var(--muted-foreground); }
 .v4 .faint { color: var(--faint); }
 
-/* ── Type ladder ───────────────────────────────────────────────────── */
 .v4 .t-meta { font-size: 12px; line-height: 16px; }
 .v4 .t-title { font-size: 20px; line-height: 26px; font-weight: 600; letter-spacing: -0.01em; }
 .v4 .t-h2 { font-family: var(--font-literata), Georgia, serif; font-size: 24px; line-height: 30px; font-weight: 500; letter-spacing: -0.012em; }
 .v4 .t-display { font-family: var(--font-literata), Georgia, serif; font-size: 32px; line-height: 38px; font-weight: 500; letter-spacing: -0.018em; }
-/* A section label inside a card ("Minutes learning, this week"). */
 .v4 .h { margin: 0; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--ink); letter-spacing: -0.003em; }
-/* A small overline above a group ("Waiting on you", "Probe"). */
 .v4 .over { font-size: 12px; line-height: 16px; font-weight: 600; color: var(--faint); letter-spacing: 0.01em; }
 
-/* ── The gradient field (calmer: softer washes, slower drift) ──────── */
 .v4 .field { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
 .v4 .blob { position: absolute; border-radius: 50%; filter: blur(110px); opacity: 0.6; will-change: transform; animation: v4-drift 70s var(--ease-in-out) infinite alternate; }
 .v4 .k1 { width: 56vw; height: 56vw; left: -16vw; top: -32vw; background: var(--blob-a); }
@@ -78,7 +56,6 @@
 .v4 .field.warm .k1 { left: auto; right: -16vw; background: var(--blob-warm-a); opacity: 0.55; }
 .v4 .field.warm .k2 { right: auto; left: -16vw; top: 26vh; background: var(--blob-warm-b); opacity: 0.5; }
 .v4 .field.warm .k3 { left: 34vw; background: var(--blob-warm-c); opacity: 0.5; }
-/* Paused when the window is in the background (set by the shell). */
 .v4 .field.still .blob { animation-play-state: paused; }
 @keyframes v4-drift {
 	0% { transform: translate3d(0, 0, 0) scale(1); }
@@ -86,10 +63,6 @@
 	100% { transform: translate3d(-2.5vw, -2vh, 0) scale(0.97); }
 }
 
-/* ── Surfaces ──────────────────────────────────────────────────────── */
-/* glass — a resting card on the field. pop — a floating layer (menus,
-   popovers, the flyout). flat — a card inside a card (never glass on
-   glass). tint — a quiet well, no border. */
 .v4 .glass { background: var(--glass); -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4); border: 1px solid var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-edge), var(--e1); }
 .v4 .pop { background: var(--glass-strong); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); border: 1px solid var(--line-strong); box-shadow: var(--e2); }
 .v4 .flat { background: var(--surface); border: 1px solid var(--line); box-shadow: var(--e1); }
@@ -97,7 +70,6 @@
 .v4 .card { border-radius: 16px; padding: 16px; }
 .v4 .sep { height: 1px; background: var(--line); border: 0; margin: 0; }
 
-/* ── Motion ────────────────────────────────────────────────────────── */
 .v4 .rise { opacity: 0; animation: v4-rise 0.7s var(--ease-expo) forwards; }
 @keyframes v4-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .v4 .settle { animation: v4-settle 0.4s var(--ease-expo) both; }
@@ -108,9 +80,7 @@
 @keyframes v4-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes v4-pop { 0% { transform: scale(0.9); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
 
-/* ── Buttons ───────────────────────────────────────────────────────── */
-/* .btn = primary (ink). Variants: .brand .secondary .quiet .danger.
-   Sizes: .sm 28 · (md) 34 · .lg 40 (.tall is the legacy name for lg). */
+/* .tall is the legacy name for .lg. */
 .v4 .btn { height: 34px; padding: 0 14px; border: 0; border-radius: 10px; background: var(--primary); color: var(--on-ink); font-weight: 600; font-size: 13px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; flex: none; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1), 0 1px 2px rgb(from var(--shadow-ink) r g b / 0.16); transition: transform var(--dur-1) var(--ease-out), background var(--dur-2), box-shadow var(--dur-2), opacity var(--dur-2); }
 .v4 .btn:hover { background: var(--primary-hover); }
 .v4 .btn:active { transform: scale(0.97); }
@@ -126,7 +96,7 @@
 .v4 .btn.quiet { background: transparent; color: var(--muted-foreground); box-shadow: none; }
 .v4 .btn.quiet:hover { background: var(--hover); color: var(--ink); }
 .v4 .btn .ic, .v4 .ghost .ic { flex: none; }
-/* .ghost — the outlined button (legacy name; = .btn.secondary at 32px). */
+/* .ghost is the legacy name for .btn.secondary at 32px. */
 .v4 .ghost { height: 32px; padding: 0 12px; border: 0; border-radius: 9px; background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line-strong) inset; font-weight: 600; font-size: 13px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; transition: box-shadow var(--dur-2), background var(--dur-2), opacity var(--dur-2), transform var(--dur-1) var(--ease-out); }
 .v4 .ghost:hover { box-shadow: 0 0 0 1px var(--line-hover) inset; }
 .v4 .ghost:active { transform: scale(0.98); }
@@ -134,7 +104,6 @@
 .v4 .ghost:disabled { opacity: 0.4; cursor: not-allowed; }
 .v4 .ghost.tall { height: 36px; padding: 0 14px; }
 .v4 .ghost.sm { height: 28px; padding: 0 10px; border-radius: 8px; font-size: 12px; }
-/* .ib — icon button. .sm 26 · (md) 30 · .lg 36. */
 .v4 .ib { width: 30px; height: 30px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--muted-foreground); transition: background var(--dur-1), color var(--dur-1), transform var(--dur-1) var(--ease-out); }
 .v4 .ib:hover { background: var(--hover); color: var(--ink); }
 .v4 .ib:active { transform: scale(0.94); }
@@ -142,16 +111,13 @@
 .v4 .ib.on { background: var(--brand-soft); color: var(--brand); }
 .v4 .ib.sm { width: 26px; height: 26px; border-radius: 7px; }
 .v4 .ib.lg { width: 36px; height: 36px; border-radius: 10px; }
-/* .mini — a quiet text control inside a toolbar row (model chip etc.). */
 .v4 .mini { height: 28px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--muted-foreground); font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: background var(--dur-1), color var(--dur-1); }
 .v4 .mini:hover { background: var(--hover); color: var(--ink); }
-/* A text link in the accent. */
 .v4 .link { color: var(--brand); font-weight: 600; display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; padding: 0; transition: color var(--dur-1); }
 .v4 .link:hover { color: var(--brand-hover); }
 .v4 .link .ic { transition: transform var(--dur-2) var(--ease-out); }
 .v4 .link:hover .ic { transform: translateX(2px); }
 
-/* ── Segmented control ─────────────────────────────────────────────── */
 .v4 .seg { display: flex; padding: 2px; border-radius: 10px; background: var(--press); }
 .v4 .seg button { flex: 1; height: 28px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--muted-foreground); font-size: 13px; font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background var(--dur-2) var(--ease-out), color var(--dur-2), box-shadow var(--dur-2); }
 .v4 .seg button:hover:not(.on):not(:disabled) { color: var(--ink); }
@@ -159,13 +125,10 @@
 .v4 .seg button:disabled { cursor: not-allowed; opacity: 0.5; }
 .v4 .seg.sm button { height: 24px; padding: 0 9px; font-size: 12px; border-radius: 7px; }
 
-/* ── Chips, pills, kbd, dots ───────────────────────────────────────── */
-/* .chip — a clickable token (suggestions, filters, helpers). */
 .v4 .chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 999px; border: 0; box-shadow: 0 0 0 1px var(--line-strong) inset; background: var(--field); font-size: 13px; font-weight: 500; color: var(--muted-foreground); white-space: nowrap; transition: background var(--dur-1), color var(--dur-1), box-shadow var(--dur-1); }
 .v4 .chip:hover { background: var(--surface); color: var(--ink); }
 .v4 .chip.on { box-shadow: 0 0 0 1px var(--brand) inset; background: var(--brand-soft); color: var(--brand); font-weight: 600; }
-/* .pill — a status label. Tones: .good .warn .danger .brand .practice .muted
-   (legacy .solid = good, .help = brand, .miss = muted). */
+/* Legacy pill tones: .solid = .good, .help = .brand, .miss = .muted. */
 .v4 .pill { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1; white-space: nowrap; background: var(--hover); color: var(--muted-foreground); }
 .v4 .pill.good, .v4 .pill.solid { background: var(--good-soft); color: var(--good); }
 .v4 .pill.warn { background: var(--warn-soft); color: var(--warn); }
@@ -173,7 +136,6 @@
 .v4 .pill.brand, .v4 .pill.help { background: var(--brand-soft); color: var(--brand); }
 .v4 .pill.practice { background: var(--practice-soft); color: var(--practice); }
 .v4 .pill.muted, .v4 .pill.miss { background: var(--hover); color: var(--muted-foreground); }
-/* .att-chips — attached files (composers and the learner's bubbles). */
 .v4 .att-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .v4 .att-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 260px; height: 28px; padding: 0 6px 0 10px; border-radius: 8px; background: var(--field); box-shadow: 0 0 0 1px var(--line-strong) inset; color: var(--ink); font-size: 13px; font-weight: 500; white-space: nowrap; }
 .v4 .att-chip .ic { flex: none; color: var(--muted-foreground); }
@@ -187,11 +149,9 @@
 .v4 .dot.warn { background: var(--warn); }
 .v4 .dot.brand { background: var(--brand); }
 .v4 .dot.good { background: var(--good); }
-/* A live dot that pings (something waits on you). */
 .v4 .ping { position: relative; display: inline-block; width: var(--ping-size, 7px); height: var(--ping-size, 7px); flex: none; border-radius: 50%; background: var(--warn); }
 .v4 .ping::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: inherit; animation: v4-ping 1.6s var(--ease-out) infinite; }
 @keyframes v4-ping { 0% { transform: scale(1); opacity: 0.6; } 80%, 100% { transform: scale(2.6); opacity: 0; } }
-/* Progress ticks (a lesson's steps). */
 .v4 .ticks { display: flex; gap: 3px; align-items: center; }
 .v4 .ticks i { width: 12px; height: 4px; border-radius: 2px; background: var(--line-strong); transition: background 0.6s var(--ease-out), width 0.6s var(--ease-out); }
 .v4 .ticks i.d { background: var(--faint); opacity: 0.55; }
@@ -199,21 +159,17 @@
 .v4 .ticks.lg i { width: 14px; }
 .v4 .ticks.lg i.c { width: 22px; }
 
-/* ── Live indicators ───────────────────────────────────────────────── */
 .v4 .wave { display: inline-flex; align-items: center; gap: 2px; height: 14px; }
 .v4 .wave i { width: 2.5px; height: 100%; border-radius: 2px; background: var(--brand); animation: v4-wv 0.9s var(--ease-in-out) infinite alternate; }
 .v4 .wave i:nth-child(2) { animation-delay: -0.2s; }
 .v4 .wave i:nth-child(3) { animation-delay: -0.45s; }
 .v4 .wave i:nth-child(4) { animation-delay: -0.1s; }
 @keyframes v4-wv { from { transform: scaleY(0.25); } to { transform: scaleY(1); } }
-/* Dictation's live bars: heights follow the real input level (DictationWave
-   sets them each tick); flat and dimmed while connecting. */
 .v4 .wave.live i { animation: none; transition: height 80ms linear; }
 .v4 .wave.live.wait i { opacity: 0.45; }
 .v4 .skel { display: block; border-radius: 6px; background: linear-gradient(90deg, var(--hover) 0%, var(--press) 50%, var(--hover) 100%); background-size: 200% 100%; animation: v4-skel 1.4s ease-in-out infinite; }
 @keyframes v4-skel { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 
-/* ── Form fields ───────────────────────────────────────────────────── */
 .v4 .finput { height: 40px; width: 100%; padding: 0 12px; border-radius: 10px; border: 0; box-shadow: 0 0 0 1px var(--line-strong) inset; background: var(--surface); outline: none; font-size: 14px; transition: box-shadow var(--dur-2); }
 .v4 .finput:hover { box-shadow: 0 0 0 1px var(--line-hover) inset; }
 .v4 .finput:focus { box-shadow: 0 0 0 1px var(--brand) inset, var(--focus-ring); }
@@ -221,14 +177,12 @@
 .v4 .finput.sm { height: 32px; font-size: 13px; border-radius: 8px; padding: 0 10px; }
 .v4 .ftext { width: 100%; min-height: 88px; padding: 10px 12px; border-radius: 10px; border: 0; box-shadow: 0 0 0 1px var(--line-strong) inset; background: var(--surface); outline: none; font-size: 14px; line-height: 20px; resize: vertical; transition: box-shadow var(--dur-2); }
 .v4 .ftext:focus { box-shadow: 0 0 0 1px var(--brand) inset, var(--focus-ring); }
-/* The field a dictation run is writing into wears the focus look, focused or not. */
 .v4 .ftext.dictating { box-shadow: 0 0 0 1px var(--brand) inset, var(--focus-ring); }
 .v4 .flabel { font-size: 13px; line-height: 18px; font-weight: 600; }
 .v4 .fhint { font-size: 12px; line-height: 16px; color: var(--muted-foreground); }
 .v4 .ferror { font-size: 12px; line-height: 16px; color: var(--danger); }
 .v4 .dict-err { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 .v4 .dict-err .link { font-size: 12px; }
-/* A select trigger: a secondary button with a trailing chevron. */
 .v4 .selectbtn { height: 32px; padding: 0 8px 0 10px; border: 0; border-radius: 8px; background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong) inset; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: box-shadow var(--dur-1); }
 .v4 .selectbtn:hover { box-shadow: 0 0 0 1px var(--line-hover) inset; }
 .v4 .selectbtn .ic { color: var(--faint); }
@@ -238,13 +192,11 @@
 .v4 .switch[aria-checked="true"] { background: var(--brand); }
 .v4 .switch[aria-checked="true"]::after { transform: translateX(14px); }
 .v4 .switch:disabled { opacity: 0.4; cursor: not-allowed; }
-/* A checkbox square (inside a .pick or a row). */
 .v4 .box { width: 16px; height: 16px; flex: none; border-radius: 5px; box-shadow: 0 0 0 1.5px var(--faint) inset; display: inline-flex; align-items: center; justify-content: center; color: var(--on-ink); transition: background var(--dur-2), box-shadow var(--dur-2); }
 .v4 .box > * { opacity: 0; transform: scale(0.6); transition: opacity var(--dur-1), transform var(--dur-2) var(--ease-out); }
 .v4 [aria-checked="true"] > .box, .v4 .box.on { background: var(--brand); box-shadow: none; }
 .v4 [aria-checked="true"] > .box > *, .v4 .box.on > * { opacity: 1; transform: none; }
 
-/* ── Menus, tooltips, overlays ─────────────────────────────────────── */
 .v4 .menu { position: absolute; right: 0; top: 38px; width: 280px; padding: 6px; border-radius: 14px; z-index: 20; }
 .v4 .mrow { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 32px; padding: 6px 10px; border: 0; border-radius: 8px; background: transparent; text-align: left; font-size: 13px; transition: background var(--dur-1); }
 .v4 .mrow:hover { background: var(--hover); }
@@ -257,7 +209,7 @@
 .v4 .overlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--scrim); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); animation: v4-fade 0.18s var(--ease-out) both; }
 .v4 .dialog { width: min(520px, 100%); max-height: calc(100vh - 48px); overflow: auto; border-radius: 20px; background: var(--glass-strong); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); border: 1px solid var(--line-strong); box-shadow: var(--e3); animation: v4-dialog 0.28s var(--ease-expo) both; }
 @keyframes v4-dialog { from { opacity: 0; transform: translateY(8px) scale(0.985); } to { opacity: 1; transform: none; } }
-/* A CSS tooltip: data-tip on a .tipb element (shows below, right-aligned). */
+/* A CSS tooltip: data-tip on a .tipb element. */
 .v4 .tipb { position: relative; }
 .v4 .tipb::after { content: attr(data-tip); position: absolute; top: calc(100% + 6px); right: 0; padding: 5px 8px; border-radius: 7px; background: var(--ink); color: var(--on-ink); font-size: 12px; line-height: 16px; font-weight: 500; white-space: nowrap; opacity: 0; pointer-events: none; transform: translateY(-3px); transition: opacity var(--dur-1), transform var(--dur-1) var(--ease-out); z-index: 30; box-shadow: var(--e2); }
 .v4 .tipb:hover::after, .v4 .tipb:focus-visible::after { opacity: 1; transform: none; transition-delay: 300ms; }
@@ -266,8 +218,6 @@
 .v4 .tipb.mid::after { right: auto; left: 50%; translate: -50% 0; }
 .v4 .tipb.up:hover::after, .v4 .tipb.up:focus-visible::after { transform: none; }
 
-/* ── Empty state ───────────────────────────────────────────────────── */
-/* <EmptyState> (components/ui/empty-state.tsx). */
 .v4 .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px 16px; text-align: center; }
 .v4 .empty.left { align-items: flex-start; text-align: left; padding: 8px 0; }
 .v4 .empty-ic { width: 36px; height: 36px; margin-bottom: 4px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: var(--brand-soft); color: var(--brand); }
@@ -275,12 +225,8 @@
 .v4 .empty-d { max-width: 40ch; font-size: 13px; line-height: 18px; color: var(--muted-foreground); }
 .v4 .empty .btn, .v4 .empty .ghost { margin-top: 6px; }
 
-/* ── v4 inside portals ─────────────────────────────────────────────── */
-/* A v4 scope without the page (dialogs portaled to <body>): the tokens and
-   type of the surface, none of its layout or ground. */
 .v4.scope { min-height: 0; background: transparent; position: static; }
 
-/* ── Responsive utilities ──────────────────────────────────────────── */
 @media (max-width: 760px) {
 	.v4 .hide-sm { display: none !important; }
 }

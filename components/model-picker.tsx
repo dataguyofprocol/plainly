@@ -12,14 +12,8 @@ import { Hint } from "@/components/ui/hint";
 import { notifySettingsSaved, onSettingsSaved, useSettingsSaved } from "@/components/settings-signal";
 import { defaultOrderLevel, populateLevel, THINKING_LABEL } from "@/components/thinking-default";
 
-/** The thinking seg's compact labels (the full name rides the tooltip). */
 const SHORT_LEVEL: Record<string, string> = { minimal: "Min", medium: "Med", xhigh: "X-high" };
 
-/** GET /api/models is cached per page load for instant menu opens, but
- *  the federation is LIVE per call — keys saved mid-session widen the
- *  catalog immediately server-side. ModelControl therefore re-fetches on
- *  every model-menu open (stale-while-revalidate: the cached list shows
- *  instantly, the fresh one swaps in while the menu is open). */
 let catalogCache: ModelCatalogResponse | undefined;
 let catalogInflight: Promise<void> | undefined;
 let catalogGeneration = 0;
@@ -58,33 +52,10 @@ export function useModelCatalog(): { catalog: ModelCatalogResponse | undefined; 
 	return { catalog, refresh };
 }
 
-/** provider:id → contextWindow over the cached catalog — the client-side
- *  twin of the server's catalogContextLimits join (context-meter
- *  amendment, owner 2026-09-23: pi's live catalog is the ONLY limit
- *  source — no hardcoded fallback exists anywhere, so a model missing
- *  from the index reads limit-null and the meter renders usage-only,
- *  the honest-render precedent). Consumed by the stats bar: the same
- *  cached /api/models fetch the picker rides feeds the denominator. */
 export function catalogLimits(catalog: Pick<ModelCatalogResponse, "models">): Map<string, number> {
 	return new Map(catalog.models.map((m) => [`${m.provider}:${m.id}`, m.contextWindow]));
 }
 
-/**
- * THE CONVERSATION MODEL CONTROL — dual-bound (owner, per-session models,
- * 2026-09-28). WITH a chatId (the in-session stats bar): the pills bind
- * THE SESSION'S OWN record — reads GET /api/chats/:id (its settings field;
- * a legacy unstamped record falls back to the strong slot's display,
- * exactly what the engine resolves), writes PUT /api/chats/:id/settings
- * (validated + level-clamped server-side). The session owns its model +
- * thinking level from birth; the strong slot never reaches it again.
- *
- * WITHOUT a chatId (the draft surfaces — home + /chat/new): the pills
- * bind the STRONG SLOT (reads the raw models section, GET /api/settings;
- * writes PUT /api/settings/models via composeSlotModel — the same seam
- * the settings Agent section and the SetupDialog write): picking there IS
- * changing the new-session default. Unpicked reads "—" (the
- * no-factory-fallback language: the UI never presents a default model).
- */
 export function ModelControl({
 	chatId,
 	onModelChange,
@@ -93,11 +64,7 @@ export function ModelControl({
 }: {
 	chatId?: string;
 	onModelChange?: (model: string | undefined) => void;
-	/** "chip" (v4 rebuild): ONE trigger — "● model · level ▾" — whose menu
-	 *  carries the model list and a Thinking switch below it (Lesson4's
-	 *  model menu). "pills" is the legacy two-pill pair. */
 	variant?: "pills" | "chip";
-	/** The chip's own class (the v4 screens pass .mini or .mchip). */
 	className?: string;
 }) {
 	const { catalog, refresh } = useModelCatalog();
@@ -107,13 +74,6 @@ export function ModelControl({
 	const [error, setError] = useState<string | null>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 
-	// The record read — BOTH mount and the cross-surface signal land
-	// here (fix wave: another surface's models write re-reads into the
-	// pill live; own writes also notify, and the refetch is idempotent).
-	// Dual-bound: chat mode reads BOTH the session record (the source of
-	// truth) and the models section (the display fallback for a legacy
-	// unstamped session — exactly what the engine resolves); draft mode
-	// reads the models section alone.
 	const readRecord = useCallback(() => {
 		if (chatId) {
 			fetch(`/api/chats/${chatId}`)
@@ -141,10 +101,6 @@ export function ModelControl({
 		if (section === "models") readRecord();
 	});
 
-	// Dual-bound truth: chat mode displays the session's own record,
-	// falling back to the strong slot for legacy unstamped sessions —
-	// EXACTLY what resolveConversationSpec runs. Draft mode is the strong
-	// slot itself.
 	const strong = models?.strong;
 	const override: ChatSettings | undefined = chatId
 		? {
@@ -162,20 +118,8 @@ export function ModelControl({
 		(m) => m.id === effectiveId && m.provider === effectiveProvider,
 	);
 	const levels = entry?.supportedLevels ?? [];
-	// Legacy display (chunk 2 item 4, owner): a record with a model but no
-	// stored level shows the RESOLVED level — the ordering's first supported
-	// — because that is exactly what the engine build would run. Display-
-	// only: the record stays unset until a fresh pick populates it.
 	const effectiveLevel = storedLevel ?? (entry ? defaultOrderLevel(levels) : undefined);
 
-	// The intuitive dropdown contract (owner, stats-control round 1): any
-	// click outside the open menu — or an Esc keypress — closes it. The
-	// menu's own surface keeps it open: the toggle buttons live inside the
-	// container, and the menu BODY lives in a portal on document.body
-	// (MenuShell) — never a container descendant, so its rows are carved
-	// out via [data-lh-menu] (the settings sections' discipline; without
-	// it a row's pointerdown counts as outside and eats the pick —
-	// live-caught in the fix wave, broken since the MenuShell migration).
 	useEffect(() => {
 		if (open === null) return;
 		const onPointerDown = (e: PointerEvent) => {
@@ -187,8 +131,6 @@ export function ModelControl({
 		};
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (e.key === "Escape") {
-				// Claim the Esc (keyboard wave A): the window-level chain must
-				// not ALSO stop dictation / abort the turn under this menu.
 				e.stopPropagation();
 				setOpen(null);
 			}
@@ -201,9 +143,6 @@ export function ModelControl({
 		};
 	}, [open]);
 
-	// One write seam: composeSlotModel preserves the cheap/vision siblings
-	// (replace-whole-section discipline) and the per-field independence of
-	// model + thinkingLevel within the strong slot.
 	const save = useCallback(
 		async (next: ModelsSettings) => {
 			setError(null);
@@ -218,9 +157,6 @@ export function ModelControl({
 					setError(body.error ?? `settings rejected (${res.status})`);
 					return;
 				}
-				// Server truth, never the request body (fix wave): a pick
-				// that rides an unsupported level lands CLAMPED in the record
-				// — the pill must show the stored value in this interaction.
 				const stored = (
 					(await res.json().catch(() => null)) as { settings?: UserSettings } | null
 				)?.settings?.models;
@@ -234,11 +170,6 @@ export function ModelControl({
 		[],
 	);
 
-	// The session write seam (chat mode): PUT the per-chat settings route
-	// — validated + level-clamped server-side; the response is the stored
-	// truth (a pick riding an unsupported level lands CLAMPED — the pill
-	// shows the stored value). No notifySettingsSaved: the write touches
-	// one session's record, not the slots — no other surface reads it.
 	const saveChat = useCallback(
 		async (next: ChatSettings) => {
 			setError(null);
@@ -263,31 +194,22 @@ export function ModelControl({
 		[chatId],
 	);
 
-	// One apply seam over both write paths: a pick names provider + id +
-	// level; chat mode writes the session's own record (any pick pins it),
-	// draft mode composes the strong slot (siblings preserved,
-	// replace-whole-section discipline).
 	const apply = useCallback(
 		(provider: string, id: string, level: ThinkingLevel | undefined) => {
 			if (chatId) {
 				void saveChat({ model: { provider, id }, thinkingLevel: level });
 			} else {
-				// composeSlotModel's empty-string convention: no level = unset.
 				void save(composeSlotModel(models, "strong", provider, id, level ?? ""));
 			}
 		},
 		[chatId, models, save, saveChat],
 	);
 
-	// Shortcut seams (keyboard wave A): ⇧⌘M opens the model menu (⌘K
-	// belongs to the omnibar since the v4 redesign); Shift+Tab cycles the thinking level
-	// up the ladder (wrapping) — the owner's replacement for browser
-	// tab-focus. Both work from any focus, including mid-typing.
 	useEffect(() => {
 		const onOpenPicker = () => {
 			setOpen("model");
 			setError(null);
-			refresh(); // mid-session key changes widen the menu (cache fix)
+			refresh();
 		};
 		window.addEventListener("lh:kbd-open-model-picker", onOpenPicker);
 		return () => window.removeEventListener("lh:kbd-open-model-picker", onOpenPicker);
@@ -305,25 +227,11 @@ export function ModelControl({
 		return () => window.removeEventListener("lh:kbd-cycle-thinking", onCycleThinking);
 	}, [levels, effectiveLevel, effectiveProvider, effectiveId, apply]);
 
-	// Selecting a model (click and Enter share one path): keep the
-	// thinking level only when the new model supports it — otherwise
-	// drop it (a carry-over would 400 at the server's catalog gate).
 	const pickModel = (m: ModelCatalogEntry) => {
-		// Auto-populate (chunk 2, owner: "populate everywhere"): a fresh pick
-		// ALWAYS writes a level — the STORED one rides as-is (the write clamps
-		// server-side when the new model doesn't support it; the signal
-		// re-reads and the clamped truth displays), and a record with no
-		// stored level populates the ordering's level. The unset state can
-		// never re-enter through this door. (The DERIVED display level never
-		// rides — it belongs to the OLD model; the fresh pick's level comes
-		// from the fresh model's own ladder.)
 		const nextLevel = populateLevel(storedLevel, m.supportedLevels);
 		apply(m.provider, m.id, nextLevel);
 	};
 
-	// Stale-while-revalidate on manual open too (⇧⌘M covers the keyboard
-	// path above): the cached list shows instantly, the fresh federation
-	// swaps in when it lands.
 	const openMenu = (kind: "model" | "thinking") => {
 		setOpen((o) => (o === kind ? null : kind));
 		setError(null);
@@ -342,8 +250,6 @@ export function ModelControl({
 		const name = effectiveId ? prettyModel(effectiveId) : "Choose a model";
 		return (
 			<div ref={containerRef} className="relative" data-testid="model-control">
-				{/* The chip truncates long ids; the tooltip carries the full
-				    provider · id · thinking level. */}
 				<Hint
 					label={effectiveId ? `${effectiveProvider} · ${effectiveId}${levelLabel ? ` · ${levelLabel} thinking` : ""}` : "Model and thinking"}
 					action="open-model-picker"
@@ -401,9 +307,6 @@ export function ModelControl({
 	return (
 		<div ref={containerRef} className="relative flex items-center gap-1.5" data-testid="model-control">
 			<Hint
-				// Trimmed (owner, subtlety round 2026-09-25): "Model selector"
-				// — the long sentence was way too much. ⇧⌘M opens this same
-				// menu (registry, override-aware).
 				label="Model selector"
 				action="open-model-picker"
 				side="bottom"
@@ -413,10 +316,6 @@ export function ModelControl({
 				data-testid="stats-model"
 				onClick={() => openMenu("model")}
 				aria-expanded={open === "model"}
-				// Chrome look (owner, fix wave round 3): matches the graph
-				// view's floating top-right buttons (import notes, gear,
-				// coverage) — blurred, fuller opacity, shadowed — so the
-				// graph no longer bleeds through these pills.
 				title={effectiveId ? `${effectiveProvider} · ${effectiveId}` : undefined}
 				className="flex h-7 max-w-56 items-center gap-1.5 rounded-full bg-surface/90 px-2.5 text-xs font-semibold whitespace-nowrap text-foreground shadow-[inset_0_0_0_1px_var(--line-strong),var(--e1)] backdrop-blur transition-shadow hover:shadow-[inset_0_0_0_1px_var(--line-hover),var(--e1)]"
 			>
@@ -425,9 +324,6 @@ export function ModelControl({
 			</button>
 			</Hint>
 			<Hint
-				// "Thinking" + its real shortcut via the registry (owner interlude
-				// 2026-09-25): ⇧⇥ cycles the level, so "Thinking (⇧⇥)" —
-				// rebind-live like every Hint suffix.
 				label="Thinking"
 				action="cycle-thinking"
 				side="bottom"
@@ -436,28 +332,17 @@ export function ModelControl({
 				type="button"
 				data-testid="stats-thinking"
 				onClick={() => {
-					// No model picked → nothing to set a level FOR: the click
-					// is a no-op, never an empty menu.
 					if (entry === undefined) return;
 					openMenu("thinking");
 				}}
 				aria-expanded={open === "thinking"}
-				// Chrome look (owner, fix wave round 3): matches the graph
-				// view's floating top-right buttons (import notes, gear,
-				// coverage) — blurred, fuller opacity, shadowed — so the
-				// graph no longer bleeds through these pills.
 				className="flex h-7 items-center gap-1.5 rounded-full bg-surface/90 px-2.5 text-xs font-semibold whitespace-nowrap text-foreground shadow-[inset_0_0_0_1px_var(--line-strong),var(--e1)] backdrop-blur transition-shadow hover:shadow-[inset_0_0_0_1px_var(--line-hover),var(--e1)]"
 			>
-				{/* Just the level — the button reads like the model button reads
-				   the model name (owner, stats-control round 1). */}
 				<span>{effectiveLevel === undefined ? "—" : levelName(THINKING_LABEL[effectiveLevel] ?? effectiveLevel)}</span>
 				<Icon name="chevron-down" size="xs" className="text-faint" />
 			</button>
 			</Hint>
 
-			{/* The shared dropdown body (extracted 2026-09-20): the agent
-			    settings' slot selects and the setup dialog use the exact same
-			    one. */}
 			{open === "model" && (
 				<MenuShell
 					anchorRef={containerRef}

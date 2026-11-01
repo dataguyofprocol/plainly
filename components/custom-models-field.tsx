@@ -1,19 +1,5 @@
 "use client";
 
-/**
- * THE MODELS FIELD of an OpenAI-compatible provider (per-model
- * capabilities, owner 2026-10-28): one row per model with Vision and
- * Thinking switches (a wire-format select while thinking), the context
- * window and the max output — the way built-in connectors describe their
- * models. Shared by the connect form (setup) and the edit view in
- * Settings → Keys.
- *
- * "Find models" asks the server's /models; a model it lists joins with
- * whatever capabilities the server described (OpenRouter-style fields,
- * Ollama, LM Studio). An undescribed model starts at the defaults —
- * vision, thinking, 128k, 8192 — and the user turns off what it lacks.
- */
-
 import { useState } from "react";
 import {
 	CUSTOM_CONTEXT_MAX,
@@ -28,7 +14,6 @@ import {
 import { ThinSelect, Toggle } from "@/components/settings/controls";
 import { Icon } from "@/components/ui/icon";
 
-/** The thinking formats in the learner's words. */
 export const THINKING_FORMAT_LABELS: Record<CustomThinkingFormat, string> = {
 	openai: "OpenAI (reasoning_effort)",
 	openrouter: "OpenRouter (reasoning)",
@@ -40,13 +25,10 @@ export const THINKING_FORMAT_LABELS: Record<CustomThinkingFormat, string> = {
 	"string-thinking": "String thinking field",
 };
 
-/** Pure: a model-id list from free text (commas, spaces or newlines). */
 export function parseModelIds(text: string): string[] {
 	return [...new Set(text.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean))];
 }
 
-/** Pure: a new model row with what the server described applied over the
- *  defaults (max output never above the context window). */
 export function modelWithDetected(id: string, detected: CustomModelDetected | undefined): CustomModelEntry {
 	const { thinkingFormat, ...m } = { ...defaultCustomModel(id), ...detected };
 	return { ...m, maxTokens: Math.min(m.maxTokens, m.contextWindow), ...(m.thinking ? { thinkingFormat } : {}) };
@@ -61,13 +43,10 @@ export function CustomModelsField({
 	autoFill,
 }: {
 	baseUrl: string;
-	/** The key typed in the form (blank = none, or the stored one below). */
 	apiKey: string;
-	/** A saved provider: the probe sends its stored key when none is typed. */
 	providerId?: string;
 	models: CustomModelEntry[];
 	onChange: (next: CustomModelEntry[]) => void;
-	/** Add the first few listed models when the list is empty (the connect form). */
 	autoFill?: boolean;
 }) {
 	const [draft, setDraft] = useState("");
@@ -177,8 +156,6 @@ export function CustomModelsField({
 	);
 }
 
-/** One model's capabilities. The number fields commit on blur (an invalid
- *  value snaps back to the saved one). */
 function CustomModelRow({
 	model,
 	fromServer,
@@ -186,7 +163,6 @@ function CustomModelRow({
 	onRemove,
 }: {
 	model: CustomModelEntry;
-	/** The server described this model (the probe's detection applied). */
 	fromServer: boolean;
 	onPatch: (next: Partial<CustomModelEntry>) => void;
 	onRemove: () => void;

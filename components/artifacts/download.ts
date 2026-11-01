@@ -1,13 +1,3 @@
-/**
- * Artifact download helpers (release polish, 2026-10-07): the tiny
- * save-a-blob seam shared by the demo + figure cards, plus the filename
- * slug. The slug is pure (test-pinned); downloadFile touches the DOM and
- * only runs on click.
- */
-
-/** Slugify a demo title into a filename stem — lowercase, accents folded,
- *  runs of non-alphanumerics collapsed to "-", trimmed, capped at 64
- *  chars. Empty/fully-symbolic titles fall back to "demo". */
 export function slugFilename(title: string): string {
 	const slug = title
 		.toLowerCase()

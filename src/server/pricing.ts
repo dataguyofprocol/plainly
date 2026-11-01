@@ -1,16 +1,10 @@
-/** Read-time API-dollar estimates. Pi owns both rates and arithmetic.
- * Catalog resolution is key-independent; no provider dispatch/auth is needed.
- * Never mutate saved native messages: calculateCost mutates its usage.cost.
- */
+/** Never mutate saved native messages: pi's calculateCost mutates its usage.cost. */
 import { calculateCost, type Usage } from "@earendil-works/pi-ai";
 import { piModels } from "../agent/models.ts";
 import type { CallUsage, ChatRecord, JobRecord, TurnUsage } from "../core/contracts.ts";
 import { isSubscriptionModel, sessionCost as foldSessionCost, turnCost as foldTurnCost, jobCost as foldJobCost } from "../core/prices.ts";
 import { isCustomProviderId } from "../core/custom-providers.ts";
 
-/** Custom OpenAI-compatible endpoints carry placeholder zero rates — their
- * real price is unknown, so they resolve to no catalog model: UNPRICED
- * (null), never $0. */
 function catalogModel(id: string) {
 	const colon = id.indexOf(":");
 	if (colon < 0 || isSubscriptionModel(id) || isCustomProviderId(id.slice(0, colon))) return undefined;
@@ -26,8 +20,6 @@ export function callCost(call: Partial<CallUsage>, modelId: string): number | nu
 	const cacheWrite = call.cacheWriteTokens ?? 0;
 	const cacheWrite1h = call.cacheWrite1hTokens ?? 0;
 	if ([input, output, cacheRead, cacheWrite, cacheWrite1h].some((v) => !Number.isFinite(v) || v < 0) || cacheWrite1h > cacheWrite) return null;
-	// Old records discarded this split. Only price them if it cannot affect
-	// the result; do not invent short-retention precision from a missing field.
 	if (cacheWrite > 0 && call.cacheWrite1hTokens === undefined &&
 		[model.cost, ...(model.cost.tiers ?? [])].some((rate) => rate.cacheWrite !== 2 * rate.input)) return null;
 	const usage: Usage = {

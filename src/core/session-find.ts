@@ -1,5 +1,3 @@
-/** Literal, case-insensitive session Find (owner, 2026-10-13). The DOM seam
- * supplies only displayed text; no transcript/Markdown/TeX indexing lives here. */
 export interface SessionTextMatch {
 	start: number;
 	end: number;
@@ -7,8 +5,7 @@ export interface SessionTextMatch {
 
 export function findSessionTextMatches(text: string, query: string): SessionTextMatch[] {
 	if (!query) return [];
-	// Escape the user's string, never expose regex semantics. RegExp retains
-	// ORIGINAL UTF-16 offsets, unlike lowercasing text (İ can change length).
+	// RegExp offsets index the original UTF-16 string; lowercasing first can change its length (İ).
 	const literal = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 	const pattern = new RegExp(literal, "giu");
 	return Array.from(text.matchAll(pattern), (m) => ({ start: m.index, end: m.index + m[0].length }));

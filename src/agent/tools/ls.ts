@@ -5,14 +5,6 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
 import { capOutput, formatSize, MAX_OUTPUT_BYTES, resolveSourcePath } from "./fs-shared.ts";
 
-/**
- * The ls tool — sources v1 (2026-09-19): a Node port of pi's
- * dist/core/tools/ls.js, home-anchored (fs-shared.ts). Schemas and the
- * output format are pi-verbatim; the only semantic deltas: the default
- * directory is the learner's home, and the path description says so.
- * Read-only by construction — readdir/stat only, no mutation APIs.
- */
-
 const DEFAULT_LIMIT = 500;
 
 const lsInput = Type.Object({
@@ -47,7 +39,6 @@ export const lsTool: AgentTool<typeof lsInput> = {
 			throw new Error(`Cannot read directory: ${(e as Error).message}`);
 		}
 
-		// pi: alphabetical, case-insensitive.
 		entries.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 
 		const effectiveLimit = input.limit ?? DEFAULT_LIMIT;

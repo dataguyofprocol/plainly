@@ -1,25 +1,3 @@
-/**
- * Session → markdown — the ONE formatting engine (owner ruling 2026-09-27).
- *
- * The extractor's view of a teaching session and the future user-facing
- * session export share this engine: a session is rendered as clean,
- * readable markdown — speaker headers, quiz/check-in blocks, tool notes —
- * with optional message-id anchors. Since the submit-schema slim
- * (2026-09-28) propositions no longer report message ids — the extractor
- * renders anchorless and provenance is chat-level — so the anchors today
- * serve only the future user-facing export; `anchors: false` mints the
- * same document without them.
- *
- * Pure core: native messages in (LhMessage), string out. Content parity
- * with the coverage line builder (core/coverage.ts messageViewLines) is
- * deliberate — every message that produces view lines produces a markdown
- * block, in the same order — but the formats are SEPARATE by design
- * (2026-09-27): coverage fingerprints hash the line format and stay stable
- * (no mass re-extraction when presentation changes); markdown is
- * presentation. A failed tool call renders nothing (retry context, not
- * learning evidence); custom markers are invisible, same as the view.
- */
-
 import type { LhMessage } from "./native-messages.ts";
 import {
 	PRACTICE_CONCLUDE_TOOL,
@@ -28,7 +6,6 @@ import {
 } from "./native-messages.ts";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
 
-/** The user-facing text blocks of a native message (string or text parts). */
 function textOf(content: unknown): string[] {
 	if (typeof content === "string") return content.trim() ? [content] : [];
 	if (!Array.isArray(content)) return [];
@@ -38,15 +15,9 @@ function textOf(content: unknown): string[] {
 		.filter((t) => t.trim().length > 0);
 }
 
-/** The practice join context (owner-approved, 2026-10-06 export round):
- *  practice tool RESULTS are acks — the statement, outcome, and verdict
- *  all live in the assistant's call arguments, and the model solution
- *  commits at POSE time. The markdown blocks join them the same way the
- *  view seam folds cards (clean-only: a refused pose's result is errored
- *  and renders nothing before this join is ever reached). */
 export interface MarkdownContext {
 	messages: ReadonlyArray<LhMessage>;
-	/** toolCallId → the call part's name + arguments. */
+	/** Keyed by toolCallId. */
 	calls: Map<string, { name: string; args: Record<string, unknown> | undefined }>;
 }
 
@@ -69,13 +40,11 @@ function markdownContext(messages: ReadonlyArray<LhMessage>): MarkdownContext {
 	return { messages, calls };
 }
 
-/** solvedWithHints → "Solved with hints" — the outcome enum reads as prose. */
 function outcomeLabel(outcome: string): string {
 	const spaced = outcome.replace(/([a-z])([A-Z])/g, (_, lo: string, hi: string) => `${lo} ${hi.toLowerCase()}`);
 	return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
-/** One tool result's learner-visible outcome, rendered as body lines. */
 function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { heading: string; body: string[] } {
 	const out = result.details as
 		| Partial<{
@@ -103,7 +72,7 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 					? "Probe"
 					: result.toolName === "recall"
 						? "Recall"
-						: "Recall check"; // explain — the teach free-recall name
+						: "Recall check";
 		const question = typeof out?.questionText === "string" && out.questionText ? out.questionText : "(no question text)";
 		const body = [`**Q:** ${question}`];
 		if (out?.dismissed === true) body.push("The learner skipped this check.");
@@ -130,8 +99,6 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 		if (outcome === "dismissed") return { heading: "Concluded", body: ["The learner skipped this problem."] };
 		const label = outcome !== "" ? `**${outcomeLabel(outcome)}.**` : "**Concluded.**";
 		const body = [verdict !== undefined ? `${label} ${verdict}` : label];
-		// The reveal (owner round, 2026-10-05): the solution committed at
-		// pose time — the newest cleanly-posed problem before this conclude.
 		const input = problemInputForConclude(ctx.messages, result.toolCallId);
 		const solution = typeof input?.modelSolution === "string" && input.modelSolution.trim() ? input.modelSolution.trim() : undefined;
 		if (solution !== undefined) body.push(`> **Model solution**\n>\n> ${solution.replace(/\n/g, "\n> ")}`);
@@ -152,15 +119,10 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 		return { heading: "Question", body };
 	}
 
-	// Parity with the line builder: other clean tool results are one line.
 	return { heading: "Tool", body: [`*${result.toolName} result delivered*`] };
 }
 
-/**
- * ONE message as a markdown block — `null` when the message renders
- * nothing (a failed tool call, a bare marker, an empty text part set).
- * `mid` is the provenance anchor shown when `anchors` is on.
- */
+/** Null when the message renders nothing. `mid` is the anchor shown when `anchors` is on. */
 export function messageMarkdown(
 	message: LhMessage,
 	mid: string,
@@ -181,21 +143,14 @@ export function messageMarkdown(
 		}
 	} else if (role === "toolResult") {
 		const result = message as ToolResultMessage;
-		if (result.isError) return null; // retry context, not learning evidence
+		if (result.isError) return null;
 		const { heading, body } = toolResultBody(result, ctx);
 		parts.push(`### ${heading}${anchor}\n\n${body.join("\n\n")}`);
 	}
 
-	// custom markers are invisible, same as the extraction view.
 	return parts.length > 0 ? parts.join("\n\n") : null;
 }
 
-/**
- * A whole session (or one extraction BATCH — same engine, subset of
- * messages) as one markdown document. Blocks render in message order;
- * messages that render nothing are skipped silently. The optional title
- * mints the document header (`# <title>`).
- */
 export function sessionMarkdown(
 	messages: ReadonlyArray<LhMessage>,
 	opts: { title?: string; anchors?: boolean } = {},

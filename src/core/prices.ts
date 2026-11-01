@@ -1,5 +1,3 @@
-/** Client-safe accounting folds. Rates and calculation live on the server,
- * using Pi's catalog and calculateCost; no copied pricing table lives here. */
 import type { CallUsage, ChatRecord, JobRecord, TurnUsage } from "./contracts.ts";
 import { NATIVE_SUBSCRIPTIONS } from "./contracts/subscriptions.ts";
 
@@ -9,7 +7,7 @@ export interface SessionPricing {
 	unpriced: number;
 	subscription?: number;
 	subscriptionProviders?: string[];
-	/** Derived at read time, keyed by the persisted turn's id. Never stored. */
+	/** Keyed by turn id. Derived at read time, never stored. */
 	turnCosts: Record<string, number | null>;
 }
 
@@ -25,8 +23,8 @@ export function subscriptionLabels(models: readonly (string | undefined)[]): str
 	return [...new Set(models.flatMap((model) => { const label = subscriptionLabel(model); return label ? [label] : []; }))];
 }
 
-/** Absent stays absent. Long-cache precision is unknown if any write-bearing
- * step lacks the split; never silently turn that missing detail into zero. */
+/** A field absent from every step stays undefined. cacheWrite1hTokens is
+ * undefined when any cache-writing step lacks it. */
 export function sumSteps(steps: readonly CallUsage[]): CallUsage {
 	const sumIfAny = (vals: (number | undefined)[]): number | undefined =>
 		vals.every((v) => v === undefined) ? undefined : vals.reduce<number>((a, v) => a + (v ?? 0), 0);
@@ -73,8 +71,5 @@ export function jobCost(job: Pick<JobRecord, "usage">, price: CallPricer): numbe
 	if (usage.calls && usage.calls.length === usage.steps) {
 		return turnCost({ model: usage.model, steps: usage.calls }, price);
 	}
-	// An old one-call job is fully reconstructible from its total. For a
-	// multi-call job, the server resolver decides whether aggregate pricing
-	// is safe for this model (tiered models need the lost per-call sizes).
 	return price(usage, usage.model);
 }

@@ -1,17 +1,5 @@
 "use client";
 
-/**
- * CONNECT A PROVIDER (v4 polish, 2026-10-26) — the first step of setup, in
- * the onboarding artboard's language: "Where should your models run?" as
- * chips, one key field, Connect. Six featured choices (owner pick):
- * OpenAI, OpenRouter, Anthropic, DeepSeek, the Z.AI Coding Plan, and any
- * OpenAI-compatible endpoint (a base URL of the learner's own); every
- * other provider the engine knows sits behind "N more".
- *
- * Saving a key dispatches the "keys" settings signal — the setup dialog
- * re-reads the catalog on it and moves on to the model pickers by itself.
- */
-
 import { useEffect, useMemo, useState } from "react";
 import { notifySettingsSaved } from "@/components/settings-signal";
 import { ProviderMenuList } from "@/components/settings/model-menu";
@@ -23,11 +11,8 @@ import type { CustomModelEntry } from "@/src/core";
 
 export { parseModelIds } from "@/components/custom-models-field";
 
-/** Opens setup on the connect screen from anywhere (the ⌘K command,
- *  Settings → Keys). The AppShell's CommandPalette listens. */
 export const OPEN_CONNECT_EVENT = "lh:open-connect";
 
-/** The featured providers, in chip order; ids are the engine's. */
 export const FEATURED_PROVIDERS: ReadonlyArray<{ id: string; label: string; keyUrl: string }> = [
 	{ id: "openai", label: "OpenAI", keyUrl: "https://platform.openai.com/api-keys" },
 	{ id: "openrouter", label: "OpenRouter", keyUrl: "https://openrouter.ai/keys" },
@@ -42,16 +27,13 @@ export function ConnectProviderBody({
 	providers,
 	connected,
 }: {
-	/** Every provider that takes a plain key (GET /api/keys). */
 	providers: ProviderKeyInfo[] | undefined;
-	/** Ids of providers already connected (a key or a subscription). */
 	connected: readonly string[];
 }) {
 	const [choice, setChoice] = useState<Choice>(null);
 	const [key, setKey] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	// The OpenAI-compatible form.
 	const [name, setName] = useState("");
 	const [baseUrl, setBaseUrl] = useState("");
 	const [models, setModels] = useState<CustomModelEntry[]>([]);

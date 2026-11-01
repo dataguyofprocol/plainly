@@ -4,16 +4,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 	const { id } = await params;
 	const chat = getChat(id);
 	if (!chat) return Response.json({ error: "Not found" }, { status: 404 });
-	// turnInFlight lets a returning client re-attach to a running turn
-	// (chat-handler write-ahead + registry — see src/server/turn-liveness.ts).
-	// coverage (extraction-UX redesign, 2026-09-24): the chat view's ring
-	// meter + sidebar block — THE coverage surface (the all-sessions GET
-	// route died with the redesign; the Extract POST stays). getChat
-	// already 404'd, so the block exists.
-	// Wave D (owner-approved 2026-09-26): the record's messages are native
-	// agent history, served VERBATIM — the client derives its view
-	// (core/view.ts projectView). turnInFlight lets a returning client
-	// re-attach to a running turn; coverage is the chat view's ring meter.
 	return Response.json({
 		...chat,
 		messages: chat.messages,
@@ -25,11 +15,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 /**
- * Rename (2026-09-17) and archive (2026-10-26). The body carries `title`,
- * `archived`, or both. Title: a non-empty string after trim (the store's
- * "Untitled session" floor is never reached from this route). Archived: a
- * boolean. Neither bumps updatedAt — renaming or archiving must not
- * reorder the sidebar (same rule as the settings PUT).
+ * Rename and archive. The body carries `title` (non-empty after trim),
+ * `archived` (boolean), or both. Neither bumps updatedAt.
  */
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
 	const { id } = await params;
@@ -52,24 +39,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 /**
- * DELETE /api/chats/[id]?mode=preserve-graph|delete-nodes — session deletion
- * (wave 6, owner rulings 2026-09-22/23). The mode is REQUIRED and explicit:
- * no default, because the two differ in destructiveness —
+ * DELETE /api/chats/[id]?mode=preserve-graph|delete-nodes. The mode is
+ * required; there is no default.
  *
  *   preserve-graph  the session record, its jobs, and its extraction
- *                   bookkeeping (coverage/checkpoint rows) die; the graph
- *                   keeps every contribution the session merged.
- *   delete-nodes    "this session never happened": every ledger trace of
- *                   the session goes too — provenance, link lines,
- *                   events, mappings — and orphaned nodes die entirely
- *                   (shared nodes survive automatically, their other
- *                   sessions' content intact).
+ *                   bookkeeping go; the graph keeps what the session merged.
+ *   delete-nodes    every ledger trace of the session goes too, and nodes
+ *                   left with no other session are deleted.
  *
- * Gates are the server orchestration's (server/chats.ts deleteChatSession):
  * 409 while a turn or background job is running, 503 while the session's
- * extraction is winding down after its abort — both retryable. The
- * response carries what was removed plus the new graphRevision (the
- * version stamp the UI polls to refetch clusters/layout).
+ * extraction is winding down; both are retryable.
  */
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
 	const { id } = await params;

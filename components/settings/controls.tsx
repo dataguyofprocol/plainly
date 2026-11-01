@@ -1,19 +1,9 @@
 "use client";
-/**
- * The settings control kit: sections → groups (a labelled flat card) →
- * rows (label + description left, one control right). Everything SSRs
- * clean (render tests pin the sections' markup). Styles: app/ui/settings.css.
- *
- * Dependency graying (owner, 2026-09-20) follows the graph viewer's
- * render-panel convention: the WHOLE row dims (opacity-40, label and
- * control together) and the control itself locks — the row owns the dim.
- */
 
 import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
 
-/** A section page: title + one line saying what lives here, then groups. */
 export function SettingsSection({
 	title,
 	hint,
@@ -21,7 +11,6 @@ export function SettingsSection({
 	testid,
 }: {
 	title: string;
-	/** One line under the title — what this page is for. */
 	hint?: string;
 	children: React.ReactNode;
 	testid?: string;
@@ -37,9 +26,6 @@ export function SettingsSection({
 	);
 }
 
-/** A labelled group: the label (a <p>, pinned by tests), an optional line
- *  of context, then the rows on one flat card. `bare` drops the card for
- *  groups that lay out their own cards. */
 export function SettingsGroup({
 	label,
 	description,
@@ -62,8 +48,6 @@ export function SettingsGroup({
 	);
 }
 
-/** One label + one control. Label left (with an optional description),
- *  control right — the settings row shape. */
 export function SettingsRow({
 	label,
 	hint,
@@ -76,10 +60,7 @@ export function SettingsRow({
 	hint?: ReactNode;
 	children: React.ReactNode;
 	testid?: string;
-	/** Dependency graying, graph-view style: the whole row dims when the
-	 *  control is inert (parent off, no file yet, …). */
 	dimmed?: boolean;
-	/** The label is a file or identifier, not prose. */
 	mono?: boolean;
 }) {
 	return (
@@ -93,9 +74,6 @@ export function SettingsRow({
 	);
 }
 
-/** The on/off switch — a plain button in the switch role. Token-styled
- *  utilities (not .switch) because it also renders outside .v4 scopes
- *  (the figure and demo cards). */
 export function Toggle({
 	checked,
 	disabled,
@@ -107,13 +85,8 @@ export function Toggle({
 	checked: boolean;
 	disabled?: boolean;
 	onChange: (next: boolean) => void;
-	/** Accessible name for the switch role. */
 	label: string;
-	/** Optional icon disc (owner round, 2026-10-07): the figure cards' invert
-	 *  toggle renders the half-filled contrast circle AS the disc — the icon
-	 *  carries the meaning; plain toggles keep the plain disc. */
 	discIcon?: ReactNode;
-	/** Optional native tooltip on the switch. */
 	title?: string;
 }) {
 	return (
@@ -129,7 +102,6 @@ export function Toggle({
 			className={cn(
 				"relative h-5 w-[34px] shrink-0 rounded-full p-0 transition-colors duration-200",
 				checked ? "bg-brand" : "bg-line-strong",
-				// The row owns the dim (see the header); the switch only locks.
 				disabled ? "cursor-not-allowed" : "cursor-pointer",
 			)}
 		>
@@ -145,8 +117,6 @@ export function Toggle({
 	);
 }
 
-/** A select-look trigger for the dropdown menus (the shared model/font/
- *  engine menus open from it). Unset reads `emptyLabel` in faint ink. */
 export function SelectTrigger({
 	value,
 	emptyLabel,
@@ -165,16 +135,12 @@ export function SelectTrigger({
 	testid: string;
 	open: boolean;
 	onClick: () => void;
-	/** The thinking trigger's fixed footprint. */
 	narrow?: boolean;
-	/** Looks inert (whole-row graying) — clicks are ignored. */
 	disabled?: boolean;
-	/** Full value on hover when it truncates. */
 	title?: string;
 }) {
 	return (
 		<button
-			// Tooltip triggers (Hint) slot their handlers and ref through here.
 			{...rest}
 			type="button"
 			aria-label={ariaLabel}
@@ -192,7 +158,6 @@ export function SelectTrigger({
 	);
 }
 
-/** A thin select — native element, options as given. */
 export function ThinSelect({
 	value,
 	onChange,
@@ -222,8 +187,6 @@ export function ThinSelect({
 	);
 }
 
-/** A thin number/text input committing on blur + Enter (settings pace, not
- *  typing pace — every commit is a section PUT). */
 export function CommitInput({
 	value,
 	placeholder,
@@ -232,10 +195,6 @@ export function CommitInput({
 	testid,
 	type = "text",
 }: {
-	/** "" = unset (the factory default). Mirrors the STORED record —
-	 *  after a clamped/normalized commit this flows back and the field
-	 *  snaps to the stored truth (owner repro: a negative size kept
-	 *  displaying "-5" while 12 was stored). */
 	value: string;
 	placeholder?: string;
 	onCommit: (next: string) => void;
@@ -243,9 +202,6 @@ export function CommitInput({
 	testid?: string;
 	type?: "text" | "number";
 }) {
-	// The draft exists only while editing; a blur shows the record's value
-	// again — commit-on-blur/Enter (owner ruling), the field honest about
-	// what landed.
 	const [draft, setDraft] = useState(value);
 	const [editing, setEditing] = useState(false);
 	return (

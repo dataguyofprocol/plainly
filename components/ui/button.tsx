@@ -4,9 +4,6 @@ import { Slot } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
-/* The shared Button, on the v4 tokens (finesse pass): the same geometry
-   and weights as .btn/.ghost in app/v4.css, as utilities so it renders the
-   same inside or outside a .v4 scope. Variant names and sizes are the API. */
 const buttonVariants = cva(
   "inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-[9px] text-[13px] leading-none font-semibold whitespace-nowrap transition-[background-color,box-shadow,color,transform] duration-150 outline-none active:scale-[0.97] focus-visible:ring-[3px] focus-visible:ring-ring/25 disabled:pointer-events-none disabled:opacity-40 aria-invalid:shadow-[inset_0_0_0_1px_var(--danger)] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {

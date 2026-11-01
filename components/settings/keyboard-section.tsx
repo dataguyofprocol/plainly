@@ -1,20 +1,4 @@
 "use client";
-/**
- * The Keyboard section (thin settings wave): view / rebind / reset over
- * core/keyboard.ts's registry. The overrides persist in localStorage
- * (lh:keymap, overrides-only, merged over DEFAULT_BINDINGS), so rebinding
- * is INSTANT — the dispatcher reads the map per keydown, no reload.
- *
- * Rebind flow: click Rebind → the row listens for the next keydown
- * (capture phase, preventDefault — nothing types anywhere), eventBinding
- * normalizes it, saveOverrides persists. Escape cancels. displayOnly
- * actions (a surface owns those keys — the question dock's row machine)
- * are listed for reading but never rebindable.
- *
- * Thin: no conflict detection — if a new binding collides with another
- * action's, the first match in registry order wins; the cheat sheet shows
- * both. Detection belongs to the designed wave.
- */
 
 import { useEffect, useState } from "react";
 import {
@@ -35,8 +19,6 @@ const SCOPES: { scope: KeyScope; label: string }[] = [
 	{ scope: "graph", label: "On the graph" },
 ];
 
-/** The overrides map after ONE change (pure — exported for tests):
- *  binding null = reset the action to its default (key removed). */
 export function nextOverrides(
 	current: Partial<Record<KeyAction, string>>,
 	id: KeyAction,
@@ -48,8 +30,6 @@ export function nextOverrides(
 	return next;
 }
 
-/** A formatted binding split into its keys: "⌘⇧F" → ⌘ ⇧ F, "Ctrl+K" →
- *  Ctrl K. Pure — exported for the cheat sheet. */
 export function bindingParts(text: string): string[] {
 	if (text.includes("+") && text.length > 1) return text.split("+").filter(Boolean);
 	const parts: string[] = [];
@@ -62,7 +42,6 @@ export function bindingParts(text: string): string[] {
 	return parts;
 }
 
-/** A shortcut as .kbd chips (the settings rows and the ? cheat sheet). */
 export function KeyChips({ text, listening }: { text: string; listening?: boolean }) {
 	return (
 		<span className={listening ? "keys listening" : "keys"} aria-label={text}>
@@ -80,12 +59,10 @@ export function KeyboardSection() {
 	const [rebinding, setRebinding] = useState<KeyAction | null>(null);
 	const [nonce, setNonce] = useState(0);
 
-	// localStorage is read post-mount (SSR-safe); `nonce` re-reads after writes.
 	useEffect(() => {
 		setOverrides(loadOverrides());
 	}, [nonce]);
 
-	// The capture listener — only while a rebind is armed.
 	useEffect(() => {
 		if (!rebinding) return;
 		const onKey = (e: KeyboardEvent) => {

@@ -1,11 +1,3 @@
-/* SETTINGS, DIALOGS, PALETTE — the settings app, setup and connect flows,
-   the command palette, confirms and menus (owner: settings + dialogs pass).
-   Every surface here is portaled to <body>, so each mounts its own
-   `.v4.scope` wrapper — these rules then resolve exactly like a page's. */
-
-/* ── Shared: overlays and dialogs ──────────────────────────────────── */
-/* The palette sits high (a launcher, not a form); stacked dialogs (a
-   connection over Settings) take the next layer. */
 .v4 .overlay.high { align-items: flex-start; padding-top: 14vh; }
 .v4 .overlay.z60 { z-index: 60; }
 .v4 .dialog.pad { padding: 24px; }
@@ -20,8 +12,6 @@
 .v4 .dlg-note { margin-top: 12px; font-size: 13px; line-height: 19px; color: var(--muted-foreground); }
 .v4 .dlg-alert { margin-top: 12px; font-size: 13px; line-height: 18px; color: var(--danger); }
 .v4 .dlg-status { margin-top: 12px; font-size: 13px; line-height: 18px; color: var(--muted-foreground); display: flex; align-items: center; gap: 8px; }
-/* Connection dialogs (ChatGPT, subscriptions): head with a mark, notes,
-   a switch panel, an account strip. */
 .v4 .dialog.conn .dlg-head { align-items: center; margin-bottom: 4px; }
 .v4 .dlg-sub { margin: 14px 0 0; font-size: 15px; line-height: 22px; font-weight: 600; }
 .v4 .dlg-sub.danger { color: var(--danger); }
@@ -41,11 +31,9 @@
 .v4 .st-conn-warn { display: flex; align-items: center; gap: 10px; margin: 0 16px 12px; padding: 8px 12px; border-radius: 10px; background: var(--warn-soft); font-size: 13px; color: var(--ink); }
 .v4 .st-conn-warn .link { margin-left: auto; }
 
-/* The icon well beside a confirm's title. */
 .v4 .well { width: 40px; height: 40px; flex: none; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: var(--brand-soft); color: var(--brand); }
 .v4 .well.danger { background: var(--danger-soft); color: var(--danger); }
 .v4 .well.warn { background: var(--warn-soft); color: var(--warn); }
-/* Confirms (delete session, abort turn). */
 .v4 .dialog.cd { width: min(460px, 100%); }
 .v4 .dialog.cd.sm { width: min(400px, 100%); }
 .v4 .cd .dlg-head { gap: 14px; }
@@ -56,7 +44,6 @@
 .v4 .inset.cd-fail .ic { color: var(--warn); flex: none; }
 .v4 .inset.cd-fail .link { margin-left: auto; white-space: nowrap; }
 
-/* A quiet inset panel inside a dialog (an option, a notice). */
 .v4 .inset { margin-top: 16px; padding: 12px 14px; border-radius: 12px; background: var(--tint); }
 .v4 .inset.row { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; transition: background var(--dur-1); }
 .v4 .inset.row:hover { background: var(--hover); }
@@ -64,12 +51,9 @@
 .v4 .inset input[type="checkbox"]:disabled { cursor: not-allowed; }
 .v4 .inset-t { display: block; font-size: 14px; line-height: 20px; font-weight: 500; color: var(--ink); }
 .v4 .inset-d { display: block; margin-top: 2px; font-size: 13px; line-height: 18px; color: var(--muted-foreground); }
-/* A menu body portaled by MenuShell: .pop at the menu's own geometry. The
-   body keeps focus for the arrow machine without drawing a ring. */
 .v4 [data-lh-menu]:focus-visible { outline: none; }
 .v4 .lh-menu { padding: 6px; border-radius: 12px; font-size: 13px; display: flex; flex-direction: column; gap: 1px; }
 
-/* ── Settings: the frame ───────────────────────────────────────────── */
 .v4 .sd { position: relative; width: min(880px, 100%); height: min(640px, calc(100vh - 48px)); max-height: none; overflow: hidden; display: grid; grid-template-columns: 212px minmax(0, 1fr); }
 .v4 .sd-nav { display: flex; flex-direction: column; gap: 2px; padding: 18px 12px 14px; border-right: 1px solid var(--line); background: var(--tint); min-height: 0; overflow-y: auto; }
 .v4 .sd-navt { padding: 4px 10px 14px; font-size: 15px; line-height: 22px; font-weight: 600; letter-spacing: -0.005em; color: var(--ink); }
@@ -88,7 +72,6 @@
 .v4 .sd-head p { margin: 4px 0 0; font-size: 13px; line-height: 18px; color: var(--muted-foreground); }
 .v4 .sd-error { margin: 0 0 16px; padding: 10px 12px; border-radius: 10px; background: var(--danger-soft); color: var(--danger); font-size: 13px; line-height: 18px; display: flex; gap: 8px; align-items: flex-start; }
 .v4 .sd-error .ic { margin-top: 2px; flex: none; }
-/* Loading: shaped like the page it stands in for. */
 .v4 .sd-skel-t { width: 140px; height: 22px; }
 .v4 .sd-skel-d { width: 300px; max-width: 100%; height: 14px; margin-top: 8px; }
 .v4 .sd-errwrap { padding-bottom: 0; }
@@ -98,14 +81,12 @@
 .v4 .st-skel .skel.c { height: 168px; border-radius: 14px; }
 .v4 .st-skel .skel.c2 { height: 112px; border-radius: 14px; margin-top: 14px; }
 
-/* ── Settings: groups and rows ─────────────────────────────────────── */
 .v4 .st-group + .st-group { margin-top: 26px; }
 .v4 .st-glabel { margin: 0 0 8px 2px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--ink); }
 .v4 .st-gdesc { display: block; margin: -4px 0 10px 2px; font-size: 13px; line-height: 18px; color: var(--muted-foreground); }
 .v4 .st-sub { display: block; margin: 16px 0 6px 2px; }
 .v4 .st-sub:first-child { margin-top: 0; }
 .v4 .st-subgroup + .st-subgroup { margin-top: 18px; }
-/* A flat card of rows, hairline-separated (never a box in a box). */
 .v4 .st-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--e1); overflow: hidden; }
 .v4 .st-card > * + * { border-top: 1px solid var(--line); }
 .v4 .st-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; padding: 10px 16px; }
@@ -116,17 +97,14 @@
 .v4 .st-desc .num { color: var(--faint); }
 .v4 .st-ctl { flex: none; display: flex; align-items: center; gap: 8px; }
 .v4 .st-empty { padding: 14px 16px; font-size: 13px; line-height: 18px; color: var(--muted-foreground); }
-/* A select trigger with a fixed footprint (values never shift the row). */
 .v4 .st-select { min-width: 148px; max-width: 220px; justify-content: space-between; }
 .v4 .st-select > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v4 .st-select.narrow { min-width: 104px; width: 104px; }
 .v4 .st-select[aria-expanded="true"] { box-shadow: 0 0 0 1px var(--brand) inset, var(--focus-ring); }
 .v4 .st-select.is-off { cursor: not-allowed; }
 .v4 .st-select .ph { color: var(--faint); }
-/* A number field that commits on blur. */
 .v4 .st-num { width: 104px; text-align: right; font-variant-numeric: tabular-nums; }
 
-/* ── Settings: provider keys ───────────────────────────────────────── */
 .v4 .st-keyrow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 16px; border: 0; background: transparent; text-align: left; transition: background var(--dur-1); }
 .v4 .st-keyrow:hover { background: var(--hover); }
 .v4 .st-keyrow:focus-visible { outline-offset: -2px; border-radius: 0; }
@@ -137,47 +115,38 @@
 .v4 .st-act { height: 28px; padding: 0 10px; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--ink); background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong) inset; white-space: nowrap; transition: box-shadow var(--dur-1); }
 .v4 .st-keyrow:hover .st-act { box-shadow: 0 0 0 1px var(--line-hover) inset; }
 .v4 .st-docs { font-size: 12px; font-weight: 600; }
-/* The provider mark: a tile carrying the initial (drawn by CSS so the
-   row's accessible text stays the provider's name alone). */
 .v4 .st-avatar { width: 32px; height: 32px; flex: none; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; background: var(--tint); box-shadow: inset 0 0 0 1px var(--line); color: var(--muted-foreground); font-size: 13px; font-weight: 600; line-height: 1; }
 .v4 .st-avatar[data-initial]::before { content: attr(data-initial); }
 .v4 .st-avatar img { width: 16px; height: 16px; }
 .v4 .st-avatar.add { background: var(--brand-soft); box-shadow: none; color: var(--brand); }
-/* The inline paste editor (a row turned into its own form). */
 .v4 .st-editor { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--tint); }
 .v4 .st-editor .finput { flex: 1; min-width: 0; font-family: var(--font-jetbrains), monospace; font-size: 12px; }
 .v4 .st-editor-name { flex: none; font-size: 14px; font-weight: 500; }
 .v4 .st-rowerr { padding: 0 16px 12px 60px; font-size: 12px; line-height: 16px; color: var(--danger); background: var(--tint); }
 .v4 .st-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
 .v4 .st-actions .meta { margin-left: auto; padding-right: 2px; font-size: 12px; color: var(--faint); }
-/* A read-only variable nobody recognises (kept, masked). */
 .v4 .st-unknown { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; opacity: 0.5; }
 .v4 .st-unknown > :first-child { font-family: var(--font-jetbrains), monospace; font-size: 12px; }
 
-/* ── Settings: subscriptions (ConnectionRow) ───────────────────────── */
 .v4 .st-conn { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 10px 16px; }
 .v4 .st-conn > :first-child { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500; }
 .v4 .st-conn select { max-width: 220px; }
 .v4 .st-conn-err { padding: 0 16px 12px 60px; font-size: 12px; color: var(--danger); }
 .v4 .st-conns { display: flex; flex-direction: column; }
 .v4 .st-conns > * + * { border-top: 1px solid var(--line); }
-/* A native select restyled as a .selectbtn (account pickers). */
 .v4 .st-nselect { height: 32px; padding: 0 28px 0 10px; border: 0; border-radius: 8px; background: var(--surface) no-repeat right 8px center / 12px; box-shadow: 0 0 0 1px var(--line-strong) inset; font-size: 13px; font-weight: 500; color: var(--ink); appearance: none; -webkit-appearance: none; cursor: pointer; background-image: linear-gradient(45deg, transparent 50%, var(--faint) 50%), linear-gradient(135deg, var(--faint) 50%, transparent 50%); background-size: 4px 4px, 4px 4px; background-position: right 13px center, right 9px center; }
 .v4 .st-nselect:disabled { opacity: 0.4; cursor: not-allowed; }
 .v4 .st-nselect.full { width: 100%; height: 40px; border-radius: 10px; font-size: 14px; }
 
-/* ── Settings: prompts ─────────────────────────────────────────────── */
 .v4 .st-seg-editor { display: flex; flex-direction: column; gap: 12px; padding: 4px 16px 16px; }
 .v4 .st-seg-editor .ftext { min-height: 112px; font-size: 13px; line-height: 19px; }
 .v4 .st-seg-editor .ftext[readonly] { background: var(--tint); box-shadow: none; color: var(--muted-foreground); }
 .v4 .st-seg-actions { display: flex; align-items: center; gap: 8px; }
 .v4 .st-seg-actions .meta { font-size: 12px; color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 4px; }
 
-/* ── Settings: keyboard ────────────────────────────────────────────── */
 .v4 .keys { display: inline-flex; align-items: center; gap: 3px; }
 .v4 .keys .kbd { min-width: 22px; height: 22px; padding: 0 6px; font-family: var(--font-manrope), system-ui, sans-serif; font-size: 12px; font-weight: 600; }
 .v4 [data-testid^="kbd-scope-"] .st-row { min-height: 48px; }
-/* Change/Reset appear with the row's attention (hover or keyboard focus). */
 .v4 [data-testid^="kbd-scope-"] .st-row .btn.quiet { opacity: 0; transition: opacity var(--dur-1); }
 .v4 [data-testid^="kbd-scope-"] .st-row:hover .btn.quiet,
 .v4 [data-testid^="kbd-scope-"] .st-row:focus-within .btn.quiet { opacity: 1; }
@@ -185,7 +154,6 @@
 .v4 .st-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 0 2px; font-size: 12px; color: var(--faint); }
 .v4 .st-foot span { display: inline-flex; align-items: center; gap: 6px; }
 
-/* ── Menus: model, thinking, provider, font lists ──────────────────── */
 .v4 .mm { width: 360px; }
 .v4 .mm.narrow { width: 200px; }
 .v4 .mm.mid { width: 300px; }
@@ -211,13 +179,11 @@
 .v4 .mm-think .over { display: block; padding: 6px 6px 6px; }
 .v4 .mm-think .seg button { min-width: 0; padding: 0 4px; }
 .v4 .mm-err { margin: 2px 4px 6px; padding: 8px 10px; border-radius: 8px; background: var(--danger-soft); color: var(--danger); font-size: 12px; }
-/* The model chip: never wraps, long ids truncate (full id on hover). */
 .v4 .mchip-t { min-width: 0; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v4 .mchip-l { color: var(--faint); white-space: nowrap; }
 .v4 .mchip-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--brand); }
 .v4 .mchip-dot.off { background: var(--faint); }
 
-/* ── Command palette ───────────────────────────────────────────────── */
 .v4 .pal { width: min(640px, 100%); max-height: min(560px, 72vh); display: flex; flex-direction: column; overflow: hidden; }
 .v4 .pal-field { display: flex; align-items: center; gap: 12px; padding: 14px 16px 14px 18px; border-bottom: 1px solid var(--line); }
 .v4 .pal-field > .ic { color: var(--faint); flex: none; }
@@ -248,7 +214,6 @@
 .v4 .pal-field.glass { border-radius: 16px; border-bottom: 1px solid var(--glass-edge); }
 .v4 .pal-drop { position: absolute; inset: calc(100% + 6px) 0 auto; z-index: 20; max-height: 50vh; border-radius: 16px; }
 
-/* ── Setup + connect ───────────────────────────────────────────────── */
 .v4 .su { width: min(600px, 100%); max-height: min(720px, calc(100vh - 48px)); display: flex; flex-direction: column; overflow: hidden; }
 .v4 .su-head { display: flex; align-items: flex-start; gap: 12px; padding: 22px 24px 4px 28px; }
 .v4 .su-head > div { min-width: 0; flex: 1; }
@@ -266,7 +231,6 @@
 .v4 .su-foot { display: flex; align-items: center; gap: 10px; padding: 14px 24px 14px 28px; border-top: 1px solid var(--line); background: var(--tint); }
 .v4 .su-foot .grow { flex: 1; min-width: 0; }
 .v4 .su-err { font-size: 13px; color: var(--danger); }
-/* Provider tiles: a grid of choices, the chosen one in brand. */
 .v4 .su-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 8px; }
 .v4 .su-tile { position: relative; display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 10px; border: 0; border-radius: 12px; background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong) inset; text-align: left; font-size: 13px; font-weight: 500; color: var(--ink); transition: box-shadow var(--dur-1), background var(--dur-1), transform var(--dur-1) var(--ease-out); }
 .v4 .su-tile:hover { box-shadow: 0 0 0 1px var(--line-hover) inset, var(--e1); }
@@ -286,7 +250,6 @@
 .v4 .su-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 12px; }
 .v4 .su-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .v4 .su-chips .chip { height: 26px; font-size: 12px; font-family: var(--font-jetbrains), monospace; }
-/* Custom provider models: one row per model, its capabilities beneath the id. */
 .v4 .cm-list { display: flex; flex-direction: column; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
 .v4 .cm-row { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; }
 .v4 .cm-row + .cm-row { border-top: 1px solid var(--line); }
@@ -299,7 +262,6 @@
 .v4 .cm-limits { display: inline-flex; flex-wrap: wrap; gap: 8px 12px; margin-left: auto; }
 .v4 .cm-num { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted-foreground); }
 .v4 .cm-num .st-num { width: 96px; }
-/* A saved custom provider's editor, unfolded inside the key card. */
 .v4 .st-card > .cp-editor { border-radius: 0; }
 .v4 .cp-editor .su-form-actions { align-items: center; }
 .v4 .cp-delete, .v4 .cp-confirm { margin-right: auto; }
@@ -307,7 +269,6 @@
 .v4 .su-more { max-height: 280px; overflow: auto; }
 .v4 .su-or { display: flex; flex-direction: column; gap: 10px; padding-top: 18px; border-top: 1px solid var(--line); }
 .v4 .su-or .st-card { box-shadow: none; }
-/* Step 2: the three model tiers. */
 .v4 .su-slots { border-radius: 14px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--e1); }
 .v4 .su-slot { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
 .v4 .su-slot + .su-slot { border-top: 1px solid var(--line); }
@@ -316,13 +277,11 @@
 .v4 .su-slot .st-select:not(.narrow) { min-width: 176px; }
 .v4 .su-done { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--good); font-weight: 600; }
 
-/* ── Update banner ─────────────────────────────────────────────────── */
 .v4 .ub { position: fixed; right: 16px; bottom: 16px; z-index: 50; width: min(360px, calc(100vw - 32px)); display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 14px; border-radius: 14px; animation: v4-settle 0.4s var(--ease-expo) both; }
 .v4 .ub .well { width: 34px; height: 34px; border-radius: 10px; }
 .v4 .ub-t { font-size: 14px; line-height: 20px; font-weight: 600; }
 .v4 .ub-d { font-size: 12px; line-height: 16px; color: var(--muted-foreground); }
 
-/* The ? cheat sheet. */
 .v4 .dialog.cs { width: min(560px, 100%); }
 .v4 .cs .dlg-head { align-items: center; margin-bottom: 8px; }
 .v4 .cs-esc { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--faint); }

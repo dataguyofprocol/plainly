@@ -1,32 +1,5 @@
 "use client";
 
-/**
- * MARKDOWN BLOCKS, MELTED INTO THE MESSAGE (owner wave, 2026-09-19): the
- * boxed streamdown chrome — the double-framed tables (border + sidebar bg +
- * a second inner border + copy/download/fullscreen button rows), the mermaid
- * container (border box + mono label header + action pill + inner border +
- * in-chart zoom buttons), the code header bars — is REPLACED by this
- * component set, wired into Streamdown via its `components` prop:
- *
- * - Tables: a plain PROSE table (no box, no sidebar bg, no buttons bar) —
- *   hairline row rules + a stronger header underline (globals.css), wide
- *   tables scroll inside the column.
- * - Mermaid: the bare chart, part of the message — no label, no container,
- *   no zoom pill (zoom/pan lives in the session-scoped focus overlay now).
- * - Code: streamdown's CodeBlock skeleton keeps the shiki plumbing, but the
- *   container melts (subtle bg tint, no border, no header — globals.css) and
- *   the buttons go.
- * - Display math: untouched visually, but gains the corner copy.
- *
- * THE ONE AFFORDANCE (user-decided): a small muted COPY icon at each block's
- * top-right corner, revealed on hover — copying the SOURCE (table →
- * Markdown, code → text, mermaid → chart source, math → the raw TeX). It
- * never fakes a table column or shifts layout, and hover-reveal keeps the
- * reading surface clean — the whole point of the melt. Text selection stays
- * free: the icon lives in dead corner space. Mermaid additionally gets an
- * EXPAND icon (opens the session overlay) when a chat page is mounted.
- */
-
 import { cloneElement, isValidElement, useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
@@ -43,8 +16,6 @@ import { MermaidError } from "@/components/mermaid-error";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { chartSize, useSessionMermaid } from "@/components/session-overlay";
 import { Hint } from "@/components/ui/hint";
-
-// ─── The one affordance: the hover-reveal corner copy ────────────────────────
 
 /** Clipboard write with a fallback: navigator.clipboard needs the
  *  `clipboard-sanitized-write` permission, which Electron's deny-by-default
@@ -76,14 +47,6 @@ async function copyText(text: string): Promise<boolean> {
 	}
 }
 
-/** A small muted copy icon for a block's top-right corner. The CONSUMER'S
- *  wrapper carries `group/md relative` (a NAMED group — the message container
- *  is also a `group`, and an unnamed group-hover would light EVERY corner in
- *  the message at once, the all-at-once the owner saw) and positions this
- *  via className; the icon self-hides until hover (opacity-0 →
- *  group-hover/md:opacity-100). Copies getText() on click; the icon flips
- *  to a check for a beat — enough feedback on its own (a "Copied" pill was
- *  tried and removed by owner ask, 2026-09-19). */
 export function CopyCorner({
 	getText,
 	label,
@@ -119,8 +82,6 @@ export function CopyCorner({
 	);
 }
 
-// ─── Code + mermaid fences (the Streamdown `code` override) ──────────────────
-
 /** The fence source from a code element's children — a bare string in the
  *  common case; an element wrapping a string when rehype nests it. Pure. */
 export function codeSource(children: ReactNode): string {
@@ -133,27 +94,13 @@ export function codeSource(children: ReactNode): string {
 	return "";
 }
 
-/** Mermaid, in the message flow: the bare chart (token-themed, rendered via
- *  the app's own plugin — components/mermaid-render.ts), the hover corner
- *  with copy + expand, the house error fallback. No container chrome, no
- *  zoom pill — the zoom/pan home is the session overlay. While the fence is
- *  still streaming (the trailing open fence), a quiet skeleton instead of a
- *  doomed parse. */
 function MermaidInline({ chart }: { chart: string }) {
 	const [svg, setSvg] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [attempt, setAttempt] = useState(0);
 	const overlay = useSessionMermaid();
 	const incomplete = useIsCodeFenceIncomplete();
-	// Mermaid bakes colors into the svg: a theme switch redraws the chart.
 	const theme = useResolvedTheme();
-	// The font-parity cap (owner rule, 2026-09-19): the house CSS
-	// (`max-width: 100% !important`) overrides mermaid's own natural-size cap,
-	// so a chart would otherwise stretch to the full column and render its
-	// text larger than the session's own text. Cap the holder at the width
-	// where the chart's 16px base font lands at the SESSION font (measured
-	// live from the wrapper — --lh-prose-size today): a chart may shrink to
-	// fit the column, but never blow its text up past the chat's.
 	const holderRef = useRef<HTMLDivElement>(null);
 	const [capW, setCapW] = useState<number | null>(null);
 	useEffect(() => {
@@ -192,8 +139,6 @@ function MermaidInline({ chart }: { chart: string }) {
 		return <MermaidError chart={chart} error={error} retry={() => setAttempt((a) => a + 1)} />;
 	}
 	return (
-		// data-streamdown="mermaid" keeps the house CSS hook (the svg
-		// max-width rule in globals.css) alive for this app-owned block.
 		<div data-testid="md-mermaid" data-streamdown="mermaid" className="group/md relative my-4">
 			<div
 				ref={holderRef}
@@ -205,8 +150,6 @@ function MermaidInline({ chart }: { chart: string }) {
 				<CopyCorner getText={() => chart} label="Copy diagram source" />
 				{overlay && (
 					<Hint
-					// Full-screen overlay copy (tooltip wave) — "session view" was
-					// internal direction-speak for the same thing.
 					label="Open full-screen"
 					side="bottom"
 				>
@@ -229,18 +172,10 @@ function MermaidInline({ chart }: { chart: string }) {
 	);
 }
 
-/** The Streamdown `code` override: inline code passes through with the
- *  house inline classes; block fences split — mermaid renders as the bare
- *  chart above, everything else delegates to streamdown's exported
- *  CodeBlock (shiki highlighting + line numbers preserved) inside a
- *  hover-copy wrapper, with NO children so its sticky button row never
- *  mounts. The container/look is CSS-melted in globals.css
- *  (data-streamdown="code-block"…). */
 export function MarkdownCode(props: ComponentProps<"code"> & ExtraProps) {
 	const incomplete = useIsCodeFenceIncomplete();
 	const { children, className, node, ...rest } = props;
 
-	// Inline code: no data-block (the pre handler stamps block fences only).
 	if (!("data-block" in props)) {
 		return (
 			<code className={cn("lh-icode", className)} data-streamdown="inline-code" {...rest}>
@@ -273,19 +208,10 @@ export function MarkdownCode(props: ComponentProps<"code"> & ExtraProps) {
 	);
 }
 
-// ─── Key-idea callouts (the Streamdown `blockquote` override) ────────────────
-
-/** GitHub-style alert markers — the syntax the models already know from a
- *  million READMEs. The PROMPT teaches only [!IMPORTANT] (one emphasis
- *  device, one meaning: load-bearing); the renderer accepts all five and
- *  boxes them identically — a stray [!NOTE] still meant "this deserves
- *  emphasis", and a literal marker line must never leak as text (owner
- *  design, callout round 2026-10-07). */
 const ALERT_MARKER_RE = /^\[!(note|tip|important|warning|caution)\][ \t]*(?:\n|$)/i;
 
 export interface ParsedAlert {
 	kind: string;
-	/** The blockquote children with the marker line stripped — prose intact. */
 	children: ReactNode;
 }
 
@@ -300,12 +226,6 @@ function markdownTag(el: React.ReactElement): string | null {
 	return node?.tagName ?? null;
 }
 
-/** Pure: does this blockquote open with a GitHub alert marker? Returns the
- *  kind and the children with the marker line removed (the marker's own
- *  paragraph dropped entirely when it stands alone — `> [!IMPORTANT]` then
- *  a blank quote line then content; a standalone marker also drops the
- *  <br> hard-break artifact that carried its line break). Non-alert
- *  blockquotes pass through untouched. Exported for hermetic tests. */
 export function parseAlertMarker(children: ReactNode): ParsedAlert | null {
 	const list = Array.isArray(children) ? children : [children];
 	const para = list.find(significant);
@@ -318,15 +238,12 @@ export function parseAlertMarker(children: ReactNode): ParsedAlert | null {
 	if (!match) return null;
 	const kind = match[1]!.toLowerCase();
 	const stripped = lead.slice(match[0].length);
-	// Rebuild the paragraph without the marker line; drop it entirely when
-	// the marker stood alone (nothing but the marker text in the paragraph).
 	const leadIdxInner = innerList.indexOf(lead);
 	const hasFollowing = innerList.some((c, i) => i > leadIdxInner && significant(c));
 	let rebuiltPara: ReactNode = null;
 	if (stripped.trim() !== "" || hasFollowing) {
 		let rest = innerList.map((c) => (c === lead ? (stripped === "" ? null : stripped) : c));
 		if (stripped === "") {
-			// the hard-break <br> that ended the marker line is now leading junk
 			while (rest.length && (rest[0] === null || (isValidElement(rest[0]) && markdownTag(rest[0]) === "br"))) rest = rest.slice(1);
 		}
 		rebuiltPara = cloneElement(para, {}, ...rest);
@@ -336,11 +253,6 @@ export function parseAlertMarker(children: ReactNode): ParsedAlert | null {
 	return { kind, children: restChildren };
 }
 
-/** The key-idea callout: a teal rule and a faint teal wash (owner, finesse
- *  pass 2026-10-26 — the light theme's answer to the 2026-10-07 outline
- *  box), still NO label and NO icon. The box hugs its text (width:
- *  fit-content, capped at the column) instead of stretching full-width
- *  into empty space. Styles: .lh-callout in app/globals.css. */
 export function MarkdownBlockquote(props: ComponentProps<"blockquote"> & ExtraProps) {
 	const { children, node, ...rest } = props;
 	const alert = parseAlertMarker(children);
@@ -370,24 +282,12 @@ export function MarkdownBlockquote(props: ComponentProps<"blockquote"> & ExtraPr
 	);
 }
 
-// ─── Tables (the Streamdown `table` override) ────────────────────────────────
-
-/** A plain PROSE table: no wrapper box, no button rows — just the table
- *  (streamdown's inner cells keep their padding/typography; the hairline
- *  rules live in globals.css on the data-streamdown attributes) inside a
- *  horizontal-scroller for wide ones, with the corner copy. The copy
- *  serializes the REAL DOM table (the library's own extractor → Markdown). */
 export function MarkdownTable(props: ComponentProps<"table"> & ExtraProps) {
 	const { children, node, ...rest } = props;
 	const ref = useRef<HTMLTableElement>(null);
 	return (
 		<div className="group/md ls-table" data-testid="md-table">
 			<CopyCorner
-				// Contained in the table's top-right corner (owner note, 2026-09-19:
-				// the old -top-3 lifted only half the 24px button above the 12px
-				// offset, so it straddled the top outline). 4px inset, z above the
-				// cells it hovers over; the scroll container stays under it (the
-				// corner is fixed to the wrapper, not the scrolling table).
 				className="absolute top-1 right-1 z-10"
 				label="Copy table"
 				getText={() => (ref.current ? tableDataToMarkdown(extractTableDataFromElement(ref.current)) : "")}
@@ -395,10 +295,6 @@ export function MarkdownTable(props: ComponentProps<"table"> & ExtraProps) {
 			<div className="ls-table-x">
 				<table
 					ref={ref}
-					// No text-sm here — the table text runs at the session prose size
-				// (owner note, 2026-09-19: streamdown's cells pin their own text-sm
-				// 12.5px; globals.css overrides cells to inherit, so tables match the
-				// 16px chat text for a consistent look).
 					className="w-full border-collapse"
 					data-streamdown="table"
 					{...rest}
@@ -409,8 +305,6 @@ export function MarkdownTable(props: ComponentProps<"table"> & ExtraProps) {
 		</div>
 	);
 }
-
-// ─── Display math (the Streamdown `span` override) ────────────────────────────
 
 /** KaTeX display equations are wrapped in a SPAN.katex-display (rehype-katex
  *  renders them as spans with display:block CSS — NOT divs; verified in the
@@ -448,7 +342,7 @@ export function MathDisplay(props: ComponentProps<"span"> & ExtraProps) {
 	);
 }
 
-// ─── The stable override set (module identity: Streamdown is memoized) ────────
+// Module identity matters: Streamdown is memoized.
 
 /** Bold as the REAL element (appearance fix, 2026-09-23): streamdown's
  *  default `strong` renders `<span class="font-semibold" data-streamdown=

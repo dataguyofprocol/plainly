@@ -1,19 +1,5 @@
 "use client";
 
-/**
- * THE GRAPH INDEX (v4 redesign, 2026-10-26): the light read of the graph
- * the chrome needs — the sidebar's idea count, the omnibar's idea search,
- * and the home's "just added" list. Only the STORED propositions (never
- * the canvas's derived implication nodes), trimmed to the fields a list
- * shows.
- *
- * Freshness rides the signals the graph view already trusts: the graph
- * has no server event of its own, so an extraction phase change
- * (activity-changed — merges land at a phase boundary) and the local
- * lh:graph-revision announcement (deletions) each refetch, debounced the
- * same 250ms as the sidebar's event refreshes.
- */
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import type { GraphSnapshot } from "@/src/core";
@@ -23,11 +9,9 @@ export interface IndexedIdea {
 	name: string;
 	statement: string;
 	createdAt: string;
-	/** The first session (or notes file) the idea came from — its label. */
 	source: string | null;
 }
 
-/** Pure: snapshot → the newest-first idea list. Exported for tests. */
 export function indexIdeas(snapshot: Pick<GraphSnapshot, "propositions" | "sessions" | "fileSources">): IndexedIdea[] {
 	return snapshot.propositions
 		.map((n) => {
@@ -38,7 +22,6 @@ export function indexIdeas(snapshot: Pick<GraphSnapshot, "propositions" | "sessi
 		.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-/** The idea list, or null until the first fetch lands. */
 export function useGraphIndex(): IndexedIdea[] | null {
 	const [ideas, setIdeas] = useState<IndexedIdea[] | null>(null);
 	const refresh = useCallback(async () => {

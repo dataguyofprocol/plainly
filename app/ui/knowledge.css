@@ -1,21 +1,13 @@
-/* KNOWLEDGE — the graph page: topic list, header, canvas frame and its
-   floating layers (idea card, map controls, hint, tray, import problems),
-   the node menu and the delete-node dialog. Primitives: app/v4.css. */
-
-/* ── Page frame ────────────────────────────────────────────────────── */
 .v4.kpage { height: 100vh; overflow: hidden; }
 .v4 .kmain { grid-column: 2; grid-row: 1; min-width: 0; height: 100vh; display: flex; flex-direction: column; gap: 12px; padding: 16px 10px 10px 16px; }
 .v4 .canvas { position: relative; flex: 1; min-height: 0; border-radius: 18px; overflow: hidden; }
 .v4 .kstage { position: absolute; inset: 0; }
 
-/* ── Header: title + meta, search ──────────────────────────────────── */
 .v4 .khead { flex: none; display: flex; align-items: center; gap: 16px; min-height: 48px; padding: 0 2px 0 4px; }
 .v4 .khead-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .v4 .khead h1 { margin: 0; }
 .v4 .kmeta { margin: 0; align-self: flex-start; font-size: 13px; line-height: 18px; color: var(--muted-foreground); }
 .v4 .kmeta.tipb { cursor: default; }
-/* The meta's tooltip opens from its left edge (the shared .tipb opens
-   right-aligned, which would run under the sidebar here). */
 .v4 .kmeta.tipb::after { left: 0; right: auto; }
 .v4 .kmeta-skel { width: 132px; height: 12px; margin: 3px 0; }
 .v4 .ksearch { position: relative; margin-left: auto; width: 260px; flex: none; }
@@ -27,7 +19,6 @@
 .v4 span.ksearch-end:not(.kbd) { font-size: 12px; line-height: 16px; color: var(--brand); font-weight: 600; }
 .v4 span.ksearch-end.none { color: var(--faint); font-weight: 500; }
 
-/* ── Topic list (inside the shell's sidebar card) ──────────────────── */
 .v4 .ktopics { display: flex; flex-direction: column; gap: 1px; padding-top: 4px; }
 .v4 .ktopics-h { display: flex; align-items: center; justify-content: space-between; height: 28px; padding: 0 10px; margin-top: 4px; }
 .v4 .ktopic { display: flex; align-items: flex-start; gap: 10px; width: 100%; min-height: 32px; padding: 7px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--muted-foreground); text-align: left; font-size: 13px; line-height: 18px; font-weight: 500; transition: background var(--dur-1), color var(--dur-1), box-shadow var(--dur-1), transform var(--dur-1) var(--ease-out); }
@@ -41,17 +32,12 @@
 .v4 .ktopic.on .ktopic-all { color: var(--brand); }
 .v4 .ktopic-skel { display: flex; align-items: center; height: 32px; padding: 0 10px; }
 .v4 .ktopic-skel .skel { height: 10px; }
-/* A topic's colour mark (also on the idea card). */
 .v4 .ksw { width: 8px; height: 8px; flex: none; border-radius: 3px; }
 
-/* The sidebar footer: Import notes. */
 .v4 .kimport { width: 100%; }
 .v4 .kspin { animation: k-spin 0.9s linear infinite; }
 @keyframes k-spin { to { transform: rotate(360deg); } }
 
-/* ── Canvas layers ─────────────────────────────────────────────────── */
-/* The idea card: a floating sheet at the canvas's top right. Flat
-   sections divided by hairlines — never a box in a box. */
 .v4 .detail { position: absolute; right: 12px; top: 12px; z-index: 5; width: 328px; max-height: calc(100% - 72px); overflow: auto; overscroll-behavior: contain; border-radius: 16px; padding: 4px 0 0; display: flex; flex-direction: column; }
 .v4 .kd-top { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 8px 0 16px; }
 .v4 .kd-topic { flex: 0 1 auto; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--muted-foreground); }
@@ -80,8 +66,6 @@
 .v4 .kd-actions { position: sticky; bottom: 0; display: flex; gap: 8px; padding: 12px 16px 16px; border-top: 1px solid var(--line); background: var(--surface); }
 .v4 .kd-actions > * { flex: 1; }
 
-/* Map controls (bottom right) and the hint (bottom left): small floating
-   toolbars over the canvas. */
 .v4 .kctrl { position: absolute; right: 12px; bottom: 12px; z-index: 5; display: flex; align-items: center; gap: 2px; height: 36px; padding: 0 4px; border-radius: 12px; }
 .v4 .kzoom { min-width: 44px; text-align: center; font-size: 12px; line-height: 16px; color: var(--muted-foreground); }
 .v4 .kctrl-sep { width: 1px; height: 16px; margin: 0 4px; background: var(--line-strong); }
@@ -89,32 +73,23 @@
 .v4 .khint > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v4 .khint-ic { flex: none; color: var(--faint); }
 
-/* The practice tray (bottom centre). */
 .v4 .tray { position: absolute; left: 50%; bottom: 12px; z-index: 6; translate: -50% 0; display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 6px 0 8px; border-radius: 14px; max-width: calc(100% - 24px); }
-/* With the idea card open, the tray centres in the space left of it. */
 .v4 .tray.beside { left: calc((100% - 340px) / 2); }
 .v4 .tray-n { display: inline-flex; align-items: center; gap: 8px; padding-right: 2px; font-size: 13px; line-height: 18px; font-weight: 600; white-space: nowrap; }
 .v4 .tray-count { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: var(--brand-soft); color: var(--brand); font-size: 12px; }
 
-/* Import problems (top left of the canvas). */
 .v4 .kerr { position: absolute; left: 12px; top: 12px; z-index: 6; width: min(380px, calc(100% - 24px)); max-height: calc(100% - 80px); overflow: auto; border-radius: 14px; padding: 6px 6px 12px 14px; display: flex; flex-direction: column; gap: 6px; }
 .v4 .kerr-h { display: flex; align-items: center; gap: 8px; }
 .v4 .kerr-h .h { flex: 1; }
 .v4 .kerr-ic { color: var(--warn); flex: none; }
 .v4 .kerr-list { display: flex; flex-direction: column; gap: 8px; padding: 0 8px 0 22px; }
-/* The lines are the server's words — quiet ink; the header carries the
-   status colour. */
 .v4 .kerr-list [role="alert"] { margin: 0; font-size: 12px; line-height: 16px; color: var(--muted-foreground); }
 
-/* The empty graph. */
 .v4 .kempty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; }
 .v4 .kempty .empty-d { max-width: 44ch; }
 .v4 .kempty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; }
 .v4 .kempty-actions .btn { height: 36px; }
 
-/* ── Portaled: the node menu and the delete-node dialog ────────────── */
-/* MenuShell portals to <body>, so the menu body itself carries the v4
-   scope: these rules key off that element. */
 .v4.scope.kmenu { display: flex; flex-direction: column; gap: 2px; width: 184px; padding: 6px; border-radius: 12px; background: var(--glass-strong); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); border: 1px solid var(--line-strong); box-shadow: var(--e2); }
 .v4 .mrow.danger .ic { color: var(--danger); }
 
@@ -132,7 +107,6 @@
 .v4 .kdlg-fail .link:disabled { opacity: 0.4; cursor: not-allowed; }
 .v4 .kdlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 
-/* ── Narrow windows ────────────────────────────────────────────────── */
 @media (max-width: 900px) {
 	.v4 .ksearch { width: 200px; }
 	.v4 .detail { width: 296px; }
@@ -141,12 +115,8 @@
 	.v4 .tray.beside { left: 50%; }
 	.v4 .kmain { height: calc(100vh - 57px); padding: 12px; }
 	.v4 .detail { left: 12px; right: 12px; width: auto; top: auto; bottom: 60px; max-height: 60%; }
-	/* macOS: the flat rail holds the title bar (app/ui/shell.css). */
 	.lh-electron[data-lh-platform="darwin"] .v4 .kmain { height: calc(100vh - 57px - var(--lh-bar)); }
 }
-/* macOS title bar (app/globals.css --lh-bar): the header IS the bar — one
-   line in the Lesson title's register (owner, 2026-10-27), the meta
-   inline after the title; beside the rail its title starts past the lights. */
 @media (min-width: 800px) {
 	.lh-electron[data-lh-platform="darwin"] .v4 .kmain { padding-top: 0; }
 	.lh-electron[data-lh-platform="darwin"] .v4 .khead { height: var(--lh-bar); min-height: 0; }
@@ -160,7 +130,6 @@
 .v4 .ksearch .finput:focus ~ .kbd { opacity: 0; }
 .v4 .ksearch .kbd { transition: opacity var(--dur-1); }
 
-/* ── Extraction coverage (the session menu's bottom block) ─────────── */
 .v4 .kcov { display: flex; align-items: center; gap: 10px; padding: 6px 4px 4px 10px; font-size: 12px; line-height: 16px; color: var(--muted-foreground); }
 .v4 .kcov-line { flex: 1; display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .v4 .kcov-stats { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -170,7 +139,6 @@
 @keyframes k-pulse { 50% { opacity: 0.35; } }
 .v4 .kcov-btn { flex: none; }
 
-/* ── The graph-context card (a lesson's map pick, in the transcript) ─ */
 .v4 .gctx { margin: 4px 0; border-radius: 12px; transition: background var(--dur-2); }
 .v4 .gctx.open { background: var(--tint); }
 .v4 .gctx-bar { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 8px 10px 8px 12px; border: 0; border-radius: 12px; background: transparent; color: var(--muted-foreground); text-align: left; font-size: 13px; line-height: 18px; box-shadow: 0 0 0 1px var(--line) inset; transition: background var(--dur-1), color var(--dur-1), box-shadow var(--dur-1); }

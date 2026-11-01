@@ -1,52 +1,29 @@
-/**
- * "NEXT FROM YOUR GRAPH" — the pure half of the home's suggestions (v4
- * redesign, owner-approved 2026-10-26): the cache record's shape, the
- * regeneration rule, the prompt built from the newest propositions, and
- * the reply parser. The CHEAP model slot writes three topics; the server
- * (src/server/suggestions.ts) owns the call, the cache file, and the
- * never-block kick.
- *
- * The prompt is server-owned operational framing (compaction's summarizer
- * precedent) — not a teaching-doctrine segment, so it lives here, not in
- * src/agent/prompts.
- *
- * Pure: no clock reads (callers pass `now`), no fs, no network. Not
- * re-exported through the core barrel — the shell reads the route's
- * payload (contracts/activity.ts SuggestionsResponse).
- */
-
 import type { CallUsage, GraphNode, Suggestion } from "./contracts.ts";
 import { localDateKey } from "./activity.ts";
 
-/** One generation attempt's spend (the money channel — success or
- *  failure, because money was spent either way). Append-only inside the
- *  cache record; dollars are inferred at read time like every channel. */
 export interface SuggestionRunUsage {
 	at: string;
-	/** provider-qualified ("provider:id") for the read-time catalog lookup. */
+	/** "provider:id". */
 	model: string;
 	steps: CallUsage[];
 	ok: boolean;
 }
 
-/** The cache record (config SUGGESTIONS_FILE). */
 export interface SuggestionsCache {
 	version: 1;
-	/** ISO of the last SUCCESSFUL generation; null before any. */
+	/** ISO time of the last successful generation; null before any. */
 	generatedAt: string | null;
 	suggestions: Suggestion[];
 	runs: SuggestionRunUsage[];
 }
 
-/** How many propositions feed the prompt (the newest). */
 export const SUGGESTION_CONTEXT_SIZE = 30;
 /** New propositions since the last generation that force a fresh one
  *  even on the same local day. */
 export const SUGGESTION_NEW_IDEAS_TRIGGER = 10;
-/** How many topics a generation keeps. */
 export const SUGGESTION_COUNT = 3;
 
-/** Distinct propositions (first ledger line per id defines), newest first. */
+/** First occurrence per id wins; newest createdAt first. */
 export function newestPropositions(nodes: readonly GraphNode[], limit = SUGGESTION_CONTEXT_SIZE): GraphNode[] {
 	const seen = new Set<string>();
 	const unique: GraphNode[] = [];
@@ -58,9 +35,6 @@ export function newestPropositions(nodes: readonly GraphNode[], limit = SUGGESTI
 	return unique.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0)).slice(0, limit);
 }
 
-/** The regeneration rule: nothing to suggest from → never; no successful
- *  generation yet → now; otherwise at most once per LOCAL day, or as soon
- *  as SUGGESTION_NEW_IDEAS_TRIGGER propositions landed since. */
 export function suggestionsStale(cache: SuggestionsCache | null, nodes: readonly GraphNode[], now: Date): boolean {
 	const props = newestPropositions(nodes, Number.POSITIVE_INFINITY);
 	if (props.length === 0) return false;
@@ -73,8 +47,6 @@ export function suggestionsStale(cache: SuggestionsCache | null, nodes: readonly
 export const SUGGESTIONS_SYSTEM_PROMPT =
 	"You suggest what a learner could study next. You receive the propositions most recently added to the learner's knowledge map and reply with exactly the JSON the instructions demand — nothing else, no preamble, no code fences.";
 
-/** The user prompt: the newest propositions (name: statement), then the
- *  output contract. */
 export function buildSuggestionsPrompt(props: readonly GraphNode[]): string {
 	return [
 		"The propositions most recently added to my knowledge map, newest first (name: statement):",
@@ -92,10 +64,7 @@ const REASON_MAX = 200;
 
 const cap = (s: string, max: number): string => (s.length <= max ? s : `${s.slice(0, max - 1).trimEnd()}…`);
 
-/** Parse the model's reply: the first JSON array in the text (fences and
- *  stray prose tolerated), entries with non-empty string title + reason,
- *  trimmed and capped, at most SUGGESTION_COUNT. [] when nothing parses —
- *  the caller treats that as a failed generation. */
+/** [] when nothing parses; the caller treats that as a failed generation. */
 export function parseSuggestions(text: string): Suggestion[] {
 	const start = text.indexOf("[");
 	const end = text.lastIndexOf("]");
@@ -119,8 +88,6 @@ export function parseSuggestions(text: string): Suggestion[] {
 	return out;
 }
 
-/** Lenient read of a cache record off disk: wrong shapes degrade to null
- *  (a fresh generation), bad entries drop. Never throws. */
 export function sanitizeSuggestionsCache(raw: unknown): SuggestionsCache | null {
 	if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
 	const r = raw as Record<string, unknown>;

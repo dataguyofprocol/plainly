@@ -1,23 +1,5 @@
 "use client";
 
-/**
- * THE DOCKS (v4 rebuild, 2026-10-26) — the right-hand column of a session,
- * as Lesson4 and Practice4 draw it. Always present: on narrow windows the
- * artboards' own breakpoint stacks it under the reading column.
- *
- *   LessonPanel   Prediction / Check / Question — the open question (the
- *                 QuestionDock form); a teach-phase check still waits behind
- *                 its reveal card so the learner reads the step first, with
- *                 the thinking-while-reading field under it.
- *                 Path — the plan as POSITION (visited / current / upcoming,
- *                 never mastery: statuses derive from which node the latest
- *                 check was ABOUT), with the map.
- *                 Helpers — this lesson's sub-agents and its numbers: time,
- *                 answers, context, tokens, cost.
- *   PracticePanel Your working — the field, how sure, the hint ladder
- *                 (Nudge → Bigger hint → First step), submit; then the set.
- */
-
 import { useContext, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { MessageResponse } from "@/components/ai-elements/message";
 import { DictationErrorLine, DictationMic, finishDictation, useDictationState, useDictationTarget, joinDictation } from "@/components/dictation";
@@ -49,12 +31,6 @@ import {
 	type TurnUsage,
 } from "@/src/core";
 
-/**
- * How a teach-phase question arrives (owner ruling, 2026-09-25): behind its
- * reveal card when it follows the composer — the learner reads the
- * teaching first — but OPEN when it follows another question (a queued
- * parallel check): the reading already happened. Pure for tests.
- */
 export function revealArrival(wasQuestion: boolean): { expanded: boolean; revealed: boolean } {
 	return wasQuestion ? { expanded: true, revealed: true } : { expanded: false, revealed: false };
 }
@@ -69,12 +45,9 @@ export interface PlanProgress {
 	steps: PlanStep[];
 	visited: number;
 	total: number;
-	/** 1-based position of the current step in the list; null before any check. */
 	currentIndex: number | null;
 }
 
-/** Pure: the plan as an ordered list with derived statuses. Exported for
- *  tests and for the header's step ticks. */
 export function planProgress(tree: PlanTree | null, messages: readonly PopupMessage[]): PlanProgress | null {
 	if (!tree || tree.nodes.length === 0) return null;
 	const statuses = derivePlanStatuses(tree, messages as Parameters<typeof derivePlanStatuses>[1]);
@@ -106,8 +79,6 @@ const JOB_ICON: Record<JobRecord["kind"], IconName> = {
 	pdf: "pdf",
 };
 
-/** The question tab's name — what kind of question waits (Lesson4 calls a
- *  predict-type check "Prediction"). */
 function questionTabLabel(pending: Pending | null): string {
 	if (!pending) return "Question";
 	const type = (pending.input as { type?: unknown } | undefined)?.type;
@@ -116,8 +87,6 @@ function questionTabLabel(pending: Pending | null): string {
 	return "Question";
 }
 
-/** The last answered question in the transcript (the dock shows it while
- *  the tutor replies). */
 function lastAnswer(messages: readonly PopupMessage[]): QuestionAnswerData | null {
 	for (let i = messages.length - 1; i >= 0; i--) {
 		const parts = messages[i]!.parts;
@@ -131,9 +100,6 @@ function lastAnswer(messages: readonly PopupMessage[]): QuestionAnswerData | nul
 	return null;
 }
 
-/** Pure: the lesson's cost, honestly (the money-channel doctrine the stats
- *  bar carried): dollars only when at least one turn priced, subscription
- *  use named by its provider, never a fake $0. Exported for tests. */
 export function lessonCostLabel(turns: readonly TurnUsage[], pricing: SessionPricing | undefined): string {
 	const { cost = 0, unpriced = turns.length, subscription = 0 } = pricing ?? {};
 	const priced = turns.length - unpriced - subscription;
@@ -183,11 +149,8 @@ export function LessonPanel({
 	const jobs = useContext(JobsContext);
 	const progress = useMemo(() => planProgress(latestTree(messages), messages), [messages]);
 	const [tab, setTab] = useState<Tab>("question");
-	// The learner chose a tab since the dock last moved on its own — the
-	// resting rule below never overrides a deliberate pick.
 	const [picked, setPicked] = useState(false);
 
-	// Reveal state per question (the W5 rule, unchanged).
 	const pendingId = pending?.toolCallId ?? null;
 	const [revealed, setRevealed] = useState(!requiresReveal);
 	const prevPendingRef = useRef(pendingId);
@@ -202,12 +165,6 @@ export function LessonPanel({
 	}
 	const revealPending = !!pending && requiresReveal && !revealed;
 
-	// THE RESTING TAB (PM, finesse pass 2026-10-26): with no question
-	// pending and the tutor not mid-reply, the dock rests on Path — an empty
-	// question tab is not a place to open on. Without a plan the question
-	// tab keeps the spot (its resting state says what comes next). While
-	// the tutor replies to an answer, the question tab stays put so the
-	// learner sees their answer land.
 	const restTab: Tab | null = !pending && !busy ? (progress ? "path" : "question") : null;
 	const [prevRestTab, setPrevRestTab] = useState<Tab | null>(null);
 	if (restTab !== prevRestTab) {
@@ -215,9 +172,6 @@ export function LessonPanel({
 		if (restTab && !picked) setTab(restTab);
 	}
 
-	// A question just landed: ring the dock (a few seconds — the CSS runs
-	// three pulses), and if the window isn't in front, a system
-	// notification says it's the learner's turn.
 	const [attn, setAttn] = useState(false);
 	useEffect(() => {
 		if (!pendingId) return;
@@ -228,9 +182,6 @@ export function LessonPanel({
 		// fire once per question
 	}, [pendingId]);
 
-	// The transcript's "your turn" card asks the dock to take focus: open
-	// the question tab, reveal a waiting check (the click is the learner's
-	// "I've read it"), and put the walk on the first row.
 	useEffect(() => {
 		const on = () => {
 			setTab("question");
@@ -243,9 +194,6 @@ export function LessonPanel({
 		return () => window.removeEventListener("lh:focus-question", on);
 	}, []);
 
-	// ENTER OPENS THE WAITING CHECK: with the check behind its card and
-	// plain focus, Enter finishes any dictation first (the flush lands in
-	// the reading-thinking field), then reveals.
 	useEffect(() => {
 		if (!revealPending) return;
 		const onKeyDown = (e: KeyboardEvent) => {
@@ -376,8 +324,6 @@ export function LessonPanel({
 	);
 }
 
-/** The question tab at rest: the last answer, compact, and what comes
- *  next — the tutor replying, or where the next check will land. */
 function QuestionRest({ answered, busy, phase }: { answered: QuestionAnswerData | null; busy: boolean; phase: "probe" | "plan" | "teach" }) {
 	const conf = answered?.confidence !== undefined ? nearestLevel(answered.confidence) : null;
 	const confColor = conf ? CONFIDENCE_LEVEL_COLORS[conf.value] : undefined;
@@ -431,11 +377,8 @@ function QuestionRest({ answered, busy, phase }: { answered: QuestionAnswerData 
 	);
 }
 
-/** Path: where you are in the plan — a vertical stepper (visited / current
- *  / upcoming are POSITION, never mastery), with the map one click away. */
 function PathSteps({ progress, onOpenPlan }: { progress: PlanProgress; onOpenPlan: () => void }) {
 	const currentRef = useRef<HTMLLIElement>(null);
-	// Long plans: open with the current step in view.
 	useEffect(() => {
 		currentRef.current?.scrollIntoView({ block: "nearest" });
 	}, []);
@@ -473,9 +416,6 @@ function PathSteps({ progress, onOpenPlan }: { progress: PlanProgress; onOpenPla
 	);
 }
 
-/** The "your turn" system notification — only when the window isn't in
- *  front (in-app, the dock's ring says it). Permission is asked once,
- *  the first time it would be useful; Electron grants it for the app. */
 function notifyYourTurn(pending: Pending | null): void {
 	if (!pending || typeof window === "undefined" || !("Notification" in window)) return;
 	if (document.visibilityState === "visible" && document.hasFocus()) return;
@@ -501,8 +441,6 @@ function elapsed(iso: string): string {
 	return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min`;
 }
 
-/** Helpers' "This lesson" block (Lesson4): time, answers, context, tokens,
- *  cost — a stat list, the context meter against the model's window. */
 function LessonNumbers({ chatId, turns, contextTokens, pricing }: { chatId: string; turns: TurnUsage[]; contextTokens: number | null; pricing?: SessionPricing }) {
 	const chats = useChats();
 	const me = chats?.find((c) => c.id === chatId);
@@ -540,20 +478,11 @@ function LessonNumbers({ chatId, turns, contextTokens, pricing }: { chatId: stri
 	);
 }
 
-// ─── Practice ───────────────────────────────────────────────────────────────
-
 export interface SetProblem {
 	id: string;
-	/** The conclude's outcome once the problem is closed; null while open. */
 	outcome: string | null;
 }
 
-/** Pure: the practice set so far, from the transcript — each settled
- *  `problem` call opens an entry, each acknowledged `conclude` closes the
- *  latest open one with its outcome. A problem's ack carries no payload,
- *  so the view keeps a settled pose at input-available (view.ts, the
- *  placeholder fork); errored and still-streaming calls count for nothing.
- *  Exported for tests and the header. */
 export function practiceSet(messages: readonly PopupMessage[]): SetProblem[] {
 	const set: SetProblem[] = [];
 	for (const m of messages) {
@@ -572,8 +501,6 @@ export function practiceSet(messages: readonly PopupMessage[]): SetProblem[] {
 }
 
 
-/** A set row's status: its label and pill tone (Practice marks wear the
- *  warm --practice; the problem being worked is the brand's "current"). */
 function setStatus(p: SetProblem | undefined): { label: string; tone: string } | null {
 	if (!p) return null;
 	if (p.outcome === null) return { label: "Working", tone: "brand" };
@@ -583,8 +510,6 @@ function setStatus(p: SetProblem | undefined): { label: string; tone: string } |
 	return { label: "Moved on", tone: "muted" };
 }
 
-/** Hints the learner asked for on one problem, read off the view's
- *  practice-thinking parts (each carries its rung when it was a hint). */
 function hintsOn(messages: readonly PopupMessage[], problemId: string): number {
 	let n = 0;
 	for (const m of messages)
@@ -599,16 +524,9 @@ function hintsOn(messages: readonly PopupMessage[], problemId: string): number {
 export interface OpenedHint {
 	rung: HintRung;
 	label: string;
-	/** The tutor's reply to the request (its plain text), or null while it
-	 *  hasn't arrived yet. */
 	text: string | null;
 }
 
-/** Pure: the hints opened on one problem, each paired with the tutor's
- *  reply. A hint request is a practice-thinking marker carrying a rung; the
- *  hint itself is the text of the assistant message(s) that follow it, up
- *  to the learner's next message. Thinking and tool parts are skipped.
- *  Exported for tests. */
 export function practiceHints(messages: readonly PopupMessage[], problemId: string): OpenedHint[] {
 	const out: OpenedHint[] = [];
 	let open: OpenedHint | null = null;
@@ -637,10 +555,6 @@ export function practiceHints(messages: readonly PopupMessage[], problemId: stri
 	return out;
 }
 
-/** Pure: the indices of assistant messages that answer a hint request (any
- *  problem) — the same walk as practiceHints(). Hints live in the panel,
- *  so the transcript folds these replies' text and thinking. Exported for
- *  tests. */
 export function hintReplyIndices(messages: readonly PopupMessage[]): Set<number> {
 	const out = new Set<number>();
 	let open = false;
@@ -660,8 +574,6 @@ export function hintReplyIndices(messages: readonly PopupMessage[]): Set<number>
 
 const HINT_ASK: Record<HintRung, string> = { 1: "Show a nudge", 2: "Show a bigger hint", 3: "Show the first step" };
 
-/** One opened hint: a quiet card. The newest is open; an older one folds
- *  to its first line until "Show" (owner, 2026-10-27). Exported for tests. */
 export function HintCard({ hint, latest }: { hint: OpenedHint; latest: boolean }) {
 	const [expanded, setExpanded] = useState(false);
 	const open = latest || expanded;
@@ -689,7 +601,6 @@ export function HintCard({ hint, latest }: { hint: OpenedHint; latest: boolean }
 	);
 }
 
-/** Pure: the set footer's square for one problem slot. */
 function slotOf(p: SetProblem | undefined): { cls: string; title: string } {
 	if (!p) return { cls: "next", title: "Not started" };
 	if (p.outcome === null) return { cls: "now", title: "Working on it" };
@@ -698,14 +609,6 @@ function slotOf(p: SetProblem | undefined): { cls: string; title: string } {
 	return { cls: "miss", title: p.outcome === "dismissed" ? "Skipped" : "Moved on" };
 }
 
-/**
- * THE PRACTICE DOCK (Practice4): your working for the open problem — the
- * field (with dictation), how sure, the hint ladder, submit — and then the
- * set. A hint request rides the thinking lane with its rung (the server
- * makes the request explicit to the agent; the doctrine's ladder decides
- * what the hint says). Between problems the working gives way to a
- * compact outcome card, with the set right under it.
- */
 export function PracticePanel({
 	messages,
 	practice,
@@ -734,7 +637,6 @@ export function PracticePanel({
 	const isTarget = useDictationTarget((t: string) => setText(joinDictation(draftRef.current, t)), !!practice);
 	const dictationPhase = useDictationState().phase;
 	const dictating = isTarget && dictationPhase !== "idle";
-	// A new problem starts clean.
 	const problemId = practice?.toolCallId ?? null;
 	useEffect(() => {
 		setText("");
@@ -763,7 +665,6 @@ export function PracticePanel({
 	const hints = useMemo(() => (problemId ? practiceHints(messages, problemId) : []), [messages, problemId]);
 	const last = set.at(-1);
 	const lastStatus = setStatus(last);
-	// The set's window: the latest five (a second set starts a fresh list).
 	const base = Math.floor(Math.max(0, set.length - 1) / PRACTICE_SET_SIZE) * PRACTICE_SET_SIZE;
 
 	return (
@@ -875,32 +776,14 @@ export function PracticePanel({
 	);
 }
 
-// ─── The reading fold (Lesson4) ─────────────────────────────────────────────
-
 export interface StepFold {
-	/** The message index where the current step begins. */
 	startIndex: number;
-	/** The part index inside messages[startIndex] where it begins: one
-	 *  teacher run can hold checks on several nodes (answers are toolResults,
-	 *  so they never break the group), and the step starts mid-group. */
 	startPart: number;
-	/** Steps folded above it (the bar reads "Steps 1–n"). */
 	steps: number;
-	/** Graded check answers before it: total, and right first time. */
 	answers: { total: number; firstTry: number };
 	heading: { number: number; title: string } | null;
 }
 
-/** Pure: Lesson4's reading mode — only the current step stays on the page.
- *  The current step starts right after the last check PART tagged to a
- *  DIFFERENT plan node (the teaching for the new node follows it) — a part,
- *  not a message: a message-level cut folded a whole group that moved on to
- *  the new node mid-run, leaving the step page empty (the poker session,
- *  2026-10-31). Everything before folds into the "Steps 1–n" bar. Null before the plan
- *  places the learner anywhere (the check-in reads in full). A question can
- *  be answered once in this app, so "right first time" is the correct count
- *  (dismissals excluded, "I don't know" counted as not right). Exported for
- *  tests. */
 export function stepFold(messages: readonly PopupMessage[], progress: PlanProgress | null): StepFold | null {
 	if (!progress || progress.currentIndex === null) return null;
 	const current = progress.steps[progress.currentIndex - 1]!;
@@ -912,8 +795,6 @@ export function stepFold(messages: readonly PopupMessage[], progress: PlanProgre
 			if (part.type !== "tool-quiz" && part.type !== "tool-explain") return;
 			const node = (part.input as { nodeId?: unknown } | undefined)?.nodeId;
 			if (typeof node !== "string" || !ids.has(node) || node === current.id) return;
-			// The step starts at the next part, or the next message when this
-			// check closes its group.
 			[startIndex, startPart] = p + 1 < m.parts.length ? [i, p + 1] : [i + 1, 0];
 		});
 	});

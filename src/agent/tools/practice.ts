@@ -1,19 +1,3 @@
-/**
- * THE PRACTICE TOOLS (practice sessions, owner design 2026-10-04): the
- * practice agent's ENTIRE toolset — `problem` (pose: terminates the turn;
- * the commitment rides the call's arguments, hidden from the learner UI)
- * and `conclude` (end the problem: normal result, the turn continues so
- * the same reply can reveal + pose the next). The gating law (owner
- * ruling): an agent cannot pose while a problem is active and cannot
- * conclude with nothing active — activeProblemOf is the single fold both
- * gates read.
- *
- * Mechanics-only descriptions (the doctrine ruling, 2026-10-04): the tool
- * descriptions carry WHAT to pass and WHAT happens — the theory, the
- * commit-before-pose law, the hint ladder all live in the system prompt
- * (prompts/practice/10-doctrine.md).
- */
-
 import { Type, type Static } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { resolveTargetId } from "../../core/chains.ts";
@@ -28,46 +12,22 @@ import type { LhMessage } from "../../core/native-messages.ts";
 import { concludeResult, invalidInputResult, problemResult } from "../tool-execute.ts";
 import { healEncodedArguments, healToolRecord } from "./heal.ts";
 
-
-/** The record-reading context the gates need (the plan-tools idiom). */
 export interface PracticeToolContext {
 	chatId: string;
 	chatStore: { getChat(id: string): { messages: LhMessage[]; kind?: string } | null };
-	/** The WHOLE-graph node list, read fresh per pose (owner round 9 — the
-	 *  mastery-trace contract): targets validate against every proposition,
-	 *  not just the session's picks, so pickless sessions and future
-	 *  graph-tools poses stay valid. Absent (tests) = no validation. */
 	graphNodes?: () => ReadonlyArray<Pick<import("../../core/contracts/graph.ts").GraphNode, "id" | "name">>;
-	/** THE RARELY-NEEDED SET (owner round 10, 2026-10-05): the map readers
-	 *  behind the SAME settings gate as the prober's (graphToolsEnabled at
-	 *  the composition root); the research + pdf jobs (both keyless).
-	 *  Each absent context (tests) = absent from the registry. */
 	graph?: GraphToolContext;
 	jobs?: JobToolContext;
 }
 
-/** TURN-SCOPED GATE STATE (the BKT incident, 2026-10-05): the gates used
- *  to read the STORED record — but the record freezes at the turn's
- *  write-ahead (persistTurn lands only at turn END), so a mid-turn
- *  conclude → pose pair could never see each other: every conclude
- *  succeeded against the stale record and every following pose died on
- *  "a problem is already active" until the model gave up ("the problem
- *  slot is stuck"). The gate seeds ONCE from the record at construction
- *  (one practiceTools per turn — chat-handler builds the agent per
- *  request, so there is no cross-turn leakage), and the executes flip
- *  this closure — the intra-turn truth the record cannot hold yet. */
 export interface PracticeGate {
 	problemActive: boolean;
 }
 
-/** Seed the turn's gate from the record (result-aware activeProblemOf —
- *  only a cleanly-posed problem counts). */
 export function createPracticeGate(ctx: PracticeToolContext): PracticeGate {
 	const record = ctx.chatStore.getChat(ctx.chatId);
 	return { problemActive: record ? activeProblemOf(record.messages) !== null : false };
 }
-
-// ─── problem: the pose ───────────────────────────────────────────────────────
 
 export const problemInputObject = Type.Object({
 	statement: Type.String({
@@ -110,12 +70,6 @@ export function problemTool(
 		executionMode: "sequential",
 		prepareArguments: (args: unknown) => {
 			const healed = healEncodedArguments(args, problemInputObject);
-			// TARGET NORMALIZATION (owner round 9): names silently become ids —
-			// the RECORD carries canonical ids (the mastery trace groups on
-			// them); unresolvable strings pass through for execute to reject.
-			// UNTAGGED PROBLEMS (owner round 12): an explicit empty list is
-			// the model saying "no targets" — healed AWAY, so the record's
-			// canonical form is tagged-or-absent, never [].
 			if (!graphNodes) {
 				const bare = (healed as { target?: unknown }).target;
 				return Array.isArray(bare) && bare.length === 0
@@ -139,12 +93,6 @@ export function problemTool(
 					"a problem is already active — call conclude on it before posing the next one",
 				]);
 			}
-			// TARGET VALIDATION (owner round 9, round 12): against the WHOLE
-			// graph, and ONLY when targets are present — absent means an
-			// untagged problem (topic sessions, owner round 12), which poses
-			// freely. A one-line rejection — the proposition list already
-			// sits in the agent's context (the [id] marker); no re-listing.
-			// The message teaches the exit: omitting always works.
 			if (graphNodes && input.target && input.target.length > 0) {
 				const list = graphNodes();
 				const unknown = input.target.filter((t) => resolveTargetId(t, list) === null);
@@ -159,8 +107,6 @@ export function problemTool(
 		},
 	};
 }
-
-// ─── conclude: the end of a problem ──────────────────────────────────────────
 
 export const concludeInputObject = Type.Object({
 	outcome: Type.Union(
@@ -219,22 +165,9 @@ export function concludeTool(gate: PracticeGate): AgentTool<typeof concludeInput
 	};
 }
 
-/** The practice toolset (the practice agent's whole registry). */
 export function practiceTools(ctx: PracticeToolContext): Record<string, AgentTool<any>> {
-	// ONE gate per turn, shared by both tools — the intra-turn truth.
 	const gate = createPracticeGate(ctx);
-	// THE RARELY-NEEDED SET (owner round 10): read/ls/find/grep over the
-	// learner's files (always — the same read-only set the teacher and
-	// prober carry), the research + pdf jobs (available without search
-	// keys; demo/visual stay teach-only), and
-	// the prober's map readers when the settings gate opened. None are
-	// toggle-filtered: problem/conclude are the session; these are
-	// exceptions the doctrine says to reach for rarely.
 	const jobs = ctx.jobs ? jobTools(ctx.jobs) : null;
-	// healToolRecord (owner, 2026-10-09 — the whitehead generalization):
-	// the standard argument heal over the WHOLE registry. problem/conclude
-	// keep their own (target-normalizing) prepareArguments as the composed
-	// inner pass; the double heal is idempotent by construction.
 	return healToolRecord({
 		problem: problemTool(gate, ctx.graphNodes),
 		conclude: concludeTool(gate),

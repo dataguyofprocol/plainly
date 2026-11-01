@@ -2,7 +2,6 @@
 
 import { useRef, useState } from "react";
 
-// Transport-only types: never import the server's extraction/agent module here.
 export interface NotesImportResult {
 	requestIndex: number;
 	filePath: string;
@@ -16,8 +15,6 @@ export interface NotesImportResult {
 	slots?: string[];
 }
 
-/** Validate the entire response before applying any row: a malformed index
- * must never attribute another file's success to this file (same names included). */
 export function parseNotesImportResults(body: unknown, files: readonly File[]): NotesImportResult[] {
 	const invalid = () => new Error("Invalid import response. Please retry the file.");
 	if (!body || typeof body !== "object" || !("results" in body) || !Array.isArray(body.results) || body.results.length !== files.length) throw invalid();
@@ -51,7 +48,6 @@ export async function postNotesImport(files: readonly File[]): Promise<NotesImpo
 	return parseNotesImportResults(body, files);
 }
 
-/** Only error text survives a request; selected Files stay request-local. */
 export function useNotesImport(callbacks: { onStart?: () => void; onFinish?: () => void } = {}) {
 	const [errors, setErrors] = useState<string[]>([]);
 	const [importing, setImporting] = useState(false);

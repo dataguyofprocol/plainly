@@ -40,7 +40,6 @@ export function useBackdropDismiss(onDismiss: () => void) {
 			gesture.current = null;
 			if (press?.released && press.backdrop === event.currentTarget &&
 				event.button === 0 && event.target === event.currentTarget) {
-				// This render's callback preserves current busy guards and props.
 				onDismiss();
 			}
 		},

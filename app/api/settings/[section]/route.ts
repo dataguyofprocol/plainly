@@ -1,31 +1,10 @@
 /**
- * PUT /api/settings/[section] — section-scoped record writes
- * (settings-storage wave, 2026-09-19). One PUT replaces ONE section
- * replace-whole (absent fields = absent overrides — the house settings
- * discipline, same as the per-chat route); sections are
- * independent, so partial writes can never clobber each other.
- *
- *   section ∈ general | chat | agent | appearance | graph | compaction
- *   Body: the complete desired section object. Parse + validate strictly
- *   (server/settings-body.ts): a bad shape/type is a 400 carrying the
- *   supported list where one exists. The chat and models sections
- *   additionally pass the catalog gate (validateChatSettings /
- *   validateModelsSettings — unknown provider/model = 400). Thinking
- *   levels never reject a write (owner, interlude 2026-09-22): a pinned
- *   level CLAMPS to the named model's nearest supported level and the
- *   clamped value is stored — model swaps just work. The agent section additionally validates prompt
- *   switches — under the orphan-heal contract (interlude 2026-09-26): an
- *   ON switch with its override file present is valid as-is; an ON whose
- *   file is gone (deleted outside the app, a disk wipe, or a record from
- *   before the delete-clears-switch fix) is an ORPHAN and is healed to
- *   OFF (the key drops) inside the same write — never a 400. Invariant:
- *   a user can never get stuck unable to write settings, and switch
- *   state never contradicts file reality for long (the delete route
- *   clears the switch by construction; this is the backstop).
- *
- * The static sibling (prompts) takes precedence over this
- * dynamic segment — Next resolves static routes first, so "prompts" never
- * lands here.
+ * PUT /api/settings/[section]: the body replaces that one section whole;
+ * other sections are untouched. 404 unknown section. 400 for a bad shape,
+ * or for an unknown provider/model in the chat or models section. A pinned
+ * thinking level clamps to the model's nearest supported level. In the
+ * agent section, an ON prompt switch whose override file is gone is
+ * dropped, not rejected.
  */
 
 import type { AgentSettings, ChatSettings, ModelsSettings } from "@/src/core";
@@ -45,7 +24,6 @@ import {
 
 export const dynamic = "force-dynamic";
 
-/** One parser, result type erased to the common envelope. */
 type AnySectionParser = (body: unknown) => SettingsBodyResult<unknown>;
 
 export async function PUT(request: Request, ctx: { params: Promise<{ section: string }> }) {
@@ -64,17 +42,12 @@ export async function PUT(request: Request, ctx: { params: Promise<{ section: st
 	}
 	let agentHealed: AgentSettings | undefined;
 
-	// Section-specific cross-validation (against the catalog / the prompt
-	// store) — the parsers only see shapes.
 	if (section === "chat") {
 		const verdict = validateChatSettings(parsed.settings as ChatSettings);
 		if (!verdict.ok) {
 			return Response.json({ error: verdict.error, supported: verdict.supported }, { status: 400 });
 		}
 	}
-	// Model slots wave (2026-09-20): the models section gets the same
-	// catalog gate the chat section gets — a slot must name a real
-	// provider+model and a thinking level it supports.
 	if (section === "models") {
 		const verdict = validateModelsSettings(parsed.settings as ModelsSettings);
 		if (!verdict.ok) {
@@ -82,12 +55,6 @@ export async function PUT(request: Request, ctx: { params: Promise<{ section: st
 		}
 	}
 	if (section === "agent") {
-		// Orphan-heal (contract fix, interlude 2026-09-26): an ON switch
-		// whose override file is gone (or whose segment left the source
-		// tree) is healed to OFF (key dropped) inside this write — never a
-		// 400. The old 400 trapped users: the record's own orphaned ON was
-		// mirrored back by every write while the disabled toggle couldn't
-		// reach the OFF escape hatch. An ON with a real file stays valid.
 		const agent = parsed.settings as AgentSettings;
 		const segments = new Set(allSegmentPaths());
 		const orphans: string[] = [];
@@ -102,16 +69,6 @@ export async function PUT(request: Request, ctx: { params: Promise<{ section: st
 		}
 	}
 
-	// Clamp-on-write (owner ruling, interlude 2026-09-22): a model swap
-	// with a pinned thinking level NEVER errors — the pin clamps to the
-	// new model's nearest supported level (pi's nearest-clamp, the same
-	// translation piEngineForSpec applies at runtime) and the clamped
-	// value is what lands in the record. The chat section's bare levels
-	// clamp against the record's resolved strong slot (the chain's
-	// fallback); the models section's slots each carry their own model.
-	// The agent section lands HEALED when orphaned prompt switches were
-	// found above (the healed copy) — after every write the record and
-	// file reality agree.
 	const sectionOut =
 		section === "chat"
 			? clampChatLevel(parsed.settings as ChatSettings, effectiveSettings().models.strong)
@@ -121,8 +78,6 @@ export async function PUT(request: Request, ctx: { params: Promise<{ section: st
 					? agentHealed
 					: parsed.settings;
 
-	// Read-modify-write ONE section of the record; everything else rides
-	// along untouched (other sections, unknown keys — sanitize preserves).
 	const record = readSettingsRecord() ?? { version: 1 };
 	const next = { ...record, [section]: sectionOut };
 	writeSettingsRecord(next);

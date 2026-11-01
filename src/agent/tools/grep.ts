@@ -16,17 +16,6 @@ import {
 	WALK_TIMEOUT_MS,
 } from "./fs-shared.ts";
 
-/**
- * The grep tool — sources v1 (2026-09-19): pi's dist/core/tools/grep.js
- * ported to a pure-Node scan (pi shells out to rg). Schemas and output
- * formats are pi-verbatim — `relative/path:LINE: text` matches,
- * `relative/path-LINE- text` context lines, the 500-char line cap, the
- * "use read to see full lines" notice. Deltas: home-anchored default,
- * .gitignore replaced by hard noise exclusions, binary detection via NUL
- * sniff, a 2MB file cap, and a wall-clock timeout with partial results.
- * Read-only by construction.
- */
-
 const DEFAULT_LIMIT = 100;
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 
@@ -70,7 +59,6 @@ export const grepTool: AgentTool<typeof grepInput> = {
 		const contextValue = input.context && input.context > 0 ? input.context : 0;
 		const effectiveLimit = Math.max(1, input.limit ?? DEFAULT_LIMIT);
 
-		// Files to scan: one explicit file, or the walked tree (glob-filtered).
 		const files: string[] = [];
 		let timedOut = false;
 		let aborted = false;
@@ -97,10 +85,6 @@ export const grepTool: AgentTool<typeof grepInput> = {
 		let matchCount = 0;
 		let limitReached = false;
 		let linesTruncated = false;
-		// The scan phase is bounded too (2026-09-19): the walk's 10s deadline
-		// bounds COLLECTION, but reading every collected file was unbounded —
-		// the grep that outlived its turn by minutes. Same budget, checked per
-		// file; abort lands mid-scan with partial results.
 		const scanDeadline = Date.now() + WALK_TIMEOUT_MS;
 		let scanTimedOut = false;
 
@@ -123,7 +107,7 @@ export const grepTool: AgentTool<typeof grepInput> = {
 			} catch {
 				continue;
 			}
-			if (fileStat.size > MAX_FILE_BYTES) continue; // rg-style silent skip of huge files
+			if (fileStat.size > MAX_FILE_BYTES) continue;
 			if (await isBinaryFile(filePath).catch(() => true)) continue;
 
 			let content: string;
@@ -149,7 +133,6 @@ export const grepTool: AgentTool<typeof grepInput> = {
 					for (let current = start; current <= end; current++) {
 						const { text, wasTruncated } = truncateGrepLine(lines[current - 1] ?? "");
 						if (wasTruncated) linesTruncated = true;
-						// pi's format: ':' for match lines, '-' for context lines.
 						outLines.push(current === i + 1 ? `${rel}:${current}: ${text}` : `${rel}-${current}- ${text}`);
 					}
 				}

@@ -1,9 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { desktopAPIAuthorized } from "./src/server/desktop-access.ts";
 
-/** Applies to every API method, including SSE and spending/settings routes.
- * No public callback or worker bypass: internal jobs call server functions,
- * and any legitimate self-HTTP request must carry the private capability. */
+/** Every /api request must carry the desktop capability; there is no bypass. */
 export function proxy(request: NextRequest) {
 	if (!desktopAPIAuthorized(request.headers)) {
 		return NextResponse.json(

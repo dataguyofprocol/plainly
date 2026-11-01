@@ -104,7 +104,6 @@ export function subscriptionScope(providerId: NativeSubscriptionProviderId, sele
 export function subscriptionScopeCurrent(scope: NativeSubscriptionScope): boolean {
 	try { return JSON.stringify(subscriptionScope(scope.providerId, scope.selectedModelId)) === JSON.stringify(scope); } catch { return false; }
 }
-/** Compatibility shape for the shared admission cycle; accountId is a local connection ID here. */
 export function subscriptionAdmissionScope(scope: NativeSubscriptionScope): AdmissionScope {
 	return { accountId: scope.connectionId, epoch: scope.epoch, authorityRevision: scope.authorityRevision, selectedModelId: scope.selectedModelId };
 }

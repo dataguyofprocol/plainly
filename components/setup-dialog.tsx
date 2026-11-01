@@ -1,36 +1,4 @@
 "use client";
-/**
- * The first-run setup flow (model-slots wave, 2026-09-20, owner design
- * "A — composer CTA + send interception"): chats cannot start until the
- * user has picked all three model slots — there are no defaults for 33
- * providers. The graph view's new-session dock (the app's home, where
- * chats start) shows a "Set up your models" CTA while unconfigured;
- * submitting a topic — or sending on /chat/new — opens THIS dialog with
- * the draft preserved; Save stores the slots — the draft WAITS in the
- * composer, the learner sends it themselves (owner ruling 2026-10-09:
- * saving models must never send the message).
- *
- * STAGED BY DEPENDENCY (owner, 2026-09-20: "first keys, then models —
- * there's no point presenting the model picker before the user has set a
- * key because there are no models to pick then"):
- *   Stage 1 — no keyed provider: a SELF-CONTAINED first-key screen
- *     (zero-keys wave, owner 2026-09-25): provider picker + one key
- *     input + save via PUT /api/keys/:id. The dialog STAYS MOUNTED —
- *     saving dispatches the "keys" signal, the fetch effect re-runs on
- *     it, and the stage flips to the pickers on its own. No Settings
- *     round-trip anymore; the draft lives in the caller's state,
- *     untouched throughout.
- *   Stage 2 — Strong → Cheap → Vision pickers over the FEDERATED catalog
- *     (keyed providers only), the vision slot filtered to image-capable
- *     models, in the app's shared dropdown language (ModelMenuList).
- *     All three required (owner: no skip, no defaults); Save PUTs the
- *     models section and reports onDone(models).
- *
- * Closable without configuring (Esc/backdrop/✕) — browsing the app stays
- * possible; the GATE is the send interception, not the dialog. The
- * settings-dialog visual language: dim backdrop, border rounded-md card,
- * CMU title, z-50.
- */
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -53,8 +21,6 @@ import { SelectTrigger } from "@/components/settings/controls";
 import { Icon } from "@/components/ui/icon";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 
-/** The pickers' slot identity — same roster language as the Agent
- *  section's slot rows. */
 const SLOT_META: Record<ModelSlotName, { label: string; roster: string }> = {
 	strong: { label: "Main model", roster: "Teaches your lessons" },
 	cheap: { label: "Helper model", roster: "Researches, builds demos, grades answers" },
@@ -62,30 +28,19 @@ const SLOT_META: Record<ModelSlotName, { label: string; roster: string }> = {
 };
 const SLOT_ORDER: readonly ModelSlotName[] = ["strong", "cheap", "vision"];
 
-/** The GET /api/models response fields the flow consumes. */
 interface ModelsBody {
 	models: ModelCatalogEntry[];
 	providers: { id: string; keyPresent: boolean }[];
-	/** The three tiers' RESOLVED pins (BYOK: NULL per unset tier) — the
-	 *  PREFILL + "needed" marks (owner, 2026-09-22): pinned tiers open
-	 *  with their pick, unpinned tiers carry the mark. */
 	slots?: Record<ModelSlotName, { model: { provider: string; id: string }; thinkingLevel?: ThinkingLevel } | null>;
 }
 
-/** Pure: which stage the flow opens at — no keyed provider = keys first
- *  (owner's dependency ordering). Exported for tests. */
 export function setupStage(
 	providers: { id: string; keyPresent: boolean }[] | null,
 ): "keys" | "pickers" {
-	if (providers === null) return "keys"; // fetch failed → the honest fallback
+	if (providers === null) return "keys";
 	return providers.some((p) => p.keyPresent) ? "pickers" : "keys";
 }
 
-/** Prefill (owner, BYOK wave 2026-09-22): each pinned tier opens with its
- *  pick — matched in the FEDERATED catalog (a lapsed key's pin does not
- *  prefill); unpinned tiers stay empty and carry the "needed" mark.
- *  First-run = nothing pinned → all three empty + marked. Exported pure
- *  for tests. */
 export function prefillFromSlots(
 	models: ModelCatalogEntry[],
 	slots: Record<ModelSlotName, { model: { provider: string; id: string } } | null> | undefined,
@@ -101,11 +56,6 @@ export function prefillFromSlots(
 	return pre;
 }
 
-/** Level prefill (chunk 2): a pinned tier opens with its STORED level
- *  as-is (Save clamps server-side if the ladder lapsed), else the
- *  ordering's level for that model — the level a fresh pick would
- *  populate (owner: the ordering's only purpose is first assignment).
- *  Exported pure for tests. */
 export function prefillLevelFromPin(
 	entry: ModelCatalogEntry,
 	pin: { thinkingLevel?: ThinkingLevel } | null | undefined,
@@ -113,17 +63,11 @@ export function prefillLevelFromPin(
 	return populateLevel(pin?.thinkingLevel, entry.supportedLevels);
 }
 
-/** Stage 1's pure body — exported for SSR pins. The connect screen
- *  (v4, 2026-10-26: featured chips + "more" + OpenAI-compatible), with
- *  subscriptions as the secondary route below it. */
 export function SetupKeysBody({
 	providers,
 	connected,
 }: {
-	/** The full provider roster (GET /api/keys providers) — undefined
-	 *  while it loads. */
 	providers: ProviderKeyInfo[] | undefined;
-	/** Provider ids that already have a key. */
 	connected: readonly string[];
 }) {
 	return (
@@ -140,10 +84,7 @@ export function SetupKeysBody({
 export function SetupDialog({
 	open,
 	onClose,
-	/** Saved: the models section landed; the caller marks configured (the
-	 *  draft stays put — save never sends). */
 	onDone,
-	/** Open on the connect screen even when a provider is keyed. */
 	connect = false,
 }: {
 	open: boolean;
@@ -155,24 +96,14 @@ export function SetupDialog({
 	const [body, setBody] = useState<ModelsBody | null>(null);
 	const [failed, setFailed] = useState(false);
 	const [picked, setPicked] = useState<Partial<Record<ModelSlotName, ModelCatalogEntry>>>({});
-	/** Per-slot thinking level (chunk 2): populated from the ordering on
-	 *  every fresh model pick, editable — an explicit pick always wins. */
 	const [levels, setLevels] = useState<Partial<Record<ModelSlotName, ThinkingLevel>>>({});
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [openMenu, setOpenMenu] = useState<{ slot: ModelSlotName; kind: "model" | "thinking" } | null>(null);
-	// Stage 1's provider roster (the connect screen owns its own form state).
 	const [keyProviders, setKeyProviders] = useState<ProviderKeyInfo[] | undefined>(undefined);
-	// "Connect another provider" from the pickers: back to stage 1 until
-	// the next key lands (the keys signal clears it).
 	const [addingProvider, setAddingProvider] = useState(false);
 
-	// The keys signal (zero-keys wave): keys-section saves/deletes AND
-	// THIS dialog's own first-key save dispatch it; the fetch effect below
-	// re-runs on it, so saving a key flips the stage to the pickers with
-	// the widened catalog — no restart, no Settings round-trip.
 	const [keysTick, setKeysTick] = useState(0);
-	// The success beat: a key just landed, so step 2 opens with a confirmation.
 	const [justConnected, setJustConnected] = useState(false);
 	useSettingsSaved((section) => {
 		if (section === "keys") {
@@ -182,8 +113,6 @@ export function SetupDialog({
 		}
 	});
 
-	// Fresh /api/models per open AND per keys change — a key saved a
-	// moment ago (stage 1's own screen) widens the pickers immediately.
 	useEffect(() => {
 		if (open) {
 			setAddingProvider(connect);
@@ -208,14 +137,8 @@ export function SetupDialog({
 				if (cancelled) return;
 				setBody(b);
 				setFailed(false);
-				// Prefill (owner, 2026-09-22): each pinned tier opens with its
-				// pick (matched in the FEDERATED catalog — a lapsed key's pin
-				// does not prefill); unpinned tiers stay empty and carry the
-				// "needed" mark. First-run = nothing pinned → all three marked.
 				const pre = prefillFromSlots(b.models, b.slots);
 				setPicked(pre);
-				// Levels prefill with the pins (chunk 2): stored level if still
-				// supported, else the ordering's level for the pinned model.
 				const preLevels: Partial<Record<ModelSlotName, ThinkingLevel>> = {};
 				for (const slot of SLOT_ORDER) {
 					const entry = pre[slot];
@@ -227,18 +150,10 @@ export function SetupDialog({
 		return () => { cancelled = true; };
 	}, [open, keysTick]);
 
-	// Esc + outside-click — layered dismissal, closable WITHOUT
-	// configuring (browsing stays possible; the gate is the send
-	// interception, not this dialog). An open slot menu eats Esc first
-	// (and any click outside it); only a bare Esc closes the dialog.
 	useEffect(() => {
 		if (!open) return;
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key !== "Escape") return;
-			// THE ONE-ESC LAW (owner, keyboard round 2026-10-06): claim at
-			// the document level before the layered dismissal — every branch
-			// below acts, so the window chain (dictation → abort) must
-			// never also fire. One Esc, one action.
 			e.preventDefault();
 			e.stopPropagation();
 			if (openMenu !== null) setOpenMenu(null);
@@ -405,10 +320,6 @@ export function SetupDialog({
 															effectiveProvider={entry?.provider}
 															onPick={(m) => {
 																setPicked((prev) => ({ ...prev, [slot]: m }));
-																// Auto-populate (chunk 2, owner: "populate
-																// everywhere"): no explicit level → the
-																// ordering's level for the fresh pick; an
-																// explicit one rides (Save clamps server-side).
 																setLevels((prev) => ({
 																	...prev,
 																	[slot]: populateLevel(prev[slot], m.supportedLevels),
@@ -419,8 +330,6 @@ export function SetupDialog({
 														/>
 													</MenuShell>
 												)}
-												{/* Thinking selector (chunk 2): editable, pre-populated from
-												    the ordering per picked model — no model, no levels. */}
 												<button
 													type="button"
 													aria-label={`${SLOT_META[slot].label} thinking`}

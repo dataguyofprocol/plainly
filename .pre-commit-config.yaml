@@ -26,8 +26,7 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-push]
-      # The rest mirrors ci.yml's Standalone job (mac-arm64 leg), in order,
-      # so a push is gated locally while GitHub CI is unavailable.
+      # The rest mirrors ci.yml's Standalone job (mac-arm64 leg), in order.
       - id: native-tests
         name: native renderer tests (Electron Node)
         entry: env NODE_ENV=test ELECTRON_RUN_AS_NODE=1 npx electron --import tsx --test tests/pdf-native-render.test.ts tests/pdf-ops.test.ts tests/svg-native-render.test.ts tests/browser-service.test.ts

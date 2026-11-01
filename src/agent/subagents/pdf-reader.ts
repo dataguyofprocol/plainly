@@ -8,21 +8,6 @@ import type { PdfResult, PdfToolInput } from "../../core/contracts.ts";
 import { getHeadless, type HeadlessApi } from "./headless.ts";
 import { pdfExtract, pdfInfo, pdfProbe, pdfSearch, type PdfSearchHit } from "./pdf-ops.ts";
 
-/**
- * The pdf-reader sub-agent (sources v0, 2026-09): reads a learner-provided
- * PDF on the teacher's behalf — a hand-rolled loop like the visual-maker's
- * (image-in-the-loop can't ride the execute-tool plumbing: rendered pages
- * are shown to THIS agent's eyes, never delivered onward — user-decided).
- *
- * System prompt = the pdf-reader skill's reading doctrine, verbatim in
- * strategy: triage with pdf_info FIRST, then size-based strategy — short
- * PDFs render all pages, medium render flagged (math/image-heavy) pages,
- * long ones search for targeted lookups before reading anything at length.
- *
- * Its final text IS the brief (researcher idiom), with (p. N) citations;
- * runPdfJob wraps it into PdfResult with pagesConsulted tracked by the loop.
- */
-
 const INSTRUCTIONS = `You are a PDF reading specialist. You work for a teacher agent inside a learning
 application: given a PDF path and a question, read the document on the teacher's behalf and
 produce a focused brief that the teacher can teach from, with page citations.
@@ -55,10 +40,7 @@ claim cited as (p. N). End with a line "Pages consulted: N, N, …" listing ever
 extracted or rendered.`;
 
 const MAX_ITERATIONS = 14;
-/** Rendered pages per pdf_render call — the skill renders selectively; a
- *  batch cap keeps one over-eager call from flooding the vision context. */
 const RENDER_BATCH_CAP = 6;
-/** Extract output ceiling — narrow the spec instead of dumping a book. */
 const EXTRACT_CAP = 24_000;
 
 export interface PdfReaderOptions {
@@ -68,19 +50,11 @@ export interface PdfReaderOptions {
 	onActivity?: (line: string) => void;
 	headless?: HeadlessApi;
 	maxIterations?: number;
-	/** Debug: raw provider-event recording key (LH_PROVIDER_EVENTS=1). */
 	chatId?: string;
 }
 
 export interface PdfReaderInput extends PdfToolInput {}
 
-/** The wire declarations (pi-ai Tool, TypeBox parameters). This loop owns
- *  execution itself — pdf_info/pdf_extract run via the plain pdfInfoText/
- *  pdfExtractText bodies below, pdf_search/pdf_render dispatch inline in
- *  the loop (search hits must join the citation set; renders feed the
- *  image-in-the-loop message) — so the declarations carry no execute.
- *  dpi/context_lines/literal carry the old zod `.default()`s as schema
- *  descriptions + loop-side ??-fills (the loop reads them via numOr). */
 export function createPdfTools(_pdfPath: string): Record<string, Tool> {
 	return {
 		pdf_info: {
@@ -120,7 +94,6 @@ export function createPdfTools(_pdfPath: string): Record<string, Tool> {
 	};
 }
 
-/** pdf_info's body (the loop's dispatch target): the triage readout. */
 async function pdfInfoText(pdfPath: string): Promise<string> {
 	const info = await pdfInfo(pdfPath);
 	const lines = [
@@ -134,7 +107,6 @@ async function pdfInfoText(pdfPath: string): Promise<string> {
 	return lines.join("\n");
 }
 
-/** pdf_extract's body: capped text extraction with the narrow-the-spec notice. */
 async function pdfExtractText(pdfPath: string, pages: string): Promise<string> {
 	const text = await pdfExtract(pdfPath, pages);
 	if (text.length > EXTRACT_CAP) {
@@ -154,9 +126,6 @@ function toolText(toolCallId: string, toolName: string, value: string): ToolResu
 	};
 }
 
-/** Doctrine gate (the visual-maker's unlooked-finish rule, ported): never
- *  deliver a brief that consulted nothing — an unread PDF brief is made-up
- *  content, exactly the class of failure the gate exists for. */
 const UNREAD_FINISH_MESSAGE =
 	"You finished without consulting any page of the PDF — your brief would be invention, not reading. Extract or render the relevant pages first, then write the brief from what you actually saw.";
 
@@ -168,21 +137,14 @@ export async function runPdfReaderAgent(
 	const maxIterations = opts.maxIterations ?? MAX_ITERATIONS;
 	const pdfPath = input.path;
 
-	// Deterministic upfront failure: unreadable / unparseable
-	// for renders — the brief never starts on a broken source.
 	const openError = await probeReadable(pdfPath);
 	if (openError) {
 		return { path: pdfPath, question: input.question, brief: `PDF failed: ${openError}`, pagesRead: [], pagesConsulted: [] };
 	}
-	// No Chrome gate (Wave E, 2026-10-10): pdf_render is native now
-	// (pdfjs paints into @napi-rs/canvas in-process) — the whole pdf-reader
-	// runs browser-free; text tools always worked without one.
 
 	const tools = createPdfTools(pdfPath);
 	const toolDeclarations = Object.values(tools);
 	const engine = opts.engine ?? piEngineFor("pdfReader");
-	// BYOK (owner, 2026-09-22): the level rides the injected engine — no
-	// factory pin to consult (engine.level is the resolved/clamped value).
 	const reasoning = engine.level;
 	const sessionId = randomUUID();
 	const prompt = [
@@ -193,11 +155,7 @@ export async function runPdfReaderAgent(
 	].join("\n");
 
 	let messages: Message[] = [{ role: "user", content: prompt, timestamp: Date.now() }];
-	/** Every page the reader extracted or rendered (the citation set). */
 	const consulted = new Set<number>();
-	/** Pages genuinely READ — extract or render output entered the loop.
-	 *  Search-hit context lines consult but don't read (the "78 pages
-	 *  consulted" overstatement split, sources v1 2026-09-19). */
 	const read = new Set<number>();
 	let finalText = "";
 	let nudged = false;
@@ -214,7 +172,6 @@ export async function runPdfReaderAgent(
 				opts.abortSignal,
 				opts.chatId ? providerEventObserver(opts.chatId, "job:pdfReader") : undefined,
 			);
-			// Money channel: each iteration is one model call.
 			opts.onUsage?.(result.usage);
 			messages = [...messages, result];
 
@@ -227,10 +184,6 @@ export async function runPdfReaderAgent(
 					.map((c) => c.text)
 					.join("")
 					.trim();
-				// The gate stays on CONSULTED, not read: search-hit context
-				// lines are genuine consultation (anti-fabrication duty) — a
-				// search-only brief is honest. pagesRead is the UI's honest
-				// count, not a delivery gate.
 				if (consulted.size === 0 && !nudged) {
 					nudged = true;
 					messages = [
@@ -243,8 +196,6 @@ export async function runPdfReaderAgent(
 			}
 
 			const toolResults: ToolResultMessage[] = [];
-			/** Rendered pages this batch, appended as images AFTER the tool
-			 *  results — the visual-maker's image-in-the-loop idiom. */
 			let renderedImages: { page: number; png: Buffer }[] | null = null;
 
 			for (const call of toolCalls) {
@@ -268,9 +219,6 @@ export async function runPdfReaderAgent(
 						const contextLines = numOr(args.context_lines, 3);
 						const literal = Boolean(args.literal);
 						opts.onActivity?.(`pdf_search: "${query}"`);
-						// Direct call (not the tool's execute): the loop needs the hits'
-						// pages — a hit's context lines ARE consultation, so they join
-						// the citation set (the unread-finish gate counts them).
 						const { hits } = await pdfSearch(pdfPath, query, { contextLines, literal });
 						for (const h of hits) consulted.add(h.page);
 						const cap = hits.slice(0, 40);
@@ -338,7 +286,6 @@ export async function runPdfReaderAgent(
 		return { path: pdfPath, question: input.question, brief: `PDF failed: the reader crashed — ${msg}`, pagesRead: [...read].sort((a, b) => a - b), pagesConsulted: [...consulted].sort((a, b) => a - b) };
 	}
 
-	// Iteration limit: deliver whatever was honestly consulted (never invention).
 	return {
 		path: pdfPath,
 		question: input.question,
@@ -348,12 +295,7 @@ export async function runPdfReaderAgent(
 	};
 }
 
-// ─── small helpers ───────────────────────────────────────────────────────────
-
-/** Parse a page spec into concrete page numbers, capped. */
 function specNumbers(spec: string, cap: number): number[] {
-	// total = Infinity: bounds come from the document at execution time; the
-	// cap alone protects the batch.
 	const parts = spec.trim().toLowerCase() === "all" ? [`${cap}`] : spec.split(",");
 	const out = new Set<number>();
 	for (const part of parts) {
@@ -376,14 +318,12 @@ function numOr(v: unknown, dflt: number): number {
 	return typeof v === "number" && Number.isFinite(v) ? v : dflt;
 }
 
-/** Cheap upfront readability probe — real parsing happens inside the tools. */
 async function probeReadable(pdfPath: string): Promise<string | null> {
 	try {
 		const fs = await import("node:fs/promises");
 		const stat = await fs.stat(pdfPath);
 		if (!stat.isFile()) return "not a regular file";
 		if (stat.size === 0) return "file is empty";
-		// parse probe: pdfProbe throws pdfjs's precise error for garbage files
 		await pdfProbe(pdfPath);
 		return null;
 	} catch (err) {
@@ -391,8 +331,6 @@ async function probeReadable(pdfPath: string): Promise<string | null> {
 	}
 }
 
-/** One raw model call (no agent loop): the visual-maker's streamOnce,
- *  duplicated here because its module keeps it private. */
 async function streamOnce(
 	engine: PiEngine,
 	systemPrompt: string,

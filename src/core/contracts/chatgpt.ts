@@ -7,8 +7,8 @@ export interface ChatGPTStatus {
 	activeId: string | null;
 	accounts: {
 		id: string; email: string; registration: string; connected: boolean; planEnabled?: boolean;
-		/** Main-owned authorization recovery eligibility. Missing means unknown, not eligible.
-		 * False for storage failures, paused/closed connections, and healthy authorization. */
+		/** Missing means unknown, not eligible. False for storage failures,
+		 * paused/closed connections, and healthy authorization. */
 		canSignInAgain?: boolean;
 	}[];
 	error: string | null;
@@ -19,7 +19,7 @@ export interface ChatGPTControlBridge {
 	login(id?: string): Promise<ChatGPTStatus>;
 	cancel(): Promise<ChatGPTStatus>;
 	select(id: string): Promise<ChatGPTStatus>;
-	/** Explicitly forget every local registration/credential for this verified identity. */
+	/** Forgets every local registration and credential for this identity. */
 	disconnect(id: string): Promise<ChatGPTStatus>;
 	logout(id: string): Promise<ChatGPTStatus>;
 	consent(enabled: boolean): Promise<ChatGPTStatus>;

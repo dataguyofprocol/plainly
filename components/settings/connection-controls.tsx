@@ -1,17 +1,9 @@
 "use client";
-/**
- * The connection kit shared by the ChatGPT and native-subscription flows:
- * a settings row (mark + name, optional account picker, one action), the
- * dialog's action bar, and the dialog itself (focus-trapped, Esc closes,
- * stacked above Settings). Styles: app/ui/settings.css.
- */
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { Button } from "@/components/ui/button";
 
-/** A provider's mark: its initial on a quiet tile, drawn by CSS so the
- *  row's text (and accessible name) stays the provider's name alone. */
 export function ProviderMark({ label, className }: { label: string; className?: string }) {
 	return <span aria-hidden className={className ? `st-avatar ${className}` : "st-avatar"} data-initial={label.trim().charAt(0).toUpperCase()} />;
 }

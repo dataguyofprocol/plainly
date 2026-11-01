@@ -1,23 +1,6 @@
 /**
- * THE ACTIVITY FOLDS (v4 redesign, owner-approved 2026-10-26): every
- * progress number the redesigned home, session list, and knowledge view
- * show — derived at read time from what is already stored. Nothing here
- * persists anything; the only new storage is the append-only time ledger
- * (contracts/activity.ts TimeBeat), and it is folded here too.
- *
- * Laws carried over from the codebase:
- *   - POSITION, NEVER MASTERY: plan progress reads the derived statuses
- *     (contracts/plan.ts derivePlanStatusesLh — quiz CALLS tag position).
- *   - HONEST ACTIVATION: practice problems and concludes count only
- *     through their clean results (native-messages.ts activeProblemOf's
- *     rule — errored/dangling calls never happened).
- *   - MONEY: dollars are inferred by an injected pricer (server-side Pi
- *     catalog), never stored; unknown price is null, never zero.
- *   - LOCAL TIME: day/week/month boundaries use the process's local time
- *     zone — a desktop app's server runs on the learner's machine.
- *
- * Pure + browser-safe: no node builtins, no clock reads (every function
- * that needs "now" takes it), no store reads.
+ * Day/week/month boundaries use the process's local time zone: the server
+ * runs on the learner's machine.
  */
 
 import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
@@ -44,15 +27,8 @@ import {
 } from "./native-messages.ts";
 import { repairMathForDisplay, splitMathSpans } from "./math-delims.ts";
 
-// ─── the time ledger ────────────────────────────────────────────────────────
-
-/** The most one beat may credit: the client beats every 30s; a late beat
- *  may carry up to a minute, never more (a sleeping laptop must not mint
- *  hours on wake). */
 export const MAX_BEAT_SECONDS = 60;
 
-/** Clamp a client-reported beat to 0..MAX_BEAT_SECONDS (non-numbers and
- *  non-finite values credit nothing). */
 export function clampBeatSeconds(value: unknown): number {
 	if (typeof value !== "number" || !Number.isFinite(value)) return 0;
 	return Math.min(Math.max(value, 0), MAX_BEAT_SECONDS);
@@ -60,32 +36,25 @@ export function clampBeatSeconds(value: unknown): number {
 
 const pad2 = (n: number): string => String(n).padStart(2, "0");
 
-/** The LOCAL calendar date of an instant, "YYYY-MM-DD". */
 export function localDateKey(d: Date): string {
 	return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-/** The LOCAL month of an instant, "YYYY-MM" — the ledger file key. */
 export function localMonthKey(d: Date): string {
 	return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
 }
 
-/** Monday 00:00 local of the week containing `now`. */
 export function weekStartOf(now: Date): Date {
-	const sinceMonday = (now.getDay() + 6) % 7; // Sun=0 → 6, Mon=1 → 0
+	const sinceMonday = (now.getDay() + 6) % 7;
 	return new Date(now.getFullYear(), now.getMonth(), now.getDate() - sinceMonday);
 }
 
-/** The 1st of the month 00:00 local. */
 export function monthStartOf(now: Date): Date {
 	return new Date(now.getFullYear(), now.getMonth(), 1);
 }
 
-/** A stats period's window and its comparison window. The current window
- *  is [start, end] (end = now). The PREVIOUS EQUAL period starts at the
- *  previous period's start and spans the same elapsed time — "this week
- *  so far vs last week up to the same moment" — capped at `start` (a
- *  31-day month's elapsed span never spills into this month). */
+/** [prevStart, prevEnd] spans the same elapsed time as [start, end],
+ *  capped at `start`. */
 export interface PeriodWindow {
 	start: Date;
 	end: Date;
@@ -104,16 +73,13 @@ export function periodWindow(period: StatsPeriod, now: Date): PeriodWindow {
 	return { start, end: now, prevStart, prevEnd };
 }
 
-/** Is an ISO instant inside [start, end]? Unparseable → false. */
 export function inWindow(iso: string | undefined, start: Date, end: Date): boolean {
 	if (!iso) return false;
 	const t = Date.parse(iso);
 	return Number.isFinite(t) && t >= start.getTime() && t <= end.getTime();
 }
 
-/** Active seconds of the beats in [start, end) — half-open so adjacent
- *  windows never double-count a beat on the seam; `endInclusive` closes
- *  it for "up to now" windows. */
+/** Half-open [start, end) unless `endInclusive`. */
 export function beatSecondsIn(beats: readonly TimeBeat[], start: Date, end: Date, endInclusive = false): number {
 	let total = 0;
 	const s = start.getTime();
@@ -126,7 +92,6 @@ export function beatSecondsIn(beats: readonly TimeBeat[], start: Date, end: Date
 	return total;
 }
 
-/** All-time active seconds per chat (the session list's `minutes`). */
 export function beatSecondsByChat(beats: readonly TimeBeat[]): Map<string, number> {
 	const out = new Map<string, number>();
 	for (const beat of beats) out.set(beat.chatId, (out.get(beat.chatId) ?? 0) + clampBeatSeconds(beat.seconds));
@@ -135,9 +100,6 @@ export function beatSecondsByChat(beats: readonly TimeBeat[]): Map<string, numbe
 
 const WEEKDAYS: readonly WeekdayLabel[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-/** The home's week strip: the current week Monday → Sunday, minutes per
- *  LOCAL day (rounded; future days 0), and how many days up to today met
- *  the goal. */
 export function dailyStats(beats: readonly TimeBeat[], now: Date, goalMinutes: number): DailyStatsResponse {
 	const secondsByDay = new Map<string, number>();
 	for (const beat of beats) {
@@ -162,20 +124,11 @@ export function dailyStats(beats: readonly TimeBeat[], now: Date, goalMinutes: n
 	return { goalMinutes, days, metDays };
 }
 
-// ─── per-session progress (the session list) ────────────────────────────────
-
-/** The pending text's length cap (the list row's one line). */
 export const PENDING_TEXT_MAX = 140;
 
-/** Markdown → one plain line, capped at `max` chars on a word boundary
- *  with an ellipsis. Light-touch by design: links keep their text,
- *  emphasis/code/heading/quote markers drop, whitespace collapses. Math
- *  STAYS as inline `$…$` (owner ruling 2026-10-28 — previews render it
- *  with KaTeX through MathLine): every delimiter form normalizes to single
- *  dollars, the display repairs run first (repairMathForDisplay — the raw
- *  record may carry eaten or doubled backslashes), and Markdown stripping
- *  never reaches inside a span. A cut that would leave an unbalanced `$`
- *  cuts before it instead. Null for non-strings and empty results. */
+/** Markdown → one plain line capped at `max` chars, with math kept as
+ *  inline `$…$` and prose dollars escaped. Null for non-strings and empty
+ *  results. */
 export function plainText(raw: unknown, max = PENDING_TEXT_MAX): string | null {
 	if (typeof raw !== "string") return null;
 	const blocks = repairMathForDisplay(raw)
@@ -183,8 +136,6 @@ export function plainText(raw: unknown, max = PENDING_TEXT_MAX): string | null {
 		.replace(/^\s{0,3}(#{1,6}|>|[-+]|\d+\.)\s+/gm, "");
 	let text = splitMathSpans(blocks)
 		.map((span) => {
-			// Prose dollars are currency: escaped, so MathLine never pairs them
-			// and the cut guard below counts only math dollars.
 			if (!span.math) return stripInlineMarkdown(span.text).replace(/(?<!\\)\$/g, "\\$");
 			const tex = span.text.trim();
 			return tex ? `$${tex}$` : "";
@@ -203,7 +154,6 @@ export function plainText(raw: unknown, max = PENDING_TEXT_MAX): string | null {
 	return text;
 }
 
-/** plainText's prose-run stripping (never applied inside math). */
 function stripInlineMarkdown(text: string): string {
 	return text
 		.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
@@ -212,7 +162,6 @@ function stripInlineMarkdown(text: string): string {
 		.replace(/(^|\s)_+|_+(?=\s|$)/g, "$1");
 }
 
-/** Clean (non-errored) tool results by call id. */
 function cleanResults(messages: readonly LhMessage[]): Map<string, ToolResultMessage> {
 	const out = new Map<string, ToolResultMessage>();
 	for (const m of messages) {
@@ -223,15 +172,13 @@ function cleanResults(messages: readonly LhMessage[]): Map<string, ToolResultMes
 	return out;
 }
 
-/** One practice conclusion: its outcome and when its clean ack landed. */
 export interface ConcludedProblem {
 	outcome: string;
-	/** ISO of the conclude's clean result (the moment it went through). */
+	/** ISO time of the conclude's clean result. */
 	at: string;
 }
 
-/** Every CLEAN conclude in record order (the dismissal-synthesized pair
- *  included — it is a conclude with outcome "dismissed"). */
+/** Clean concludes in record order, dismissals included. */
 export function concludedProblemsOf(messages: readonly LhMessage[]): ConcludedProblem[] {
 	const clean = cleanResults(messages);
 	const out: ConcludedProblem[] = [];
@@ -251,19 +198,14 @@ export function concludedProblemsOf(messages: readonly LhMessage[]): ConcludedPr
 	return out;
 }
 
-/** The practice set fold: done-in-current-set + whether a whole set just
- *  closed (see contracts/activity.ts PracticeSetProgress). */
 export function practiceSetOf(concluded: number, active: boolean): { size: number; done: number; complete: boolean } {
 	const size = PRACTICE_SET_SIZE;
 	if (concluded === 0) return { size, done: 0, complete: false };
 	const rem = concluded % size;
 	if (rem !== 0) return { size, done: rem, complete: false };
-	// A multiple of the set size: the set is complete — until the next
-	// set's first problem is posed (active), which reads 0 again.
 	return active ? { size, done: 0, complete: false } : { size, done: size, complete: true };
 }
 
-/** The graded quiz-answer fold (see contracts/activity.ts ChatAnswerStats). */
 export function answerStatsOf(messages: readonly LhMessage[]): { total: number; firstTry: number } {
 	let total = 0;
 	let firstTry = 0;
@@ -279,8 +221,6 @@ export function answerStatsOf(messages: readonly LhMessage[]): { total: number; 
 	return { total, firstTry };
 }
 
-/** The record-derived progress of one session (no liveness — see
- *  chatStateOf). Pure; reads only what the stored record carries. */
 export function chatProgressOf(record: { kind?: ChatKind; tree?: PlanTree; messages: readonly LhMessage[] }): ChatProgress {
 	const messages = record.messages;
 	const pending = danglingQuestionOf(messages);
@@ -324,31 +264,24 @@ export function chatProgressOf(record: { kind?: ChatKind; tree?: PlanTree; messa
 	};
 }
 
-/** The row state: a running turn outranks everything (working). */
 export function chatStateOf(progress: Pick<ChatProgress, "restingState">, busy: boolean): ChatState {
 	return busy ? "working" : progress.restingState;
 }
 
-// ─── period stats (the home) ────────────────────────────────────────────────
-
-/** One priced usage entry: when it billed, its tokens, its inferred
- *  dollars (null = unpriced — unknown model, subscription, or a
- *  provider that never reported the billable fields). */
+/** `dollars` null = unpriced. */
 export interface UsagePart {
 	at: string;
 	tokens: number;
 	dollars: number | null;
 }
 
-/** Tokens of one call: input + output + cache reads + cache writes
- *  (reasoning is already inside output; absent fields add nothing). */
+/** Reasoning is already inside output. */
 export function callTokens(step: Partial<CallUsage>): number {
 	return (step.inputTokens ?? 0) + (step.outputTokens ?? 0) + (step.cacheReadTokens ?? 0) + (step.cacheWriteTokens ?? 0);
 }
 
-/** Fold parts in [start, end] into the stats' token block. dollars: sum
- *  of the priced parts; null only when parts exist and none priced; 0
- *  when the window billed nothing at all. */
+/** dollars: sum of the priced parts; null only when parts exist and none
+ *  is priced; 0 when the window billed nothing. */
 export function foldUsage(parts: readonly UsagePart[], start: Date, end: Date): { total: number; dollars: number | null } {
 	let total = 0;
 	let dollars = 0;
@@ -366,14 +299,12 @@ export function foldUsage(parts: readonly UsagePart[], start: Date, end: Date): 
 	return { total, dollars: any && !priced ? null : dollars };
 }
 
-/** What the stats fold reads — the server gathers it from the stores. */
 export interface StatsInput {
-	/** Every session: its kind, updatedAt, record messages, and progress. */
 	chats: ReadonlyArray<{ kind: ChatKind; updatedAt: string; messages: readonly LhMessage[]; progress: ChatProgress }>;
-	/** Raw node ledger lines (deduped by id here — first line defines). */
+	/** Raw ledger lines; deduped by id here. */
 	nodes: readonly GraphNode[];
 	beats: readonly TimeBeat[];
-	/** Every usage channel, already priced (server-side pricer). */
+	/** Already priced. */
 	usage: readonly UsagePart[];
 }
 
@@ -417,11 +348,6 @@ export function buildStats(input: StatsInput, period: StatsPeriod, now: Date): S
 	};
 }
 
-// ─── topics (the knowledge view) ────────────────────────────────────────────
-
-/** The proposition ids a practice session was started on: its
- *  graph-context marker's picks (message[0] by construction; scanned
- *  anywhere for robustness). */
 export function graphContextIdsOf(messages: readonly LhMessage[]): string[] {
 	const ids: string[] = [];
 	for (const m of messages) {
@@ -435,7 +361,6 @@ export function graphContextIdsOf(messages: readonly LhMessage[]): string[] {
 	return ids;
 }
 
-/** A notes file's display name: the basename without its extension. */
 export function fileTopicName(filePath: string): string {
 	const base = filePath.split(/[\\/]/).pop() ?? filePath;
 	const dot = base.lastIndexOf(".");
@@ -443,29 +368,22 @@ export function fileTopicName(filePath: string): string {
 }
 
 export interface TopicsInput {
-	/** The snapshot's clusters (birth-session communities; members may
-	 *  include derived implication ids — filtered to propositions here). */
+	/** Members may include derived implication ids; filtered here. */
 	clusters: readonly Cluster[];
-	/** Proposition ledger lines (first line per id defines createdAt). */
+	/** The first line per id defines createdAt. */
 	propositions: readonly GraphNode[];
-	/** chatId → title (snapshot.sessions). */
+	/** chatId → title. */
 	sessions: Readonly<Record<string, string>>;
-	/** srcId → file path (snapshot.fileSources). */
+	/** srcId → file path. */
 	fileSources: Readonly<Record<string, string>>;
-	/** Practice sessions: updatedAt + their graph-context picks. */
 	practice: ReadonlyArray<{ updatedAt: string; pickedIds: readonly string[] }>;
 }
 
-/** One topic per snapshot cluster, newest-learned first (null last).
- *  Name: a notes cluster reads its file's basename without extension;
- *  a chat cluster its label, else its birth session's title; else its
- *  first idea's name (a deleted birth chat keeps its members unlabeled);
- *  else "Untitled topic". */
+/** Newest-learned first, null last. */
 export function topicsOf(input: TopicsInput): Topic[] {
 	const createdAt = new Map<string, string>();
 	for (const node of input.propositions) if (!createdAt.has(node.id)) createdAt.set(node.id, node.createdAt);
 	const nameOf = new Map(input.propositions.map((n) => [n.id, n.name]));
-	// A cluster whose birth chat is gone names itself by its first idea.
 	const firstIdeaName = (ids: readonly string[]): string | null => {
 		const first = [...ids].sort((a, b) => (createdAt.get(a) ?? "").localeCompare(createdAt.get(b) ?? ""))[0];
 		return first ? (nameOf.get(first) ?? null) : null;

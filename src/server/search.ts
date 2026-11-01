@@ -1,29 +1,7 @@
-/**
- * The search engines' server composition (search port + model slots wave,
- * 2026-09-20): the Tavily + Brave adapters behind the core port
- * (core/search.ts) + the live-engine resolution the settings UI and the
- * agent-layer tool both read.
- *
- * Owner decisions (2026-09-20) baked in:
- *  - NO default engine: an engine is live iff its key is present (auth
- *    store or env — env wins, keyed via server/keys.ts keyValue).
- *  - Setting a key is ALL the user does — auto-detection: explicit
- *    agent.search.engine pins the preference (when BOTH keys are present
- *    the preference order is Tavily → Brave); without a pin, whichever
- *    engine has a key is the engine.
- *  - An explicit choice does NOT silently fall back to the other engine:
- *    engine pinned but its key missing = honestly unavailable (reason
- *    says so) — no guessing what the user meant.
- *
- * The adapters are injected dependencies (fetch-shaped) so the agent-layer
- * tool depends on the PORT only and tests never touch the network.
- */
-
 import type { SearchEngineId, SearchHit, SearchProvider, SearchStatus } from "../core/search.ts";
 import { keyValue } from "./keys.ts";
 import { effectiveSettings } from "./stores.ts";
 
-/** The wire-callable shape the adapters close over (tests inject a stub). */
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
 /** Tavily: POST https://api.tavily.com/search — Bearer auth in the
@@ -108,28 +86,19 @@ export function braveProvider(apiKey: string, fetchFn: FetchLike = fetch): Searc
 	};
 }
 
-/** The engines this wave ships, in PREFERENCE order (both keys present,
- *  no explicit pin → the first live engine wins; owner decision
- *  2026-09-20: Tavily first — the AI-native search API the wave chose). */
 const ENGINE_ORDER: ReadonlyArray<{ id: SearchEngineId; envVar: string }> = [
 	{ id: "tavily", envVar: "TAVILY_API_KEY" },
 	{ id: "brave", envVar: "BRAVE_API_KEY" },
 ];
 
-/** The engine's key (env-or-file; env wins) — null when the engine is
- *  not keyed, which by owner decision means NOT LIVE. */
 function engineKey(id: SearchEngineId): string | null {
 	const envVar = ENGINE_ORDER.find((e) => e.id === id)?.envVar;
 	const value = envVar ? keyValue(envVar) : undefined;
 	return value ? value : null;
 }
 
-/** Resolve the search state PURELY from the given pins (testable): the
- *  explicit engine (if pinned) wins but must be keyed; absent pin → first
- *  keyed engine in preference order. Never throws. */
 export function resolveSearchEngineFor(
 	pinned: SearchEngineId | undefined,
-	/** Per-engine live keys (absent engine = absent property is fine). */
 	keys: Partial<Record<SearchEngineId, string | undefined>>,
 ): SearchStatus & { key: string | null } {
 	const pinnedKey = pinned ? keys[pinned] ?? null : null;
@@ -156,9 +125,6 @@ export function resolveSearchEngineFor(
 	};
 }
 
-/** The live search state (the honest availability signal): reads the
- *  settings record's pin + the auth store fresh each call, so a key saved
- *  mid-session activates on the next check (no restart). */
 export function searchStatus(): SearchStatus {
 	const { available, engine, reason } = resolveSearchEngineFor(
 		effectiveSettings().agent.search?.engine,
@@ -170,15 +136,10 @@ export function searchStatus(): SearchStatus {
 	return { available, engine, reason };
 }
 
-/** Search available at all? (the settings UI's gray-out signal + the
- *  researcher's enable/disable pin — Teacher stream's rewiring reads this.) */
 export function searchAvailable(): boolean {
 	return searchStatus().available;
 }
 
-/** The LIVE adapter, or null when unavailable. Composed fresh each call —
- *  the tool layer (Teacher stream) calls this once per search, so key
- *  rotations take effect immediately. */
 export function searchProvider(): SearchProvider | null {
 	const resolved = resolveSearchEngineFor(effectiveSettings().agent.search?.engine, {
 		tavily: engineKey("tavily") ?? undefined,

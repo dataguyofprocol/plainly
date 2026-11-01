@@ -1,71 +1,24 @@
-# electron-builder config — Plainly desktop (macOS arm64; Windows/Linux x64).
-#
-# Shape (fact-checked 2026-09-17):
-#   - the app's real server (.next/standalone, curated by
-#     scripts/build-server.mjs) ships via extraResources — OUTSIDE the asar,
-#     because native .node/dylib can't dlopen from a read-only archive and
-#     server.js process.chdir()s into its own dir;
-#   - the asar holds only the shell (electron/main.cjs + package.json);
-#   - Plainly fork (2026-10-27): macOS builds are ad-hoc signed and NOT
-#     notarized until the fork has its own Developer ID (owner ruling).
-#     Users install with scripts/install.sh (curl sets no quarantine flag,
-#     so Gatekeeper never asks); the zip is the only macOS package.
+# The server (.next/standalone) ships via extraResources, outside the asar:
+# native .node/dylib can't dlopen from a read-only archive, and server.js
+# process.chdir()s into its own dir. The asar holds only the shell.
 appId: app.plainly.Plainly
 productName: Plainly
 directories:
   output: dist
-# Icons (owner ruling, 2026-10-13) — per-platform sources in build/:
-#   mac   build/icon.icon  — the Icon Composer document (layered Liquid
-#         Glass); actool (Xcode 26+) compiles Assets.car (CFBundleIconName,
-#         macOS 26+ renders the true layered icon) + an actool fallback icns
-#         capped at 256px, which scripts/after-pack.cjs swaps for the
-#         hand-packed full-res build/icon.icns (pre-Tahoe keeps 16→1024).
-#         Requires actool ≥ 26: desktop:dist injects DEVELOPER_DIR locally;
-#         the release workflow's mac job runs setup-xcode.
-#   win   build/icon.ico  — generated (16→256) from the flat design by
-#         scripts/make-icons.mjs.
-#   linux build/icon.png  — 512×512, same script. Rounded squircle with
-#         baked transparency on both (owner ruling) — Windows/Linux don't
-#         mask, the shape ships in the artwork.
+# mac build/icon.icon needs actool >= 26 (Xcode 26+). Its fallback icns is
+# capped at 256px, so scripts/after-pack.cjs swaps in the full-res
+# build/icon.icns.
 files:
-  # Only the shell goes into the asar. ORDER IS LOAD-BEARING (payload
-  # wave, 2026-09-24): electron-builder's dependency collector packs the
-  # whole production dep tree into node_modules/ REGARDLESS of this
-  # allow-list — normalizeFiles turns this array into one {filter: [...]}
-  # fileSet, getNodeModuleFileMatcher feeds EVERY filter entry (positives
-  # included) to the per-dep copier, and without a negation its implicit
-  # '**/*' passes everything (the measured result: a 502MB asar holding
-  # next/@ai-sdk/pdfjs/mermaid/puppeteer… while the launcher requires
-  # nothing but electron + node builtins — the server ships via
-  # extraResources).
-  #
-  # The fix is gitignore-style ordering (verified against the installed
-  # app-builder-lib 26.15.3 + a DEBUG-mode rebuild): '!**/*' first excludes
-  # EVERYTHING, the two positives after it re-include only the shell.
-  # The per-dep collector then contributes ZERO files — app-builder-lib's
-  # filter evaluates each dep file's DESTINATION path (the
-  # stat.moduleFullFilePath quirk in util/filter.js getRelativePath), so
-  # '!**/*' matches every 'node_modules/<dep>/...' path and the bare
-  # positives can never re-include one (DEBUG logs confirm filesCount=0
-  # for all 566 modules). If a future electron-builder fixes that quirk,
-  # ~1MB of package.json stubs would start landing — harmless. The
-  # two-package.json layout avoids the collector entirely but
-  # restructures the repo. app.asar.unpacked dies with it: the natives
-  # were only unpacked because their packages were packed.
+  # Order matters. Without a leading negation, electron-builder's
+  # dependency collector packs the whole production dep tree into the asar
+  # regardless of this list. '!**/*' first excludes everything, and the
+  # positives after it re-include only the shell (app-builder-lib matches
+  # each dep file by its destination path, util/filter.js getRelativePath).
   - "!**/*"
   - electron/**/*
   - package.json
-  # Auto-update (Wave C, 2026-10-10): electron-updater + its runtime tree
-  # re-included explicitly. The negation above excludes node_modules, and
-  # the shell's bare positives can't re-include them — these explicit
-  # node_modules positives do (gitignore order: the LAST matching pattern
-  # wins; verified post-build by listing the asar — see desktop:dist notes).
-  # Tree fact-checked via each package's declared dependencies:
-  # electron-updater → fs-extra, js-yaml, lazy-val, lodash.escaperegexp,
-  # lodash.isequal, semver, tiny-typed-emitter, builder-util-runtime;
-  # builder-util-runtime → debug, sax; fs-extra → graceful-fs, jsonfile,
-  # universalify; debug → ms; jsonfile → universalify (again); js-yaml →
-  # argparse. Keep in sync when electron-updater bumps (npm ls --all).
+  # electron-updater and its runtime dependency tree, re-included past the
+  # negation above. Keep in sync when electron-updater bumps (npm ls --all).
   - node_modules/electron-updater/**/*
   - node_modules/fs-extra/**/*
   - node_modules/js-yaml/**/*
@@ -82,20 +35,15 @@ files:
   - node_modules/universalify/**/*
   - node_modules/ms/**/*
   - node_modules/argparse/**/*
-  # Main-process ID-token signature verification (no bundled OAuth implementation).
   - node_modules/jose/**/*
 extraResources:
   # Attribution/license for the bounded local Pi cutoff-selector port.
   - from: docs/compaction-accounting.md
     to: licenses/pi-compaction.md
-  # Copy from the PARENT dir (.next), not .next/standalone itself:
-  # electron-builder hard-excludes a copy's root node_modules and the
-  # default no-filter pattern is a literal path match (empirically both
-  # node_modules/ and .next/ were silently dropped → server died on
-  # "Cannot find module 'next'"). With `from: .next` the filter's
-  # relative paths start with standalone/, dodging the root-node_modules
-  # rule, and the explicit wildcard (minimatch dot:true) reaches
-  # standalone/.next and standalone/node_modules.
+  # Copy from .next, not .next/standalone: electron-builder hard-excludes a
+  # copy's root node_modules, and its default pattern drops dot dirs. From
+  # .next, the paths start with standalone/ and the explicit wildcard
+  # reaches standalone/.next and standalone/node_modules.
   - from: .next
     to: server
     filter:
@@ -107,36 +55,27 @@ mac:
     - from: electron/server-title-guard.cjs
       to: server-title-guard.cjs
   icon: build/icon.icon
-  # zip only (owner ruling, 2026-10-27): scripts/install.sh and
-  # electron/mac-updater.cjs both install from it. The DMG is gone: a
-  # browser-downloaded DMG is quarantined, and Gatekeeper calls an
-  # un-notarized app inside it malware.
+  # zip only: scripts/install.sh and electron/mac-updater.cjs install from
+  # it. Gatekeeper calls an un-notarized app in a quarantined DMG malware.
   target:
     - target: zip
       arch:
         - arm64
-  # Locale trim (payload wave, 2026-09-24): English-only app — cuts
-  # every non-en .lproj from the frameworks (the STT/mic entitlements
-  # don't depend on locales). Revisit only if localization ever lands.
   electronLanguages:
     - en
   category: public.app-category.education
-  # Laid for the STT milestone (researcher-verified): the TCC mic prompt
-  # reads this string; macOS asks regardless of Electron's own handlers.
+  # The TCC mic prompt reads this string; macOS asks regardless of
+  # Electron's own handlers.
   extendInfo:
     NSMicrophoneUsageDescription: "Plainly uses the microphone only for speech-to-text input into your sessions."
   # Hardened runtime is off while ad-hoc signed: its library validation
   # rejects Electron's pre-signed frameworks (different Team ID) and the
-  # server's native modules. It is only required for notarization — turn
-  # it back on together with notarize.
+  # server's native modules. Notarization requires it.
   hardenedRuntime: false
   entitlements: build/entitlements.mac.plist
-  # Signing (Plainly fork, owner ruling 2026-10-27): ad-hoc ("-") until the
-  # fork has its own Developer ID. Apple Silicon refuses to run unsigned
-  # code, so ad-hoc is the floor. Squirrel.Mac rejects ad-hoc updates, so
-  # macOS updates run through electron/mac-updater.cjs instead.
-  # To restore: drop identity, set notarize: true, and supply the
-  # CSC_*/APPLE_* credentials (see docs/desktop-release.md).
+  # Ad-hoc ("-"): Apple Silicon refuses to run unsigned code. Squirrel.Mac
+  # rejects ad-hoc updates, so macOS updates run through
+  # electron/mac-updater.cjs.
   identity: "-"
   notarize: false
 afterPack: scripts/after-pack.cjs
@@ -147,8 +86,6 @@ win:
       arch:
         - x64
   artifactName: "${productName}-${version}-${arch}-setup.${ext}"
-  # Unsigned Windows release (owner ruling): preserve icon/version metadata,
-  # skip signing, and do not require a publisher signature for updates.
   signExecutable: false
   verifyUpdateCodeSignature: false
 nsis:
@@ -167,17 +104,10 @@ linux:
   category: Education
   # Match Electron's app_id/WM_CLASS to the installed desktop launcher.
   syncDesktopName: true
-  # Both targets update via electron-updater 6.8.9. AppImage replaces its
-  # own file; deb uses dpkg/apt and may request administrator permission.
 publish:
-  # Update feed = GitHub Releases (decided 2026-10-08): latest-mac.yml +
-  # zip/blockmap live on releases; electron-updater reads them anonymously.
-  # REQUIRES THE REPO TO BE PUBLIC before 0.3.0 ships — anonymous downloads
-  # from a private repo are impossible, and a token baked into the app
-  # would be a leak. desktop:dist passes no --publish flag, so builds never
-  # upload; publishing happens at release time (GH_TOKEN + --publish).
+  # electron-updater reads the feed anonymously, so the repo must be
+  # public; a token baked into the app would leak.
   - provider: github
     owner: dataguyofprocol
     repo: plainly
-    # All three CI jobs contribute assets; only the owner publishes it.
     releaseType: draft

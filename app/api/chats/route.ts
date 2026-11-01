@@ -3,17 +3,6 @@ import { newGraphContextMessage, type GraphContextPick } from "@/src/core";
 import { chatListItems, createChat, readSettingsRecord, stores, titleFromPrompt } from "@/src/server";
 import type { ChatListItem } from "@/src/core";
 
-/** The session picker's list: record-derived summaries (phase, pending
- *  question) + live liveness — a running turn marks the session busy
- *  (contracts.ts ChatListItem; the store can't see liveness, the route is
- *  the merge point). Owner, minimal-color round: background jobs NO LONGER
- *  count — the sidebar's Background agents section is their channel now
- *  (a running spinner per row would double-signal them), so busy means
- *  exactly "a teach turn is in flight". */
-/** v4 redesign (2026-10-26): each item also carries state, the pending
- *  question's text, plan position, active minutes, answer stats, and the
- *  practice set — all record-derived or ledger-derived
- *  (server/activity.ts chatListItems, contracts/chat.ts ChatListItem). */
 export async function GET() {
 	const chats: ChatListItem[] = chatListItems();
 	return Response.json({ chats });
@@ -22,17 +11,8 @@ export async function GET() {
 export async function POST(req: Request) {
 	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; graphContext?: unknown };
 	const title = typeof body.title === "string" ? body.title : "";
-	// Practice sessions (owner, 2026-10-04): kind "practice" marks the
-	// record — the practice agent + its tools from turn 1, no extraction.
 	const kind = body.kind === "practice" ? ("practice" as const) : undefined;
 	const chat = createChat(titleFromPrompt(title || "Untitled session"), kind);
-	// PER-SESSION MODELS (owner, 2026-09-28): a session owns its model +
-	// thinking level from birth — stamped verbatim from the STRONG slot,
-	// the new-session default. From here the strong slot never reaches
-	// this session again: in-session picks write the session's own record
-	// (PUT /api/chats/:id/settings). No strong slot configured (fresh BYOK
-	// boot) → no stamp; the turn gate's 503 models_not_configured envelope
-	// refuses honestly until the setup flow fills the slot.
 	const strong = readSettingsRecord()?.models?.strong;
 	if (strong?.model) {
 		stores.chatStore.saveSettings(chat.id, {
@@ -40,12 +20,6 @@ export async function POST(req: Request) {
 			thinkingLevel: strong.thinkingLevel,
 		});
 	}
-	// The session's map context (owner, 2026-10-04): the picked
-	// propositions ride the CREATION — message[0] is a graph-context
-	// marker (a separate custom message BEFORE the learner's first user
-	// message), carrying the picks plus the reasoning chains among them.
-	// The picks carry their own name/statement (what the learner saw at
-	// pick time); the chains derive from the CURRENT graph snapshot.
 	const rawPicks = (body.graphContext as { propositions?: unknown } | undefined)?.propositions;
 	const picks: GraphContextPick[] = Array.isArray(rawPicks)
 		? rawPicks

@@ -1,7 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
 
-/** Per-launch desktop HTTP capability. This is not an OS-user malware
- * boundary and is not an OAuth credential. Browser-only mode is unchanged. */
 export function desktopAPIAuthorized(
 	headers: Headers,
 	env: Record<string, string | undefined> = process.env,

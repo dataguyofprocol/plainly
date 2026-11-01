@@ -58,7 +58,6 @@ export const MessageContent = ({
   className,
   ...props
 }: MessageContentProps) => (
-  // Layout + rhythm live in the caller's class (the lesson's .ls-turn).
   <div className={cn("min-w-0", className)} {...props}>
     {children}
   </div>
@@ -205,7 +204,6 @@ export const MessageBranchContent = ({
     [children]
   );
 
-  // Use useEffect to update branches when they change
   useEffect(() => {
     if (branches.length !== childrenArray.length) {
       setBranches(childrenArray);
@@ -234,7 +232,6 @@ export const MessageBranchSelector = ({
 }: MessageBranchSelectorProps) => {
   const { totalBranches } = useMessageBranch();
 
-  // Don't render if there's only one branch
   if (totalBranches <= 1) {
     return null;
   }
@@ -323,22 +320,11 @@ export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 // Type-only version skew: @streamdown/code bundles shiki@3 types while
 // streamdown@2.5 expects shiki@4 types. Both work at runtime (each ships its
 // own highlighter); the cast papers over the .d.ts mismatch.
-//
-// Standard dollar authoring (owner, 2026-10-12): $...$ inline, $$ fenced
-// on separate lines for display. transformMathDelimiters stays as the
-// compatibility reader for old \(...\)/\[...\] content; its two-dollar
-// output remains valid alongside native single-dollar math.
-//
 // remark-breaks rides in the cjk plugin's remarkPluginsAfter slot (public
 // PluginConfig API): Streamdown's bare `remarkPlugins` PROP would REPLACE the
 // defaults ([remark-gfm, codeMeta]), silently dropping GFM and code-fence
 // metastring parsing. The slot appends after the defaults, which is the
 // standard remark-gfm → remark-breaks order.
-//
-// MERMAID is app-owned since the chrome-melt wave (2026-09-19): the md-blocks
-// `code` override intercepts mermaid fences and renders via
-// components/mermaid-render.ts — streamdown's internal mermaid machinery
-// (the plugin entry + the `mermaid` prop) is retired with it.
 export const streamdownPlugins = {
   cjk: {
     ...cjk,
@@ -350,9 +336,6 @@ export const streamdownPlugins = {
 
 export const MessageResponse = memo(
   ({ className, children, ...props }: MessageResponseProps) => {
-    // Legacy backslash delimiters are converted in a single linear scan;
-    // native dollar math passes through to Streamdown unchanged. Incomplete
-    // legacy spans are left for a later render when their closer arrives.
     const content =
       typeof children === "string"
         ? transformMathDelimiters(children)
@@ -361,8 +344,6 @@ export const MessageResponse = memo(
     return (
       <Streamdown
         className={cn(
-          // Source Sans 3 + emphasis-color tokens on every markdown surface
-          // (labels stay JetBrains Mono). Unlayered plain CSS wins over text-sm.
           "lh-prose size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
           className
         )}

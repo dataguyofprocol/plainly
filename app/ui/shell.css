@@ -1,17 +1,9 @@
-/* SHELL — the sidebar card, session rows, the rail and its flyouts
-   (components/v4/shell.tsx). Three widths:
-     ≥1100     the 248px sidebar card
-     800–1099  the icon rail (the same rail Lesson and Practice use)
-     <800      the rail lies flat along the top — functional fallback */
-
-/* ── Frame ─────────────────────────────────────────────────────────── */
 .v4 .shell { position: relative; z-index: 1; display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
 .v4 .shell.k { height: 100vh; }
 .v4 .side { grid-column: 1; grid-row: 1; position: sticky; top: 0; height: 100vh; padding: 12px 0 12px 12px; }
 .v4 .side-rail { display: none; grid-column: 1; grid-row: 1; position: relative; z-index: 30; }
 .v4 .main { grid-column: 2; grid-row: 1; min-width: 0; padding: 24px 24px 32px; }
 
-/* ── The sidebar card ──────────────────────────────────────────────── */
 .v4 .sidein { height: 100%; border-radius: 16px; padding: 12px 8px 8px; display: flex; flex-direction: column; overflow: hidden; }
 .v4 .side-brand { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 32px; padding: 0 2px 0 6px; flex: none; }
 .v4 .side-logo { display: inline-flex; align-items: center; gap: 10px; min-width: 0; font-size: 15px; line-height: 22px; font-weight: 600; letter-spacing: -0.012em; }
@@ -28,23 +20,17 @@
 .v4 .side-mid { flex: 1; min-height: 0; overflow: auto; margin: 12px -8px 0; padding: 0 8px 8px; border-top: 1px solid var(--line); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 .v4 .side-foot { flex: none; padding-top: 8px; border-top: 1px solid var(--line); margin: 0 -8px; padding-left: 8px; padding-right: 8px; }
 
-/* ── Session groups ────────────────────────────────────────────────── */
 .v4 .sgroups { display: flex; flex-direction: column; }
 .v4 .sgroup { display: flex; flex-direction: column; gap: 1px; }
 .v4 .gl { display: flex; align-items: baseline; justify-content: space-between; padding: 16px 10px 6px; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--faint); letter-spacing: 0.01em; }
 .v4 .gl .num { font-weight: 500; }
 .v4 .sgroups.compact .sgroup:first-child .gl { padding-top: 8px; }
-/* A row: [mark] title / meta. The mark column keeps titles on one edge
-   whether the row pings or not. */
 .v4 .sess { display: grid; grid-template-columns: 14px minmax(0, 1fr); column-gap: 6px; row-gap: 1px; align-items: center; width: 100%; padding: 7px 10px 7px 6px; border: 0; border-radius: 10px; background: transparent; text-align: left; transition: background var(--dur-1), box-shadow var(--dur-2); }
 .v4 .sess:hover { background: var(--hover); }
 .v4 .sess:active { background: var(--press); }
 .v4 .sess.on { background: var(--surface); box-shadow: var(--e1), 0 0 0 1px var(--line) inset; }
 .v4 .sess.ctx { background: var(--hover); box-shadow: 0 0 0 1px var(--line-strong) inset; }
 .v4 .sess-mark { grid-row: 1; display: flex; align-items: center; justify-content: center; height: 18px; color: var(--faint); }
-/* The mark is the session's kind (book = lesson, target = practice); a
-   warn ping rides its corner while the session waits on you, and a live
-   turn tints it brand. */
 .v4 .sess-mark { position: relative; }
 .v4 .sess-mark .ic { opacity: 0.85; }
 .v4 .sess-mark.working { color: var(--brand); }
@@ -57,7 +43,6 @@
 .v4 .sess.renaming { cursor: text; }
 .v4 .sess-input { grid-column: 2; width: 100%; height: 18px; padding: 0; border: 0; border-radius: 0; background: transparent; outline: none; font-size: 13px; line-height: 18px; font-weight: 600; box-shadow: 0 1px 0 var(--brand); }
 .v4 .sess-input:focus-visible { outline: none; }
-/* Archived: a collapsed group at the bottom; the header is its toggle. */
 .v4 .sgroup.archived { margin-top: 8px; border-top: 1px solid var(--line); }
 .v4 .gl-toggle { width: 100%; border: 0; background: transparent; border-radius: 8px; cursor: pointer; text-align: left; transition: color var(--dur-1); }
 .v4 .gl-toggle:hover { color: var(--ink); }
@@ -74,21 +59,17 @@
 .v4 .sess-skel i:first-child { height: 12px; width: 82%; }
 .v4 .sess-skel i:last-child { height: 10px; width: 46%; }
 
-/* Knowledge's topic rows ride the same card (knowledge-view.tsx). */
 .v4 .trow { display: flex; align-items: center; gap: 10px; width: 100%; height: 32px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: var(--muted-foreground); font-size: 13px; font-weight: 500; text-align: left; transition: background var(--dur-1), color var(--dur-1); }
 .v4 .trow:hover { background: var(--hover); color: var(--ink); }
 .v4 .trow.on { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: var(--e1), 0 0 0 1px var(--line) inset; }
 .v4 .sw { width: 10px; height: 10px; flex: none; border-radius: 3px; }
 
-/* The session context menu — portaled to <body>, so it carries its own
-   .v4.scope and the floating surface here. */
 .v4.scope.ctx-menu { width: 224px; padding: 6px; border-radius: 12px; background: var(--glass-strong); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); border: 1px solid var(--line-strong); box-shadow: var(--e2); font-size: 13px; animation: v4-fade 0.14s var(--ease-out) both; }
 .v4.scope.ctx-menu .mrow { gap: 8px; }
 .v4.scope.ctx-menu .mrow:focus-visible { outline: none; background: var(--hover); }
 .v4.scope.ctx-menu .mrow.danger:hover { background: var(--danger-soft); }
 .v4.scope.ctx-menu .ctx-coverage { font-size: 12px; line-height: 16px; color: var(--muted-foreground); }
 
-/* ── The rail ──────────────────────────────────────────────────────── */
 .v4 .rail { position: sticky; top: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; height: 100vh; padding: 12px 0; }
 .v4 .ri { position: relative; width: 40px; height: 40px; flex: none; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 12px; background: transparent; color: var(--muted-foreground); transition: background var(--dur-1), color var(--dur-1), box-shadow var(--dur-2), transform var(--dur-1) var(--ease-out); }
 .v4 .ri:hover { background: var(--hover); color: var(--ink); }
@@ -102,25 +83,19 @@
 .v4 .ri.foot { margin-top: auto; }
 .v4 .ri-wrap { display: block; flex: none; }
 .v4 .rail-sep { width: 20px; height: 1px; margin: 8px 0; background: var(--line-strong); flex: none; }
-/* The waiting badge: a warn dot cut out of the ground. */
 .v4 .badge { position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 2px var(--background); }
 .v4 .ri.open .badge { box-shadow: 0 0 0 2px var(--surface); }
-/* Tooltips sit to the right of the rail. */
 .v4 .ri .tip { position: absolute; left: calc(100% + 10px); top: 50%; display: inline-flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 7px; background: var(--ink); color: var(--on-ink); font-size: 12px; line-height: 16px; font-weight: 500; white-space: nowrap; opacity: 0; pointer-events: none; transform: translate(-4px, -50%); transition: opacity var(--dur-1), transform var(--dur-2) var(--ease-out); box-shadow: var(--e2); z-index: 41; }
 .v4 .ri:hover .tip, .v4 .ri:focus-visible .tip { opacity: 1; transform: translate(0, -50%); transition-delay: 250ms; }
 .v4 .tip-k { font-family: var(--font-jetbrains), monospace; font-size: 11px; color: color-mix(in srgb, var(--on-ink) 64%, transparent); }
-/* A flyout hangs from the rail's top edge, beside it (its containing
-   block is the rail; closing waits a beat so the pointer can cross). */
 .v4 .fly { position: absolute; left: calc(100% + 8px); top: 12px; z-index: 40; width: 300px; max-height: calc(100vh - 24px); padding: 8px; border-radius: 16px; display: flex; flex-direction: column; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 .v4 .fly-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 4px 4px 10px; }
 .v4 .fly-head .mini { color: var(--brand); }
 .v4 .fly-foot { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
 .v4 .fly .ghost { width: 100%; }
 
-/* Electron on macOS: the title bar (--lh-bar, app/globals.css). The
-   .titlebar band is the window-drag surface across the top (first in the
-   DOM, so later carve-outs subtract from it); the card, the main column
-   and the rail start below it. */
+/* Electron on macOS: .titlebar is the window-drag surface. It comes first in
+   the DOM so later carve-outs subtract from it. */
 .v4 .titlebar, .v4 .rail-lights { display: none; }
 .lh-electron[data-lh-platform="darwin"] .v4 .titlebar { display: block; position: absolute; top: 0; left: 0; right: 0; height: var(--lh-bar); }
 .lh-electron[data-lh-platform="darwin"] .v4 .side { padding-top: var(--lh-bar); }
@@ -129,7 +104,6 @@
 .lh-electron[data-lh-platform="darwin"] .v4 .rail-lights { display: block; width: 100%; height: var(--lh-bar); margin-bottom: 8px; flex: none; }
 .lh-electron[data-lh-platform="darwin"] .v4 .rail .fly { top: calc(var(--lh-bar) + 12px); max-height: calc(100vh - var(--lh-bar) - 24px); }
 
-/* ── Responsive ────────────────────────────────────────────────────── */
 @media (max-width: 1099px) {
 	.v4 .shell { grid-template-columns: 60px minmax(0, 1fr); }
 	.v4 .side { display: none; }
@@ -146,16 +120,12 @@
 	.v4 .side-rail .tip { display: none; }
 	.v4 .side-rail .fly { position: fixed; left: 12px; right: 12px; top: 60px; width: auto; max-height: calc(100vh - 72px); }
 	.v4 .main { padding: 16px; }
-	/* macOS: the flat rail's own band grows to hold the title bar; the
-	   lights band leaves the row (it would take the row's full width). */
 	.lh-electron[data-lh-platform="darwin"] .v4 .side-rail { padding-top: calc(var(--lh-bar) + 8px); }
 	.lh-electron[data-lh-platform="darwin"] .v4 .rail-lights { position: absolute; top: 0; left: 0; right: 0; width: auto; margin: 0; }
 	.lh-electron[data-lh-platform="darwin"] .v4 .side-rail .fly { top: calc(var(--lh-bar) + 60px); max-height: calc(100vh - var(--lh-bar) - 72px); }
 	.lh-electron[data-lh-platform="darwin"] .v4 .main { padding-top: 16px; }
 }
 
-/* New lesson / New practice: two action rows under the places, set off by
-   a hairline so they never read as destinations. */
 .v4 .side-new { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); flex: none; }
 .v4 .side-new-b .ic { color: var(--brand); }
 .v4 .side-new-b:hover .ic { color: var(--brand); }

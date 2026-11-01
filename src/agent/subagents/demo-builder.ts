@@ -8,41 +8,18 @@ import type { DemoResult } from "../../core/contracts.ts";
 import { getHeadless, type DemoRunResult, type HeadlessApi } from "./headless.ts";
 import { healToolRecord } from "../tools/heal.ts";
 
-/**
- * The demo-builder sub-agent (vision §2 interactive demos + §2.5 "sub-agents
- * verify; they never one-shot"): given a brief it writes a self-contained
- * single-file HTML/JS demo, TESTS IT HEADLESSLY (run_demo), and iterates
- * fix → re-run until clean — before anything reaches the lesson.
- *
- * Shape: a ToolLoopAgent with two executable tools (write_demo / run_demo) —
- * the engine is injectable (tests use a scripted faux engine) and the headless
- * API is injectable (tests use a fake; production uses the app's own
- * Chromium browser service, system Chrome as fallback).
- *
- * Failure semantics (decided in the W6 brief): `tested: true` means "the
- * verify loop ran"; on failure the result is { title, html: "", tested: true,
- * notes: "FAILED: <reason>" } — the card renders the failure note, no iframe.
- * The job wrapper treats html === "" as failure and marks the job error.
- */
-
 export interface DemoBuilderInput {
 	title: string;
 	brief: string;
 }
 
 export interface DemoBuilderOptions {
-	/** Test seam: scripted engine; production uses the demoBuilder role. */
 	engine?: PiEngine;
 	headless?: HeadlessApi;
-	/** Max agent steps (each write/run/fix is one step). Default 24 ≈ 6 cycles. */
 	maxSteps?: number;
-	/** Live activity-line callback (updates the job record). */
 	onActivity?: (line: string) => void;
-	/** Kills the run mid-model-call (2026-09 real-kill abort semantics). */
 	abortSignal?: AbortSignal;
-	/** Money channel: one call per agent step, folded into JobRecord.usage. */
 	onUsage?: (usage: Usage) => void;
-	/** Debug: raw provider-event recording key (LH_PROVIDER_EVENTS=1). */
 	chatId?: string;
 }
 
@@ -77,7 +54,6 @@ Never claim success you did not see: a PASSED run_demo is the only definition of
 
 interface BuilderState {
 	html: string | null;
-	/** The html that the last run_demo tested (null = never tested). */
 	testedHtml: string | null;
 	lastResult: DemoRunResult | null;
 }
@@ -91,7 +67,6 @@ const runDemoInput = Type.Object({
 		Type.String({
 			description:
 				"Optional JS expression evaluated in the page after settling, e.g. \"document.querySelectorAll('input').length\".",
-
 		}),
 	),
 });
@@ -174,7 +149,6 @@ function formatRunResult(result: DemoRunResult): string {
 	return sections.join("\n");
 }
 
-/** Short summary of a run for failure notes. */
 function failureSummary(result: DemoRunResult | null): string {
 	if (!result) return "never tested";
 	const details = [...result.consoleErrors, ...result.pageErrors, ...result.failedRequests].slice(0, 5);
@@ -221,7 +195,6 @@ export async function runDemoBuilder(input: DemoBuilderInput, opts: DemoBuilderO
 		return { title, html: "", tested: true, notes: `FAILED: the builder crashed — ${msg}` };
 	}
 
-	// The model produced nothing.
 	if (!state.html) {
 		return {
 			title,
@@ -231,8 +204,6 @@ export async function runDemoBuilder(input: DemoBuilderInput, opts: DemoBuilderO
 		};
 	}
 
-	// The verify gate: the delivered html must have a clean headless run —
-	// even when the model claims success or forgets the final run_demo.
 	if (state.testedHtml !== state.html || !state.lastResult?.ok) {
 		opts.onActivity?.("final verification");
 		let verify: DemoRunResult;

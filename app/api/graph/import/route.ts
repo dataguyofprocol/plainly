@@ -1,17 +1,7 @@
 /**
- * POST /api/graph/import — the format-agnostic front door's transport
- * (vision §1, 2026-09-13): raw personal-notes files in, one extraction run
- * per file through the SAME pipeline the sessions use. Multipart form data
- * (field "files", any text format — the extractor is format-agnostic); the
- * pipeline mints a deterministic source id per file path, persists the
- * source record (the file's provenance + the run's usage), and runs
- * extractor → auditor → merger over the raw text.
- *
- * Small concurrency cap: the model calls are the slow part, and a burst of
- * 25 simultaneous runs would trip provider rate limits — a 3-wide worker
- * pool keeps the run registry (the dock's status chips) and the ledgers
- * healthy. The dock's chips + graph refetch track progress live through
- * /api/graph/status, as with session runs.
+ * POST /api/graph/import, multipart field "files" (any text format): one
+ * notes-extraction run per file. At most 3 run at once to stay under
+ * provider rate limits.
  */
 import { extraction, NotesImportError } from "@/src/server";
 import {
@@ -30,9 +20,7 @@ interface ImportResult {
 	ok: boolean;
 	stats?: EmissionStats;
 	error?: string;
-	/** The machine discriminator when ok:false is a config refusal — the
-	 * BYOK models refusal (owner, 2026-09-22) or the provider-key refusal
-	 * (2026-09-25); the client can open the setup/keys flow off it. */
+	/** Set when ok:false is a config refusal; the client opens the setup/keys flow off it. */
 	code?: "models_not_configured" | (typeof PROVIDER_KEY_MISSING_CODE);
 	missing?: string[];
 	/** The key-refusal specifics (provider_key_missing only). */

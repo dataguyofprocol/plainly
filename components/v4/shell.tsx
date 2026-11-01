@@ -1,28 +1,5 @@
 "use client";
 
-/**
- * THE V4 SHELL (rebuild, 2026-10-26; finesse pass) — the pieces every
- * screen frames itself with:
- *
- *   Field        the drifting gradient behind everything (paused when the
- *                window is in the background; still under reduced motion)
- *   SidebarCard  the inset glass card at ≥1100px: wordmark, Home /
- *                Knowledge, New session, a screen-owned middle (sessions by
- *                default, topics on Knowledge), a footer (Settings, or
- *                Import notes). Between 800 and 1099px the same frame
- *                renders as the icon rail; below 800 the rail lies flat
- *                along the top. CSS decides which one shows (no layout
- *                flash on first paint).
- *   SessionGroups  Waiting on you / Today / Earlier, capped per group, then
- *                a collapsed Archived group; the right-click menu (rename,
- *                export, archive, delete, extraction coverage)
- *   Rail         the icon column of Lesson and Practice, with the
- *                sessions flyout (hover, focus, click, or ⌘B) — the very
- *                same component the sidebar card collapses into
- *
- * Styles: app/ui/shell.css.
- */
-
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -35,7 +12,6 @@ import { displayTitle } from "@/components/ui/format";
 import { kbdEventForAction, type ChatDeleteMode } from "@/src/core";
 import { groupChats, isPractice, sessionLine, sessionState, useChats, type V4Chat } from "@/components/v4/data";
 
-/** Rows shown per group before "Show all" (a real library runs to hundreds). */
 const GROUP_CAP = 8;
 
 type Place = "home" | "knowledge" | "practice";
@@ -49,10 +25,6 @@ function placeOf(pathname: string | null): Place | undefined {
 	return pathname === "/" ? "home" : pathname === "/knowledge" ? "knowledge" : pathname === "/practice" ? "practice" : undefined;
 }
 
-/** New session = Home's composer, focused and set to that kind (⌘N and
- *  the sidebar/rail "+" open Learn; /practice and ⌘K open Practice).
- *  Already on Home, the event alone switches it;
- *  elsewhere the URL carries the mode for Home's first render. */
 function useNewSession() {
 	const router = useRouter();
 	const pathname = usePathname();
@@ -67,10 +39,7 @@ function useNewSession() {
 	);
 }
 
-// ─── Field ─────────────────────────────────────────────────────────────────
-
 export function Field({ variant = "home" }: { variant?: "home" | "knowledge" | "warm" }) {
-	// Pause the drift while the window is hidden — no GPU work nobody sees.
 	const [still, setStill] = useState(false);
 	useEffect(() => {
 		const on = () => setStill(document.visibilityState !== "visible");
@@ -87,11 +56,6 @@ export function Field({ variant = "home" }: { variant?: "home" | "knowledge" | "
 	);
 }
 
-// ─── Sidebar card ──────────────────────────────────────────────────────────
-
-/** The sidebar card. With no `children` its middle is the session list;
- *  a screen may pass its own (Knowledge passes topics) — in rail mode that
- *  middle and the footer move into the rail's panel flyout. */
 export function SidebarCard({
 	children,
 	footer,
@@ -108,7 +72,6 @@ export function SidebarCard({
 	const here = placeOf(pathname);
 	return (
 		<>
-			{/* macOS title bar's drag band (app/ui/shell.css .titlebar). */}
 			<div className="titlebar lh-drag" aria-hidden="true" />
 			<aside className="side" aria-label="Navigation">
 				<div className="sidein glass">
@@ -161,11 +124,6 @@ export function SidebarCard({
 	);
 }
 
-// ─── Session groups (+ the session context menu) ───────────────────────────
-
-/** The session rows of the sidebar card and the rail flyout. Right-click a
- *  row for Rename / Export as Markdown / Delete, with the extraction
- *  coverage block below (the management menu the old sidebar carried). */
 export function SessionGroups({ chats, compact = false }: { chats: V4Chat[] | null; compact?: boolean }) {
 	const pathname = usePathname();
 	const router = useRouter();
@@ -254,8 +212,6 @@ export function SessionGroups({ chats, compact = false }: { chats: V4Chat[] | nu
 			{groups.map((g) => {
 				const all = expanded.has(g.name);
 				const activeAt = g.chats.findIndex((c) => pathname === `/chat/${c.id}`);
-				// Archived folds shut until opened (the open session keeps it
-				// open); live groups are capped, the open session always in view.
 				const archive = g.name === "Archived";
 				const archiveOpen = archive && (all || activeAt !== -1);
 				const shown = archive
@@ -425,21 +381,16 @@ function RenameRow({ chat, onCommit, onCancel }: { chat: V4Chat; onCommit: (t: s
 	);
 }
 
-// ─── Rail ──────────────────────────────────────────────────────────────────
-
-/** The rail of Lesson and Practice. */
 export function Rail({ active }: { active?: Place }) {
 	const chats = useChats();
 	return (
 		<>
-			{/* macOS title bar's drag band (app/ui/shell.css .titlebar). */}
 			<div className="titlebar lh-drag" aria-hidden="true" />
 			<RailNav chats={chats} active={active} />
 		</>
 	);
 }
 
-/** One rail item's tooltip (a real element, so it can carry a key hint). */
 function Tip({ label, keys }: { label: string; keys?: string }) {
 	return (
 		<span className="tip" aria-hidden="true">
@@ -449,8 +400,6 @@ function Tip({ label, keys }: { label: string; keys?: string }) {
 	);
 }
 
-/** A hover/focus/click flyout anchored to a rail button. Closing waits a
- *  beat so the pointer can cross from the button to the panel. */
 function useFlyout() {
 	const [open, setOpen] = useState(false);
 	const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -482,9 +431,7 @@ function RailNav({
 }: {
 	chats: V4Chat[] | null;
 	active?: Place;
-	/** Inside the sidebar card's rail mode: the card owns the settings testid. */
 	embedded?: boolean;
-	/** A screen's own sidebar middle (Knowledge's topics), as a second flyout. */
 	panel?: { label: string; content: ReactNode };
 }) {
 	const { open: openSettings } = useSettingsDialog();
@@ -495,7 +442,6 @@ function RailNav({
 	const railRef = useRef<HTMLElement>(null);
 	const { setOpen: setSessionsOpen } = sessions;
 
-	// ⌘B toggles the sessions flyout — only on the rail that is showing.
 	useEffect(() => {
 		const event = kbdEventForAction("toggle-sidebar");
 		const on = () => {

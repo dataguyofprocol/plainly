@@ -4,28 +4,10 @@ import { serverExecute } from "../tool-execute.ts";
 import type { JobRecord } from "../../core/contracts.ts";
 import type { JobStore } from "../../core/ports.ts";
 
-/**
- * Async sub-agent job tools (vision §2.5; W2/W6 kinds + the pi-model
- * protocol). SERVER-EXECUTED: each call creates the job record, fires the
- * background runner (via the injected spawn seam — the agent layer never
- * imports one), and resolves IMMEDIATELY with a fire-and-forget ack. The
- * teacher's turn does NOT end at the call; the result arrives later as a
- * steer message that wakes the teacher in a new turn. See contracts.ts
- * "THE ASYNC PROTOCOL".
- */
-
-/** What the job tools need at execute time (injected by the composition root). */
 export interface JobToolContext {
 	chatId: string;
-	/** Creates the job record (deduped by toolCallId). */
 	jobStore: JobStore;
-	/** Fire the background runner for a fresh job — fire-and-forget. The
-	 *  input rides along because the spawn happens MID-STREAM, before
-	 *  onFinish persists the tool part — a transcript scan would race it. */
 	spawn: (job: JobRecord, input: ResearchInput | DemoInput | VisualInput | PdfInput) => void;
-	/** Search-provider availability, retained for existing composition seams.
-	 *  Research dispatch does not depend on it: web_fetch is keyless and
-	 *  web_search reports a missing provider as a recoverable tool result. */
 	searchAvailable?: () => boolean;
 }
 
@@ -66,10 +48,6 @@ export const pdfInputSchema = Type.Object({
 	}),
 });
 
-/**
- * The per-call dispatch: create the job (idempotent by toolCallId), fire the
- * runner, and return the ack. Shared by all three tools — only kind differs.
- */
 function dispatch(
 	ctx: JobToolContext,
 	kind: JobRecord["kind"],
@@ -120,14 +98,6 @@ const PDF_DESCRIPTION =
 	"continues; the brief arrives later as a new message. For quick looks at plain text or image files, use the read tool " +
 	"directly instead of dispatching.";
 
-/**
- * Per-request job tool registry: each tool closes over the composition root's
- * context (chatId + jobStore + the spawn seam), so concurrent chats never
- * share state. chat-handler wires it each turn; tests wire their own.
- *
- * Research remains available without a search-provider key; the role's
- * existing user-toggle filtering still applies outside this registry.
- */
 export function jobTools(ctx: JobToolContext): Record<string, AgentTool<any>> {
 	return {
 		research: {

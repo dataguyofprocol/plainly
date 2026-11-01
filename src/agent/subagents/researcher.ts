@@ -6,16 +6,6 @@ import type { SearchProvider } from "../../core/search.ts";
 import type { PiEngine } from "../models.ts";
 import { runSubagent } from "./pi-run.ts";
 
-/**
- * The researcher sub-agent (vision §2.5): a SEPARATE ToolLoopAgent instance
- * from the teacher — an isolated loop with only web_search + web_fetch, so
- * raw search/fetch churn never touches the teacher's context window.
- *
- * System prompt adapted from the pi researcher agent
- * (~/.pi/agent/extensions/interactive-subagents/agents/researcher.md).
- * The engine is injectable so tests run the loop with a scripted faux engine.
- */
-
 const INSTRUCTIONS = `You are a research specialist. You work for a teacher agent inside a learning
 application: given a research question, conduct thorough web research and produce a focused,
 well-sourced brief that the teacher can teach from.
@@ -69,28 +59,14 @@ What couldn't be answered. Suggested next steps.`;
 
 export interface ResearcherRunOptions {
 	engine?: PiEngine;
-	/** The search seam (search port wave, 2026-09-20): resolves the LIVE
-	 *  provider per call, null = honestly unavailable (the web_search tool
-	 *  reports that in its output — no crash, no silent fallback). Absent
-	 *  seam reads as unavailable; web_fetch remains usable without it. */
 	search?: () => SearchProvider | null;
-	/** The researcher's PDF dir (PDF wave, 2026-10-07): when present, the
-	 *  toolset gains web_fetch_pdf + pdf_info/pdf_extract/pdf_search scoped
-	 *  to this per-job temp dir — PDFs from the web, read page-level. The
-	 *  runner owns its lifecycle (mkdtemp before, rm after). */
 	pdfDir?: string;
 	abortSignal?: AbortSignal;
 	onUsage?: (usage: Usage) => void;
 	onToolStart?: (toolName: string, args: unknown) => void;
-	/** Debug: raw provider-event recording key (LH_PROVIDER_EVENTS=1). */
 	chatId?: string;
 }
 
-/**
- * Run the researcher to completion: isolated context, web tools only, final
- * text = the brief. The engine and search seam are injectable so tests run
- * the loop scripted.
- */
 export async function runResearcherAgent(prompt: string, opts: ResearcherRunOptions = {}): Promise<string> {
 	const tools = Object.values(createWebTools(opts.search ?? (() => null)));
 	if (opts.pdfDir) tools.push(...Object.values(createPdfReadTools(opts.pdfDir)));

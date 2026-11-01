@@ -63,12 +63,6 @@ export const Reasoning = memo(
     children,
     ...props
   }: ReasoningProps) => {
-    // COLLAPSED BY DEFAULT, ALWAYS (owner, streaming round 2026-10-01):
-    // the old default opened on streaming and an auto-open effect
-    // re-fought a manual collapse — the block "wasn't collapsible until
-    // it finished". Collapsed is the default; opening is always the
-    // learner's click; the auto-close after the stream still tidies a
-    // row the learner had opened.
     const resolvedDefaultOpen = defaultOpen ?? false;
 
     const [isOpen, setIsOpen] = useControllableState<boolean>({
@@ -79,7 +73,6 @@ export const Reasoning = memo(
     const hasEverStreamedRef = useRef(isStreaming);
     const [hasAutoClosed, setHasAutoClosed] = useState(false);
 
-    // Auto-close when streaming ends (once only, and only if it ever streamed)
     useEffect(() => {
       if (
         hasEverStreamedRef.current &&
@@ -129,10 +122,6 @@ export type ReasoningTriggerProps = ComponentProps<
   getThinkingMessage?: (isStreaming: boolean) => ReactNode;
 };
 
-/* The settled label (finesse pass, 2026-10-26): a quiet "Thinking" —
-   the old "Agent's thinking" repeated loudly between every turn. Motion
-   (spinner + shimmer) stays the working signal; a settled row carries
-   the brain glyph instead. */
 const defaultGetThinkingMessage = (isStreaming: boolean) => {
   if (isStreaming) {
     return <Shimmer duration={1} as="span">Thinking…</Shimmer>;
@@ -153,18 +142,10 @@ export const ReasoningTrigger = memo(
       <CollapsibleTrigger
         className={cn("ls-think-t", className)}
         {...props}
-        /* FOCUS HYGIENE (owner, keyboard round 2026-10-10): a pointer click
-           on the thinking toggle must not leave focus here — the learner's
-           next Enter submits, it must not re-toggle. Radix composes this
-           with its own toggle handler. */
         onClick={(e) => blurAfterPointerClick(e)}
       >
         {children ?? (
           <>
-            {/* The working-state grammar (owner, streaming round
-                2026-10-01): the Braille spinner WHILE STREAMING — the same
-                size as the transcript placeholder, so the handoff between
-                the two states is seamless. */}
             {isStreaming ? <BrailleSpinner label="Thinking" /> : <Icon name="thinking" size="sm" />}
             {getThinkingMessage(isStreaming)}
             <Icon name="chevron-right" size="xs" className="ls-chev" />
@@ -180,9 +161,6 @@ export type ReasoningContentProps = ComponentProps<
 > & {
   children: string;
 };
-
-// Shares message.tsx's Streamdown config (math delimiters, dark mermaid,
-// remark-breaks) — reasoning renders the same contract as message text.
 
 export const ReasoningContent = memo(
   ({ className, children, ...props }: ReasoningContentProps) => (

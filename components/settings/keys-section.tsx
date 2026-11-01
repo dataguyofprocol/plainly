@@ -1,29 +1,4 @@
 "use client";
-/**
- * The Keys section (wave-5 polish, 2026-09-21 — owner design): a MINIMAL
- * key-value table. Provider left, masked key right, no description hints
- * (they took too much space), the "Get a key ↗" link a tiny muted guest.
- * Clicking a writable row unfolds a paste field + Save (+ Delete for a
- * file-sourced value) beneath it; Esc or a second click folds it away.
- * The Add-provider control is the LAST ROW of the table and uses the
- * app's shared dropdown look (ProviderMenuList — fuzzy search over the
- * 33 pi-ai providers).
- *
- * Owner rulings carried in:
- *  - Env-owned rows (a real environment variable owns the name — dev
- *    .env.local or launch env) render READ-ONLY + dimmed, no paste field:
- *    a paste box on a key the UI cannot make live would mislead.
- *  - OpenRouter is NOT special: one provider among 33, a row only when
- *    stored, otherwise it lives in the Add dropdown like everyone else.
- *  - Providers groups API keys, OpenAI-compatible endpoints (their own
- *    editor — custom-providers-section.tsx), subscriptions, dictation
- *    and search.
- *    Unknown variables stay masked/read-only at the end of Model API keys.
- *
- * API: GET /api/keys (masked statuses + the providers array), PUT
- * /api/keys/:id (shape-gated 400s land inline), DELETE. Saves take
- * effect immediately. Plaintext never returns from the store.
- */
 
 import { useEffect, useRef, useState } from "react";
 import { AUTH_KEYS, type AuthKeyStatus } from "@/src/core";
@@ -37,8 +12,6 @@ import { notifySettingsSaved } from "@/components/settings-signal";
 import { OPEN_CONNECT_EVENT } from "@/components/connect-provider";
 import { Icon } from "@/components/ui/icon";
 
-/** One pi-ai provider with plain API-key auth (the Platform seam —
- *  derived from pi-ai's own env-key table; no drift possible). */
 export interface ProviderKeyInfo {
 	id: string;
 	envVar: string;
@@ -50,27 +23,15 @@ interface KeysResponse {
 	providers?: ProviderKeyInfo[];
 }
 
-/** The curated tools group, pinned by id (the catalog owns the copy;
- *  these ids are the contract). Derived from the catalog (search wave,
- *  2026-09-20: the Google CSE pair retired, Tavily + Brave joined) — the
- *  section can never drift from core/auth-keys.ts again. */
 const TOOL_IDS = AUTH_KEYS.map((k) => k.id) as readonly string[];
 
-/** The classification driving the table groups. Pure — exported for
- *  tests. OpenRouter is un-pinned (wave-5 owner ruling): no synthesis,
- *  no special row — it rides the same provider classification. */
 export function classifyKeys(
 	statuses: readonly AuthKeyStatus[],
 	providers: readonly ProviderKeyInfo[] | undefined,
 ): {
-	/** Stored provider keys (env or file), in GET order. */
 	providerRows: AuthKeyStatus[];
-	/** The curated tools rows (synthesized when absent — always shown,
-	 *  they carry the docs links a first boot needs). */
 	toolRows: AuthKeyStatus[];
-	/** Unknown file vars — preserved, read-only. */
 	unknownRows: AuthKeyStatus[];
-	/** Providers without a stored key — the Add dropdown's options. */
 	addable: ProviderKeyInfo[];
 } {
 	const byId = new Map(statuses.map((s) => [s.id, s]));
@@ -102,8 +63,6 @@ export function classifyKeys(
 	};
 }
 
-/** The minimal status line, e.g. "…ab12 · 64 chars" (" · env" marks an
- *  environment-owned value — the row itself is read-only then). Pure. */
 export function keyStatusLine(status: AuthKeyStatus): string {
 	if (!status.present || !status.masked) return "not set";
 	const tail = status.masked.replace(/ \((\d+) chars\)$/, "");
@@ -111,23 +70,17 @@ export function keyStatusLine(status: AuthKeyStatus): string {
 	return `${tail} · ${chars}${status.source === "env" ? " · env" : ""}`;
 }
 
-/** The masked tail alone ("…ab12"), for display beside the name. Pure. */
 function maskedTail(status: AuthKeyStatus): string | null {
 	if (!status.present || !status.masked) return null;
 	return status.masked.replace(/ \((\d+) chars\)$/, "");
 }
 
-/** What each curated tool key is FOR, in the learner's words (display-only;
- *  the catalog's own descriptions are written for operators). */
 const TOOL_PURPOSE: Record<string, string> = {
 	DEEPGRAM_API_KEY: "Lets you answer out loud instead of typing",
 	TAVILY_API_KEY: "Lets the research assistant search the web",
 	BRAVE_API_KEY: "Another web search for the research assistant",
 };
 
-/** One table row: label left, tiny docs link + status right. Writable
- *  rows click-unfold an editor beneath (owner interaction); env-owned
- *  rows are dimmed and read-only (a paste box there would mislead). */
 function KeyTableRow({
 	label,
 	docsUrl,
@@ -141,17 +94,13 @@ function KeyTableRow({
 	purpose,
 }: {
 	label: string;
-	/** One line on what the key unlocks (the tool keys). */
 	purpose?: string;
-	/** The "Get a key ↗" target — curated keys carry one. */
 	docsUrl?: string;
 	status: AuthKeyStatus;
 	expanded: boolean;
 	onToggle: () => void;
 	onSave: (value: string) => Promise<string | null>;
 	onDelete?: () => Promise<void>;
-	/** Folds the editor (owner, fix wave: the way OUT of a paste prompt
-	 *  must be visible — Cancel beside Save/Delete, not only Esc). */
 	onCancel: () => void;
 	testid: string;
 }) {
@@ -170,10 +119,6 @@ function KeyTableRow({
 		setBusy(false);
 	}
 
-	// INLINE editing (owner, fix wave: "type the keys in line — more
-	// table-like"): the expanded row becomes the editor itself — name
-	// left, the paste field filling the middle, Save | Cancel (| Delete)
-	// right — instead of a second line beneath the row.
 	if (expanded && !envOwned) {
 		return (
 			<div data-testid={testid}>
@@ -296,8 +241,6 @@ function KeyTableRow({
 	);
 }
 
-/** The Add-provider control — the table's last row, the app's shared
- *  dropdown look (portaled menu, the search + arrow-walk machine). */
 function AddProviderRow({
 	addable,
 	onPick,
@@ -360,8 +303,6 @@ function AddProviderRow({
 					align="left"
 					menuClass="pop lh-menu mm mid"
 				>
-					{/* Close on pick (owner, fix wave): a chosen provider ends
-					    the dropdown — the paste row is the next step. */}
 					<ProviderMenuList
 						providers={addable}
 						onPick={(p) => {
@@ -376,10 +317,6 @@ function AddProviderRow({
 }
 
 export function KeysSection({
-	/** A deep-linked row to unfold on arrival (zero-keys wave): the
-	 *  dictation error's click lands here on DEEPGRAM_API_KEY. Followed
-	 *  while mounted too — the settings dialog's while-open retarget
-	 *  pattern. undefined = nothing seeded. */
 	initialRow,
 }: {
 	initialRow?: string;
@@ -387,17 +324,10 @@ export function KeysSection({
 	const [statuses, setStatuses] = useState<AuthKeyStatus[] | null>(null);
 	const [providers, setProviders] = useState<ProviderKeyInfo[] | undefined>(undefined);
 	const [loading, setLoading] = useState(true);
-	/** The unfolded row (its id), null = all folded. Seeded by the
-	 *  deep-link (initialRow) and re-followed when it retargets. */
 	const [openRow, setOpenRow] = useState<string | null>(initialRow ?? null);
-	/** The paste editor for a freshly chosen Add-provider target. */
 	const [adding, setAdding] = useState<ProviderKeyInfo | null>(null);
 	const [addError, setAddError] = useState<string | null>(null);
 
-	// Escape folds any open editor (unfolded row or the Add-provider paste)
-	// WITHOUT closing the dialog. Claimed at document CAPTURE phase — the
-	// only stopPropagation that outruns both the input's React handler and
-	// the dialog's window-level listener.
 	useEffect(() => {
 		if (openRow === null && adding === null) return;
 		const onKeyDown = (e: KeyboardEvent) => {
@@ -425,9 +355,6 @@ export function KeysSection({
 		void reload();
 	}, []);
 
-	// The deep-link follow: a retarget while the section is open (the
-	// same while-open pattern the dialog's section nav uses) unfolds the
-	// named row; a fresh mount seeds it via the useState initializer.
 	useEffect(() => {
 		if (initialRow !== undefined) setOpenRow(initialRow);
 	}, [initialRow]);
@@ -443,9 +370,6 @@ export function KeysSection({
 			return body.error ?? `Save failed (${res.status})`;
 		}
 		await reload();
-		// The cross-surface keys signal (zero-keys wave): the zero-keys pill,
-		// the setup dialog's stage advance, and any other keys reader hear
-		// that a key landed — deletions included (see deleteKey below).
 		notifySettingsSaved("keys");
 		return null;
 	}
@@ -503,7 +427,7 @@ export function KeysSection({
 						onToggle={() => setOpenRow(openRow === status.id ? null : status.id)}
 						onSave={async (v) => {
 							const err = await saveKey(status.id, v);
-							if (!err) setOpenRow(null); // fold on success — rest state
+							if (!err) setOpenRow(null);
 							return err;
 						}}
 						onCancel={() => setOpenRow(null)}
@@ -580,8 +504,6 @@ export function KeysSection({
 	);
 }
 
-/** The paste field for a provider chosen in the Add dropdown — rendered
- *  as the card's editor row until saved or cancelled. */
 function AddProviderEditor({
 	provider,
 	onSave,

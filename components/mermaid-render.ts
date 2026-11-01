@@ -1,14 +1,3 @@
-/**
- * The app's ONE mermaid renderer (the chrome-melt wave, 2026-09-19): both the
- * in-chat block (components/md-blocks.tsx) and the session-scoped focus
- * overlay (components/session-overlay.tsx) render charts through this module
- * — one light-theme config, one plugin instance, unique render ids. This
- * REPLACES streamdown's internal mermaid path entirely: its fullscreen portal
- * was hard-wired `fixed inset-0` (covering the window-drag bar, X landing in
- * drag territory) with no styling hook, which is what drove the custom
- * component in the first place.
- */
-
 import { createMermaidPlugin } from "@streamdown/mermaid";
 import type { MermaidConfig } from "mermaid";
 

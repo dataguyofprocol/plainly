@@ -2,42 +2,20 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
-/**
- * PDF plumbing for the pdf-reader sub-agent — sources v0 (2026-09): Node
- * ports of the four pdf-reader skill scripts (pdf_info / pdf_extract /
- * pdf_search / pdf_render), on the user-chosen hybrid stack:
- *
- * - TEXT (info / extract / search): pdfjs-dist — pure JS, no native deps.
- * - RENDER: subagents/headless.ts uses the same pdfjs engine with
- *   @napi-rs/canvas (Skia), in-process — no browser needed.
- *
- * Doctrine (the skill's reading strategy, mirrored in the sub-agent's system
- * prompt): triage with pdf_info FIRST, then size-based strategy — short PDFs
- * render all pages, medium render flagged (math/image-heavy) pages, long
- * ones search for targeted lookups before reading anything at length.
- *
- * These are pure library functions — no model in sight. The pdf-reader
- * agent (pdf-reader.ts) drives them through its own tool loop.
- */
-
 export interface PdfPageInfo {
 	page: number;
 	text_length: number;
 	image_count: number;
-	/** Fraction of math-flavored chars — the render-this-page signal (port
-	 *  of the skill's unicode-range density heuristic). */
 	math_density: number;
 }
 
 export interface PdfInfo {
 	path: string;
 	page_count: number;
-	/** Mean chars/page — the size class the strategy branches on. */
 	mean_text_length: number;
 	pages: PdfPageInfo[];
 }
 
-/** Load the legacy pdfjs build (runs headless in plain node, no worker). */
 async function loadPdfjs() {
 	const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
 	return pdfjs;
@@ -63,7 +41,6 @@ async function openDocument(filePath: string) {
 	return { doc: await task.promise, task };
 }
 
-/** Concatenate a page's text items into a body string. */
 function itemsToText(items: unknown[]): string {
 	let out = "";
 	for (const it of items) {
@@ -75,20 +52,19 @@ function itemsToText(items: unknown[]): string {
 	return out;
 }
 
-/** Math-flavored char fraction — the skill's heuristic, verbatim ranges. */
 function mathDensity(text: string): number {
 	let mathChars = 0;
 	for (const c of text) {
 		const code = c.codePointAt(0)!;
 		if (
-			(code >= 0x2200 && code <= 0x22ff) || // Mathematical Operators
-			(code >= 0x2100 && code <= 0x214f) || // Letterlike Symbols
-			(code >= 0x2190 && code <= 0x21ff) || // Arrows
-			(code >= 0x27c0 && code <= 0x27ef) || // Misc Mathematical Symbols-A
-			(code >= 0x2980 && code <= 0x29ff) || // Misc Mathematical Symbols-B
-			(code >= 0x2a00 && code <= 0x2aff) || // Supplemental Mathematical Operators
-			(code >= 0x0370 && code <= 0x03ff) || // Greek
-			(code >= 0x1d400 && code <= 0x1d7ff) || // Mathematical Alphanumeric Symbols
+			(code >= 0x2200 && code <= 0x22ff) ||
+			(code >= 0x2100 && code <= 0x214f) ||
+			(code >= 0x2190 && code <= 0x21ff) ||
+			(code >= 0x27c0 && code <= 0x27ef) ||
+			(code >= 0x2980 && code <= 0x29ff) ||
+			(code >= 0x2a00 && code <= 0x2aff) ||
+			(code >= 0x0370 && code <= 0x03ff) ||
+			(code >= 0x1d400 && code <= 0x1d7ff) ||
 			"∫∑∏√∂∇∞≈≠≤≥±×÷∈∉⊂⊃∪∩∧∨¬∀∃∅".includes(c)
 		) {
 			mathChars++;
@@ -97,17 +73,13 @@ function mathDensity(text: string): number {
 	return mathChars / Math.max(text.length, 1);
 }
 
-/** Cheap validity probe: getDocument resolves only for parseable PDFs —
- *  no page walk, no text extraction (unlike pdfInfo). The reader's upfront
- *  unreadable-source gate; garbage files throw pdfjs's precise error. */
 export async function pdfProbe(filePath: string): Promise<void> {
 	const { task } = await openDocument(filePath);
 	await task.destroy();
 }
 
-/** pdf_info: page count + per-page triage signals. ALWAYS run first. */
 export async function pdfInfo(filePath: string): Promise<PdfInfo> {
-	const pdfjs = await loadPdfjs(); // OPS constant for the operator-list scan
+	const pdfjs = await loadPdfjs();
 	const { doc } = await openDocument(filePath);
 	const pages: PdfPageInfo[] = [];
 	let totalText = 0;
@@ -115,7 +87,6 @@ export async function pdfInfo(filePath: string): Promise<PdfInfo> {
 		const page = await doc.getPage(i);
 		const content = await page.getTextContent();
 		const text = itemsToText(content.items as unknown[]);
-		// count page images: paintImageXObject ops in the operator list
 		const ops = await page.getOperatorList();
 		let imageCount = 0;
 		for (const fn of ops.fnArray) {
@@ -137,7 +108,6 @@ export async function pdfInfo(filePath: string): Promise<PdfInfo> {
 	};
 }
 
-/** Parse 'all' | '1-5' | '1,3,7' | '3' into a sorted 1-indexed page list. */
 export function parsePageSpec(spec: string, total: number): number[] {
 	const trimmed = spec.trim().toLowerCase();
 	if (trimmed === "all") return Array.from({ length: total }, (_, i) => i + 1);
@@ -158,7 +128,6 @@ export function parsePageSpec(spec: string, total: number): number[] {
 	return [...pages].sort((a, b) => a - b);
 }
 
-/** pdf_extract: text of the requested pages, `--- Page N ---` headed. */
 export async function pdfExtract(filePath: string, pageSpec: string): Promise<string> {
 	const { doc } = await openDocument(filePath);
 	const pages = parsePageSpec(pageSpec, doc.numPages);
@@ -176,13 +145,9 @@ export async function pdfExtract(filePath: string, pageSpec: string): Promise<st
 export interface PdfSearchHit {
 	page: number;
 	line: number;
-	/** contextLines around the hit, `>>>` marking the hit line. */
 	context: string;
 }
 
-/** pdf_search: keyword/regex across all pages with context lines.
- *  pageTexts rides along so the agent can extract a hit's full page without
- *  a second pass (the skill pipelines `search → extract` the same way). */
 export async function pdfSearch(
 	filePath: string,
 	query: string,
@@ -226,9 +191,7 @@ function escapeRegex(s: string): string {
 	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Where rendered pages land (mirrors the skill's /tmp convention). */
 export function renderDir(filePath: string): string {
-	// FNV-1a short hash of the absolute path — stable per file, no deps.
 	const abs = path.resolve(filePath);
 	let h = 0x811c9dc5;
 	for (let i = 0; i < abs.length; i++) {

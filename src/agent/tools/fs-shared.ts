@@ -2,55 +2,21 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 
-/**
- * Shared plumbing for the learner-filesystem tools (ls / find / grep) —
- * sources v1 (2026-09-19): the agent locates and reads the learner's files
- * itself (user decision: the learner references files in messages; the
- * agent finds them). The composer's paperclip (2026-10-31) keeps that
- * law — it only writes the file's exact path into the message
- * (src/core/attachments.ts); nothing is uploaded or auto-read.
- *
- * Safety posture (user-locked): READ-ONLY by construction — no shell-out,
- * no user-controlled process args, no mutation APIs anywhere here. The one
- * deliberate scope widening vs pi: relative paths and default roots resolve
- * against the LEARNER'S HOME, not a project cwd — the harness has no
- * meaningful working directory, and "find my notes" should just work.
- *
- * Ported behaviors (mirroring pi's dist/core/tools/{ls,find,grep}.js): the
- * schemas, descriptions, output formats, and truncation notices are copied
- * verbatim except where semantics differ (home default, no .gitignore —
- * replaced by hard noise exclusions).
- */
-
-/** 50KB — pi's DEFAULT_MAX_BYTES, the output ceiling for every fs tool. */
 export const MAX_OUTPUT_BYTES = 50 * 1024;
-/** pi's grep line-truncation length (GREP_MAX_LINE_LENGTH). */
 export const GREP_MAX_LINE_LENGTH = 500;
-/** Wall-clock budget for tree walks (find/grep over a whole home dir). */
 export const WALK_TIMEOUT_MS = 10_000;
 
-/**
- * Directory names never entered during walks. node_modules/.git mirror pi's
- * fd/rg defaults; Library/.Trash are the home-root noise the user approved
- * (2026-09-19) — caches, app support, and the trash live under them.
- * Explicit paths (ls/read of ~/Library/…) are NOT filtered — only walks.
- */
 const EXCLUDED_DIR_NAMES = new Set(["node_modules", ".git", "Library", ".Trash"]);
 
-/** Resolve a tool path argument: absolute stays, relative/absent → home.
- *  (pi resolves against the project cwd; the harness's "project" is the
- *  learner's life, so the home directory is the anchor.) */
 export function resolveSourcePath(p?: string): string {
 	if (!p) return os.homedir();
 	return path.isAbsolute(p) ? p : path.join(os.homedir(), p);
 }
 
-/** pi's formatSize idiom (50KB prints as "50.0KB"). */
 export function formatSize(bytes: number): string {
 	return bytes >= 1024 ? `${(bytes / 1024).toFixed(1)}KB` : `${bytes}B`;
 }
 
-/** Cap output to MAX_OUTPUT_BYTES on whole lines, pi's truncateHead idiom. */
 export function capOutput(lines: string[]): { content: string; truncated: boolean } {
 	const out: string[] = [];
 	for (const line of lines) {
@@ -63,9 +29,6 @@ export function capOutput(lines: string[]): { content: string; truncated: boolea
 	return { content: out.join("\n"), truncated: false };
 }
 
-/** Expand top-level brace alternatives: '*.{ts,tsx}' → ['*.ts', '*.tsx'].
- *  Nested braces are out of scope (pi's fd handles them; models rarely
- *  emit them — a non-expanding literal match is the graceful fallback). */
 export function expandBraces(pattern: string): string[] {
 	const open = pattern.indexOf("{");
 	if (open === -1) return [pattern];
@@ -80,8 +43,6 @@ export function expandBraces(pattern: string): string[] {
 	return alts;
 }
 
-/** Glob → anchored RegExp. '*' stays within a segment, '**' crosses '/',
- *  '?' is one char, everything else literal. */
 export function globToRegex(glob: string): RegExp {
 	let re = "";
 	for (let i = 0; i < glob.length; i++) {
@@ -103,13 +64,6 @@ export function globToRegex(glob: string): RegExp {
 	return new RegExp(`^${re}$`);
 }
 
-/**
- * pi/fd's matching rule: a pattern with no slash matches against the
- * BASENAME at any depth; one with a slash matches the relative path, with
- * an implied leading "**-slash" prefix unless it is itself anchored (see
- * the code below — the literal sequence cannot appear in this comment
- * because it terminates block comments).
- */
 export function matchGlob(relativePath: string, pattern: string): boolean {
 	const posix = relativePath.split(path.sep).join("/");
 	const basename = posix.split("/").pop() ?? posix;
@@ -128,12 +82,6 @@ export function matchGlob(relativePath: string, pattern: string): boolean {
 	return false;
 }
 
-/**
- * Depth-first walk under `root`, never entering EXCLUDED_DIR_NAMES.
- * `visit` receives absolute file paths; returning true STOPS the walk
- * (find's result limit). The deadline bounds a home-dir walk to
- * WALK_TIMEOUT_MS — partial results are the graceful degradation.
- */
 export async function walkFiles(
 	root: string,
 	visit: (filePath: string) => boolean | Promise<boolean>,
@@ -184,7 +132,6 @@ export async function walkFiles(
 	return { timedOut, aborted };
 }
 
-/** True if the first 8KB chunk contains a NUL byte — pi/rg's binary skip. */
 export async function isBinaryFile(filePath: string): Promise<boolean> {
 	const handle = await fs.open(filePath, "r");
 	try {
@@ -196,7 +143,6 @@ export async function isBinaryFile(filePath: string): Promise<boolean> {
 	}
 }
 
-/** pi's GREP_MAX_LINE_LENGTH line truncation (no mid-word care, hard cap). */
 export function truncateGrepLine(line: string): { text: string; wasTruncated: boolean } {
 	if (line.length <= GREP_MAX_LINE_LENGTH) return { text: line, wasTruncated: false };
 	return { text: `${line.slice(0, GREP_MAX_LINE_LENGTH)}… [truncated]`, wasTruncated: true };

@@ -1,14 +1,5 @@
 "use client";
 
-/**
- * KNOWLEDGE — the knowledge graph page (v4). The sidebar card lists the
- * topics (click one to zoom to it); the canvas is the graph engine
- * (graph-view.tsx, v4 mode) in topic colours; clicking an idea opens its
- * card — what it rests on, what it leads to, where it was learned — and
- * lights its chain; ideas collect in the practice tray and leave as one
- * practice set. Styles: app/ui/knowledge.css.
- */
-
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { GraphView, ideaNeighbours, type GraphViewApi } from "@/components/graph-view";
@@ -23,16 +14,11 @@ import { ago, chainNeighbourhood, topicColor, useGraphSnapshot, useTopics } from
 import { Field, SidebarCard } from "@/components/v4/shell";
 import { bindingForAction, formatBinding, type GraphNode, type GraphSnapshot } from "@/src/core";
 
-/** How many related ideas the card names before "Show N more". */
 const NEIGHBOUR_LIMIT = 4;
-/** The map hint stays dismissed for this viewer (a convenience only). */
 const HINT_KEY = "lh.knowledge.hint.dismissed";
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-/** The ideas a topic zoom frames: its CORE — members within twice the
- *  median distance of its centre — so a few strays far across the map
- *  don't keep the camera at the whole-graph view. Display-only. */
 function topicCore(ids: string[], positions: Record<string, { x: number; y: number }> | undefined): string[] {
 	const pts = positions ? ids.flatMap((id) => (positions[id] ? [{ id, ...positions[id]! }] : [])) : [];
 	if (pts.length < 4) return ids;
@@ -66,8 +52,6 @@ export function KnowledgeView({ initialConfigured, focusIdeaId }: { initialConfi
 	const [hintOpen, setHintOpen] = useState(false);
 	useEffect(() => {
 		setNow(new Date());
-		// Client-only: the live (override-aware) Find binding, and whether
-		// this viewer already dismissed the map hint.
 		setFindKey(formatBinding(bindingForAction("find")));
 		try {
 			setHintOpen(localStorage.getItem(HINT_KEY) !== "1");
@@ -76,10 +60,8 @@ export function KnowledgeView({ initialConfigured, focusIdeaId }: { initialConfi
 		}
 	}, []);
 
-	// A fresh import's errors show again even if the last ones were closed.
 	useEffect(() => setErrorsHidden(false), [notesImport.errors]);
 
-	// ⌘F: the page owns the graph's search.
 	useEffect(() => {
 		const onFind = () => {
 			searchRef.current?.focus();
@@ -96,15 +78,12 @@ export function KnowledgeView({ initialConfigured, focusIdeaId }: { initialConfi
 		for (const t of topics ?? []) for (const id of t.ideaIds) m.set(id, { id: t.id, name: t.name });
 		return m;
 	}, [topics]);
-	// The canvas labels wear the topic list's names. Keyed by content so
-	// the canvas re-feeds only when a name actually changes.
 	const namesKey = (topics ?? []).map((t) => `${t.id}\u0000${t.name}`).join("\u0001");
 	const topicNames = useMemo(
 		() => (namesKey ? new Map(namesKey.split("\u0001").map((row) => row.split("\u0000") as [string, string])) : null),
 		[namesKey],
 	);
 
-	// Arrival focus (/knowledge?idea=…): select and frame it once known.
 	const focusDone = useRef(false);
 	useEffect(() => {
 		if (!focusIdeaId || focusDone.current || !byId.has(focusIdeaId)) return;
@@ -113,13 +92,11 @@ export function KnowledgeView({ initialConfigured, focusIdeaId }: { initialConfi
 		window.setTimeout(() => api.current?.frame([focusIdeaId]), 300);
 	}, [focusIdeaId, byId]);
 
-	// Keep the zoom readout live.
 	useEffect(() => {
 		const t = window.setInterval(() => api.current && setZoomPct(api.current.zoomPercent()), 400);
 		return () => window.clearInterval(t);
 	}, []);
 
-	// Esc closes the idea card (dialogs claim Esc at the document first).
 	useEffect(() => {
 		if (!sel) return;
 		const onKey = (e: KeyboardEvent) => {
@@ -191,9 +168,6 @@ export function KnowledgeView({ initialConfigured, focusIdeaId }: { initialConfi
 	return (
 		<div className="v4 kpage">
 			<Field variant="knowledge" />
-			{/* One file picker for every Import button (the sidebar, the rail's
-			    topic flyout, the empty state) — outside the footer, which the
-			    shell may mount twice. */}
 			<input
 				ref={fileRef}
 				type="file"
@@ -448,8 +422,6 @@ export function KnowledgeView({ initialConfigured, focusIdeaId }: { initialConfi
 	);
 }
 
-// ─── The topic list (the sidebar card's middle) ────────────────────────────
-
 function TopicList({
 	topics,
 	total,
@@ -507,8 +479,6 @@ function TopicList({
 		</div>
 	);
 }
-
-// ─── The idea card ─────────────────────────────────────────────────────────
 
 function IdeaCard({
 	idea,

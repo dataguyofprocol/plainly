@@ -18,7 +18,6 @@ export function chatGPTStreamError(message: string): string {
 	return "ChatGPT request failed. Check your connection and ChatGPT usage, then retry. No API-key fallback was used.";
 }
 
-/** Restrict the body at the final payload seam, even if caller samplingParams add fields. */
 export function chatGPTPayload(raw: unknown, selectedModelId: string): Record<string, unknown> {
 	const payload = raw as Record<string, unknown>;
 	const out: Record<string, unknown> = { model: selectedModelId, store: false, stream: true };
@@ -34,7 +33,6 @@ export function chatGPTPayload(raw: unknown, selectedModelId: string): Record<st
 	return out;
 }
 
-/** Only ChatGPT history is translated. Mixed API-key history keeps its actual identity. */
 export function chatGPTHistory(context: TranscriptContext, logicalModel: Model<Api>): TranscriptContext {
 	// Apply Pi's normal foreign-model signature treatment BEFORE the alias
 	// becomes openai, or real API-key turns could look like subscription turns.
@@ -96,7 +94,6 @@ export function chatGPTStream(background: () => boolean, lifecycle?: ChatGPTDisp
 				});
 				for await (const event of source) {
 					const message = "partial" in event ? event.partial : event.type === "done" ? event.message : event.error;
-					// Copy the message, not its tool/reasoning blocks: IDs/signatures remain byte-for-byte intact.
 					partial = { ...message, provider: "chatgpt" };
 					if (event.type === "done") {
 						if (!completed || failure) throw new Error(failure || "missing terminal response.completed");

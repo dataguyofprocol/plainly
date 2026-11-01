@@ -5,16 +5,6 @@ import { Tooltip as TooltipPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
-/**
- * The styled tooltip (v4 finesse pass): an ink chip — 12px, radius 7,
- * --e2, no arrow (nothing purely decorative) — matching the CSS .tipb
- * tooltip. Opens after a 300ms rest, so tooltips appear when you pause on
- * a control, never in passing; disableHoverableContent means the chip is
- * un-hoverable — the instant the cursor leaves the trigger it's gone.
- * Utilities, not v4 classes: the content portals outside any .v4 scope.
- */
-
-/** The rest delay (ms): shared by hover and focus opens. */
 export const TOOLTIP_DELAY_MS = 300
 
 function TooltipProvider({

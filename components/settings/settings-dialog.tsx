@@ -1,25 +1,4 @@
 "use client";
-/**
- * THE SETTINGS DIALOG (settings-app wave, 2026-09-20): the thin settings
- * page graduated into the designed surface — a centered modal over
- * everything, left section nav + one scrolling content column.
- *
- * Owner decisions this wave:
- * - Dialog, not a page: opens over whatever screen you're on (the payoff:
- *   appearance edits restyle the chat LIVE behind the dialog). Escape,
- *   backdrop, and the close button all close. Modal-only — /settings
- *   redirects, so nothing links into a dead surface.
- * - v4 frame (finesse pass, 2026-10-26): a tinted left nav with icons
- *   (active = raised surface), each section a titled page of grouped
- *   rows. Styles: app/ui/settings.css.
- * - The dialog is surface-agnostic by construction: the sections talk to
- *   /api/settings* and localStorage only, so this shell can be re-mounted
- *   as a true OS window in the Electron round with near-zero churn.
- *
- * The record + the single `write` seam moved here from the thin page:
- * one record instance for the whole dialog, sections write through it,
- * switching sections never refetches.
- */
 
 import {
 	createContext,
@@ -55,8 +34,6 @@ import { KeyboardSection } from "./keyboard-section.tsx";
 import { ChatGPTUIProvider } from "./chatgpt-connection.tsx";
 import { NativeSubscriptionUIProvider } from "./subscription-connections.tsx";
 
-/** The sections, in nav order. `title` + `hint` head each page (PM copy,
- *  finesse pass); `label` is the nav's short name. */
 const SECTIONS = [
 	{ id: "keys", label: "Providers", icon: "provider", title: "Providers", hint: "The model accounts your tutor runs on, plus voice and web search." },
 	{ id: "agent", label: "Tutor", icon: "model", title: "Tutor", hint: "Which models teach you, and what your tutor is allowed to do." },
@@ -66,16 +43,8 @@ const SECTIONS = [
 ] as const satisfies ReadonlyArray<{ id: string; label: string; icon: IconName; title: string; hint: string }>;
 type SectionId = (typeof SECTIONS)[number]["id"];
 
-/** `open(section?, row?)` — the optional ROW deep-links into the Keys
- *  section with that row unfolded (zero-keys wave: the dictation error's
- *  click lands on the Deepgram row). `row` is the KEY ID (the env-var
- *  name, e.g. DEEPGRAM_API_KEY — KeysSection's openRow state), not the
- *  row's testid. */
 const DialogContext = createContext<{ open: (section?: string, row?: string) => void }>({ open: () => {} });
 
-/** AppShell-level mount: the sidebar row and the mod+, chord call this.
- *  `open(section)` lands the dialog on a specific section (the first-run
- *  setup flow deep-links to Keys when no provider key exists yet). */
 export function SettingsDialogProvider({
 	children,
 }: {
@@ -89,7 +58,6 @@ export function SettingsDialogProvider({
 		setLandOnRow(row ?? null);
 		setShow(true);
 	}, []);
-	// The connect screen replaces Settings rather than stacking on it.
 	useEffect(() => {
 		const onConnect = () => setShow(false);
 		window.addEventListener(OPEN_CONNECT_EVENT, onConnect);
@@ -116,11 +84,9 @@ function SettingsDialog({
 }: {
 	onClose: () => void;
 	initialSection: SectionId;
-	/** The keys-section row to unfold (see DialogContext above). */
 	initialRow: string | null;
 }) {
 	const backdropDismiss = useBackdropDismiss(onClose);
-	// A genuine backdrop click closes; the dialog body stops propagation.
 	return createPortal(
 		<div className="v4 scope">
 			<div className="overlay" data-testid="settings-backdrop" {...backdropDismiss}>
@@ -131,8 +97,6 @@ function SettingsDialog({
 	);
 }
 
-/** The dialog without the portal/backdrop — the SSR-testable frame
- *  (portals render nothing under renderToStaticMarkup). */
 export function SettingsDialogBody({
 	onClose,
 	initialSection = "keys",
@@ -140,8 +104,6 @@ export function SettingsDialogBody({
 }: {
 	onClose: () => void;
 	initialSection?: SectionId;
-	/** The keys row to unfold on arrival (null = none). While-open
-	 *  retargets follow it exactly like initialSection below. */
 	initialRow?: string | null;
 }) {
 	const { onAppearanceChange } = useAppearance();
@@ -149,16 +111,10 @@ export function SettingsDialogBody({
 		undefined,
 	);
 	const [error, setError] = useState<string | null>(null);
-	// MenuShell open-count — drives the content column's scroll lock.
 	const [openMenus, setOpenMenus] = useState(0);
 	const contentRef = useRef<HTMLDivElement | null>(null);
-	// Scroll-lock (fix wave, owner ruling: the scrollbar MAY stay,
-	// scrolling must NOT happen, nothing may move): the content column
-	// keeps overflow-y-auto — the scrollbar and every width stay exactly
-	// as they are — and while any MenuShell is open, non-passive wheel +
-	// touchmove listeners on the column preventDefault. React attaches
-	// synthetic wheel/touch passively at the root, so this needs the
-	// native-listener ref seam.
+	// React attaches synthetic wheel/touch listeners passively at the root,
+	// so the scroll lock needs native non-passive listeners through this ref.
 	useEffect(() => {
 		const el = contentRef.current;
 		if (!el || openMenus === 0) return;
@@ -182,18 +138,10 @@ export function SettingsDialogBody({
 		};
 	}, []);
 	const [active, setActive] = useState<SectionId>(initialSection);
-	// A deep-link fired while the dialog is ALREADY open (first exercised by
-	// the wave-6 embedding picker's "Add a provider key first…" link — the
-	// picker itself died with wave 7, the mechanism is general) changes
-	// initialSection under our feet — follow it, or the link silently does
-	// nothing.
 	useEffect(() => {
 		setActive(initialSection);
 	}, [initialSection]);
 
-	// Fetch once per dialog mount. 200 {settings: null} is FIRST BOOT
-	// (no record = factory everything), not a failure — the error state is
-	// a non-200 or a network throw only.
 	useEffect(() => {
 		fetch("/api/settings")
 			.then((r) =>
@@ -205,15 +153,9 @@ export function SettingsDialogBody({
 			.catch(() => setRecord(null));
 	}, []);
 
-	// Escape closes — the layered-dismiss convention (Esc is dead for the
-	// sections' own editors while they hold focus; this listener is the
-	// dialog's outer layer).
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key === "Escape") {
-				// THE ONE-ESC LAW (owner, keyboard round 2026-10-06): claim
-				// at the document level — the window chain (dictation →
-				// abort) must not also act. One Esc, one action.
 				e.preventDefault();
 				e.stopPropagation();
 				onClose();
@@ -223,9 +165,6 @@ export function SettingsDialogBody({
 		return () => document.removeEventListener("keydown", onKey);
 	}, [onClose]);
 
-	/** ONE writer for the whole dialog: PUT the whole section, keep the
-	 *  record mirror in sync, surface route errors inline (a 400 is a
-	 *  schema mistake caught by the validation surface). */
 	const write = useCallback(
 		async (
 			section: "general" | "agent" | "models" | "appearance" | "graph" | "compaction",
@@ -244,11 +183,6 @@ export function SettingsDialogBody({
 				setError(`${section}: ${detail.error ?? res.status}`);
 				return;
 			}
-			// Server truth, never the request body (fix wave, owner repro):
-			// the models section clamps pinned thinking levels on write
-			// (bd68486) — a swap that rides an unsupported level lands
-			// CLAMPED in the record, and the writing surface must show the
-			// stored value in this same interaction, not the optimistic one.
 			const stored = (
 				(await res.json().catch(() => null)) as { settings?: UserSettings } | null
 			)?.settings;
@@ -312,12 +246,6 @@ export function SettingsDialogBody({
 				</button>
 			</Hint>
 
-			{/* Content column — one section at a time, this scrolls — and
-			    LOCKS while any MenuShell is open (owner ruling: no
-			    scrolling with a dropdown down; MenuShell announces
-			    open/close, the count keeps overlap honest). The lock
-			    intercepts wheel/touch instead of hiding the scrollbar —
-			    nothing may shift when the lock engages. */}
 			<div ref={contentRef} className="sd-main" data-testid="settings-content">
 				{record === undefined ? (
 					<div className="sd-page" aria-busy="true">

@@ -1,13 +1,8 @@
 name: Desktop release
 
 on:
-  # Plainly fork (owner ruling 2026-10-27): releases are built locally,
-  # macOS only, so a v* tag must not start this workflow. Restore the
-  # tag trigger below when Windows/Linux release through CI again:
-  #   push:
-  #     tags: ["v*"]
-  # Manual runs are artifact-only, unsigned, and NEVER create a release.
-  # Use this for the first Windows/Linux dress rehearsal without secrets.
+  # Releases are built locally, so a v* tag must not start this workflow.
+  # Manual runs are artifact-only, unsigned, and never create a release.
   workflow_dispatch:
 
 permissions:
@@ -56,7 +51,6 @@ jobs:
     permissions:
       contents: write
     steps:
-      # This job succeeds without creating anything on manual rehearsals.
       # Preparing once avoids the publisher's list-miss/create race between OS jobs.
       - name: Create or reuse the tag's draft
         if: github.event_name == 'push'
@@ -119,7 +113,6 @@ jobs:
       # The mac icon is the Icon Composer document (build/icon.icon);
       # compiling it needs both macOS 26+ and actool ≥ 26 (Xcode 26+).
       # Xcode 26's asset compiler crashes on macOS 15's older frameworks.
-      # Select the latest stable Xcode; no-op for Windows/Linux.
       - name: Select Xcode 26+ for actool (mac icon compile)
         if: runner.os == 'macOS'
         uses: maxim-lobanov/setup-xcode@v1
@@ -136,17 +129,14 @@ jobs:
       - run: node scripts/smoke-provider-runtime.mjs
       - run: node scripts/build-server.mjs
       - run: node scripts/smoke-server.mjs --electron
-      # Plainly fork (owner ruling 2026-10-27): no Developer ID yet, so the
-      # mac release is ad-hoc signed and not notarized (electron-builder.yml
-      # mac.identity "-"). Restore the secrets check + signed step when the
-      # fork has its own Apple credentials.
+      # No Developer ID: the mac release is ad-hoc signed and not notarized
+      # (electron-builder.yml mac.identity "-").
       - name: macOS release (ad-hoc signed, not notarized) → draft
         if: github.event_name == 'push' && runner.os == 'macOS'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npx electron-builder ${{ matrix.builder_args }} --publish always
-      # The curl | sh entry point (owner ruling 2026-10-27) rides beside the zip.
       - name: install.sh → draft
         if: github.event_name == 'push' && runner.os == 'macOS'
         env:
@@ -212,13 +202,10 @@ jobs:
             dist/*.blockmap
             dist/latest*.yml
 
-  # The last gate before a human publishes: after ALL three packaging jobs
-  # have uploaded, fail the run unless the tag's single draft release holds
-  # exactly the 10 verified assets (mac ZIP + install.sh, 3 installers, the
-  # zip/exe blockmaps, 3 latest*.yml feeds) and the feeds reference those uploads
-  # by exact name at the package.json version. Read-only: it never creates,
-  # edits, publishes, or deletes anything. Manual rehearsals upload nothing,
-  # so there is no draft to verify and the job stays skipped.
+  # Fails unless the tag's single draft release holds exactly the 10
+  # verified assets (mac ZIP + install.sh, 3 installers, the zip/exe
+  # blockmaps, 3 latest*.yml feeds) and the feeds reference those uploads by
+  # exact name at the package.json version. Read-only.
   verify:
     name: Verify draft release
     needs: package
@@ -230,7 +217,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      # The tagged revision — verify exactly what was packaged, not a moving default.
+      # Verify exactly the tagged revision that was packaged.
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}

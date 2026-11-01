@@ -1,18 +1,4 @@
 "use client";
-/**
- * The OpenAI-compatible endpoints group of Settings → Keys (per-model
- * capabilities, owner 2026-10-28): one row per saved custom provider;
- * clicking a row unfolds its editor — name, base URL, key (replace or
- * remove; the stored key never reaches the browser), and the models with
- * their capabilities (the shared CustomModelsField). Save is one PUT
- * /api/providers/custom/:id; Delete removes the provider and its key.
- * Hidden while no custom provider exists — the "Connect an
- * OpenAI-compatible endpoint" action under the key table adds the first.
- *
- * Every write dispatches the "keys" settings signal (the pickers re-read
- * the catalog); a "keys" signal from elsewhere (the connect form) re-reads
- * this list.
- */
 
 import { useEffect, useState } from "react";
 import type { CustomModelEntry, CustomProviderView } from "@/src/core";
@@ -105,8 +91,6 @@ function CustomProviderEditor({
 	const [error, setError] = useState<string | null>(null);
 	const [confirmDelete, setConfirmDelete] = useState(false);
 
-	// Escape folds the editor without closing the settings dialog (the key
-	// table's capture-phase claim).
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (e.key !== "Escape") return;

@@ -1,39 +1,16 @@
-/**
- * CUSTOM OPENAI-COMPATIBLE PROVIDERS (custom-endpoint wave, 2026-10-26):
- * the user points the app at any server that speaks OpenAI's chat
- * completions dialect — a self-hosted vLLM, LM Studio, Ollama's /v1, a
- * Together-style gateway — and its models join the strong/cheap/vision
- * pickers like any built-in provider's.
- *
- * THE RECORD: settings.providers.custom (non-secret — id, name, base URL,
- * the models the user typed or probed, each with its capabilities). THE KEY: optional (local
- * servers need none), stored in the SAME auth.json map as every other
- * provider key under LH_CUSTOM_<SLUG>_API_KEY — written only through
- * /api/providers/custom, never through the generic /api/keys gate.
- *
- * PURE, browser-safe — the shapes, the read-side sanitizer, the write-side
- * parsers, and the id minting. The engine wiring lives in agent/models.ts,
- * the CRUD + probe in server/custom-providers.ts.
- */
-
-/** How a thinking model is asked to think — pi-ai's openai-completions
- *  `compat.thinkingFormat` values that need no further configuration
- *  (chat-template, baseten and ant-ling need extra kwargs or a level map,
- *  so they are not offered). */
+/** pi-ai openai-completions `compat.thinkingFormat` values that need no
+ *  further configuration (chat-template, baseten and ant-ling need extra
+ *  kwargs or a level map). */
 export const CUSTOM_THINKING_FORMATS = ["openai", "openrouter", "deepseek", "qwen", "qwen-chat-template", "zai", "together", "string-thinking"] as const;
 export type CustomThinkingFormat = (typeof CUSTOM_THINKING_FORMATS)[number];
 
-/** One model's capabilities (per-model capabilities, owner 2026-10-28):
- *  what the user set or the probe detected. Nothing in an OpenAI-style
- *  /models answer says what a model can do, so unset means what most
- *  models now do — vision, thinking, 128k context, 8192 output. */
+/** OpenAI-style /models answers carry no capabilities, so unset fields
+ *  take CUSTOM_MODEL_DEFAULTS. */
 export interface CustomModelEntry {
 	id: string;
-	/** Accepts image input (joins the vision slot's picker). */
 	vision: boolean;
-	/** Can think (reasoning: true — the thinking picker offers levels). */
 	thinking: boolean;
-	/** Present exactly when `thinking` — "openai" (reasoning_effort) unless set. */
+	/** Present exactly when `thinking`; defaults to "openai". */
 	thinkingFormat?: CustomThinkingFormat;
 	contextWindow: number;
 	maxTokens: number;
@@ -43,31 +20,25 @@ export const CUSTOM_MODEL_DEFAULTS = { vision: true, thinking: true, contextWind
 export const CUSTOM_CONTEXT_MIN = 1_024;
 export const CUSTOM_CONTEXT_MAX = 10_000_000;
 
-/** One custom provider as stored in the settings record. */
 export interface CustomProviderEntry {
-	/** "custom-<slug>" — minted once from the first name, stable across renames. */
+	/** "custom-<slug>", minted once and stable across renames. */
 	id: string;
-	/** Display name (1..60 chars). */
+	/** 1..60 chars. */
 	name: string;
-	/** http(s) URL WITHOUT a trailing slash — the OpenAI base (…/v1). */
+	/** http(s) URL without a trailing slash (…/v1). */
 	baseUrl: string;
-	/** The models this endpoint serves (1..50, unique non-empty ids). Records
-	 *  written before per-model capabilities hold bare id strings; the
-	 *  sanitizer reads those as the defaults. */
+	/** 1..50, unique non-empty ids. */
 	models: CustomModelEntry[];
 }
 
-/** The GET/POST/PUT view: the stored entry + whether a key is stored. */
 export interface CustomProviderView extends CustomProviderEntry {
 	keyPresent: boolean;
 }
 
-/** What the probe could read about one model from the server's own
- *  metadata — only the fields it actually found. */
+/** Only the fields the server's metadata actually reported. */
 export type CustomModelDetected = Partial<Pick<CustomModelEntry, "vision" | "thinking" | "contextWindow" | "maxTokens">>;
 
-/** The probe route's answer — always HTTP 200; `ok` carries the verdict.
- *  `detected` holds an entry only for models the server described. */
+/** Always HTTP 200; `ok` carries the verdict. */
 export type CustomProviderProbeResult =
 	| { ok: true; models: string[]; detected: Record<string, CustomModelDetected> }
 	| { ok: false; error: string };
@@ -76,30 +47,23 @@ export const CUSTOM_PROVIDER_PREFIX = "custom-";
 export const CUSTOM_PROVIDER_ID_RE = /^custom-[a-z0-9-]{1,40}$/;
 export const CUSTOM_PROVIDER_NAME_MAX = 60;
 export const CUSTOM_PROVIDER_MODELS_MAX = 50;
-/** The slug's budget inside the id (the regex's {1,40}). */
 const SLUG_MAX = 40;
 
 export function isCustomProviderId(id: string): boolean {
 	return CUSTOM_PROVIDER_ID_RE.test(id);
 }
 
-/** custom-my-vllm → LH_CUSTOM_MY_VLLM_API_KEY. Slugs are [a-z0-9-], so the
- *  mapping is injective — no two providers can share a key slot. */
+/** custom-my-vllm → LH_CUSTOM_MY_VLLM_API_KEY. */
 export function customProviderEnvVar(id: string): string {
 	const slug = id.slice(CUSTOM_PROVIDER_PREFIX.length);
 	return `LH_CUSTOM_${slug.toUpperCase().replace(/-/g, "_")}_API_KEY`;
 }
 
-/** Is this env var a custom provider's key slot? Such vars are managed by
- *  the custom routes only — the generic keys API neither lists nor writes
- *  them. */
 export function isCustomProviderEnvVar(envVar: string): boolean {
 	return /^LH_CUSTOM_[A-Z0-9_]+_API_KEY$/.test(envVar);
 }
 
-/** Lowercase, diacritics folded, every other run of non-[a-z0-9] collapsed
- *  to one dash, edges trimmed. Empty (an all-symbol or non-Latin name)
- *  falls back to "provider" — the id is plumbing, the name is what shows. */
+/** Falls back to "provider" when nothing slug-safe remains. */
 export function slugifyProviderName(name: string): string {
 	const slug = name
 		.normalize("NFKD")
@@ -110,8 +74,8 @@ export function slugifyProviderName(name: string): string {
 	return slug || "provider";
 }
 
-/** "custom-" + the slugified name, de-duplicated against `taken` with
- *  -2, -3, … — the base is cut so the suffixed slug still fits 40 chars. */
+/** De-duplicates against `taken` with -2, -3, …, keeping the slug within
+ *  40 chars. */
 export function mintCustomProviderId(name: string, taken: Iterable<string>): string {
 	const used = new Set(taken);
 	const base = slugifyProviderName(name);
@@ -136,7 +100,6 @@ export function normalizeBaseUrl(raw: string): string | null {
 	return value;
 }
 
-/** A whole number inside [min, max], else null. */
 function boundedInt(raw: unknown, min: number, max: number): number | null {
 	return typeof raw === "number" && Number.isInteger(raw) && raw >= min && raw <= max ? raw : null;
 }
@@ -145,13 +108,10 @@ function isThinkingFormat(raw: unknown): raw is CustomThinkingFormat {
 	return (CUSTOM_THINKING_FORMATS as readonly unknown[]).includes(raw);
 }
 
-/** A model with every capability at its default. */
 export function defaultCustomModel(id: string): CustomModelEntry {
 	return settleModel({ id, ...CUSTOM_MODEL_DEFAULTS });
 }
 
-/** The canonical form: thinkingFormat present exactly when thinking, and
- *  maxTokens never above the context window. */
 function settleModel(m: CustomModelEntry): CustomModelEntry {
 	const { thinkingFormat, ...rest } = m;
 	return {
@@ -161,9 +121,6 @@ function settleModel(m: CustomModelEntry): CustomModelEntry {
 	};
 }
 
-/** Lenient: a bare id string (records before per-model capabilities) or
- *  an object; a bad capability field falls back to its default. null
- *  when there is no usable id. */
 function sanitizeModel(raw: unknown): CustomModelEntry | null {
 	if (typeof raw === "string") return raw.trim() ? defaultCustomModel(raw.trim()) : null;
 	if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
@@ -180,8 +137,6 @@ function sanitizeModel(raw: unknown): CustomModelEntry | null {
 	});
 }
 
-/** Sanitized models, de-duplicated by id (first wins); null when the
- *  value is not a list. */
 function cleanModels(raw: unknown): CustomModelEntry[] | null {
 	if (!Array.isArray(raw)) return null;
 	const out: CustomModelEntry[] = [];
@@ -192,11 +147,8 @@ function cleanModels(raw: unknown): CustomModelEntry[] | null {
 	return out;
 }
 
-// ─── Read side: the settings sanitizer ─────────────────────────────────────
-
-/** Lenient (the sanitizer discipline): an invalid entry DROPS, a duplicate
- *  id keeps the first, a model list over the cap truncates — never throws,
- *  and nothing that would fail the write-side rules survives into use. */
+/** Never throws: invalid entries drop, duplicate ids keep the first, and
+ *  model lists over the cap truncate. */
 export function sanitizeCustomProviders(raw: unknown): CustomProviderEntry[] {
 	if (!Array.isArray(raw)) return [];
 	const out: CustomProviderEntry[] = [];
@@ -216,8 +168,6 @@ export function sanitizeCustomProviders(raw: unknown): CustomProviderEntry[] {
 	return out;
 }
 
-// ─── Write side: the route parsers (strict, 400-ready messages) ────────────
-
 export type CustomProviderParse<T> = { ok: true; value: T } | { ok: false; error: string };
 
 function parseName(raw: unknown): CustomProviderParse<string> {
@@ -236,9 +186,6 @@ function parseBaseUrl(raw: unknown): CustomProviderParse<string> {
 		: { ok: false, error: "The base URL must be an http:// or https:// URL, e.g. http://localhost:11434/v1" };
 }
 
-/** One model: a bare id (every capability at its default) or {id, vision?,
- *  thinking?, thinkingFormat?, contextWindow?, maxTokens?} — an absent
- *  field takes its default, a present one must be valid. */
 function parseModel(raw: unknown): CustomProviderParse<CustomModelEntry> {
 	if (typeof raw === "string") return { ok: true, value: defaultCustomModel(raw.trim()) };
 	if (raw === null || typeof raw !== "object" || Array.isArray(raw) || typeof (raw as { id?: unknown }).id !== "string") {
@@ -277,7 +224,6 @@ function parseModels(raw: unknown): CustomProviderParse<CustomModelEntry[]> {
 	for (const item of raw) {
 		const model = parseModel(item);
 		if (!model.ok) return model;
-		// blanks drop, a repeated id keeps the first
 		if (model.value.id && !models.some((m) => m.id === model.value.id)) models.push(model.value);
 	}
 	if (models.length === 0) return { ok: false, error: "Add at least one model id" };
@@ -287,10 +233,7 @@ function parseModels(raw: unknown): CustomProviderParse<CustomModelEntry[]> {
 	return { ok: true, value: models };
 }
 
-/** A custom key's paste hygiene: trimmed, non-empty, no whitespace. NO
- *  length floor — self-hosted servers accept whatever token their operator
- *  chose (vLLM's --api-key, a gateway's short secret), so the 12-char
- *  provider floor would reject real keys. */
+/** No length floor: self-hosted servers accept any operator-chosen token. */
 export function parseCustomProviderKey(raw: unknown): CustomProviderParse<string> {
 	const key = typeof raw === "string" ? raw.trim() : "";
 	if (!key || /\s/.test(key)) return { ok: false, error: "The API key must be non-empty with no whitespace" };
@@ -301,11 +244,10 @@ export interface CustomProviderCreate {
 	name: string;
 	baseUrl: string;
 	models: CustomModelEntry[];
-	/** Absent = keyless (an empty string counts as absent). */
+	/** Absent = keyless. */
 	apiKey?: string;
 }
 
-/** POST body: {name, baseUrl, apiKey?, models}. */
 export function parseCustomProviderCreate(body: unknown): CustomProviderParse<CustomProviderCreate> {
 	if (body === null || typeof body !== "object" || Array.isArray(body)) {
 		return { ok: false, error: "body must be {name, baseUrl, apiKey?, models}" };
@@ -334,7 +276,6 @@ export interface CustomProviderUpdate {
 	apiKey?: string | null;
 }
 
-/** PUT body: any subset of {name, baseUrl, apiKey (string | null), models}. */
 export function parseCustomProviderUpdate(body: unknown): CustomProviderParse<CustomProviderUpdate> {
 	if (body === null || typeof body !== "object" || Array.isArray(body)) {
 		return { ok: false, error: "body must be {name?, baseUrl?, apiKey?, models?}" };
@@ -368,12 +309,10 @@ export function parseCustomProviderUpdate(body: unknown): CustomProviderParse<Cu
 export interface CustomProviderProbeInput {
 	baseUrl: string;
 	apiKey?: string;
-	/** A saved provider whose stored key to send when no apiKey is given —
-	 *  the edit view probes without the key ever reaching the browser. */
+	/** A saved provider whose stored key is sent when no apiKey is given. */
 	providerId?: string;
 }
 
-/** Probe body: {baseUrl, apiKey?, providerId?}. */
 export function parseCustomProviderProbe(body: unknown): CustomProviderParse<CustomProviderProbeInput> {
 	if (body === null || typeof body !== "object" || Array.isArray(body)) {
 		return { ok: false, error: "body must be {baseUrl, apiKey?, providerId?}" };

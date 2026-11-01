@@ -1,20 +1,5 @@
 "use client";
 
-/**
- * THE OMNIBAR (v4 redesign, owner 2026-10-26): ⌘K from anywhere — one
- * field that starts a lesson or a practice set, and finds sessions and
- * ideas. It replaced the sidebar's session search (⇧⌘F opens it too) and
- * took ⌘K from the model selector (now ⇧⌘M).
- *
- * The result model is a pure function (paletteResults) so the ranking and
- * grouping are pinned by tests; the component is the dialog around it.
- * Keyboard: ↑/↓ walk, Enter runs the walked row (the first row when
- * nothing is walked — the quick-open pattern the sidebar search had), Esc
- * closes. Esc is claimed at the document level like every surfaced layer
- * (THE ONE-ESC LAW in keyboard-shortcuts.tsx), so it never also aborts a
- * turn.
- */
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -88,10 +73,6 @@ function ranked<T>(items: readonly T[], query: string, fields: (t: T) => string[
 		.map((r) => r.item);
 }
 
-/** Pure: what the omnibar lists for a query. Empty query = where you left
- *  off (waiting sessions first, then recent) plus the commands; a query =
- *  the two ways to start it (the chosen mode first), then matching
- *  sessions, ideas and commands. Exported for tests. */
 export function paletteResults(
 	query: string,
 	mode: PaletteMode,
@@ -125,8 +106,6 @@ export function paletteResults(
 	].filter((g) => g.rows.length > 0);
 }
 
-/** Each row kind's glyph — the app's semantic icon names (Practice is
- *  always a target, Knowledge always a network). */
 const ROW_ICON: Record<PaletteRow["icon"], IconName> = {
 	learn: "learn",
 	practice: "practice",
@@ -137,11 +116,8 @@ const ROW_ICON: Record<PaletteRow["icon"], IconName> = {
 	connect: "provider",
 };
 
-/** Display-only: titles and hints in sentence case; a session that waits
- *  on you gets the warn pill; a shortcut renders as key chips. */
 function RowHint({ row, group }: { row: PaletteRow; group: string }) {
 	if (row.hint === "waiting on you") {
-		// Under its own "Waiting on you" overline the pill would repeat it.
 		return group === "Waiting on you" ? <span className="dot warn" aria-hidden /> : <span className="pill warn">Waiting on you</span>;
 	}
 	if (/^[⌘⇧⌥⌃]/.test(row.hint)) {
@@ -163,21 +139,13 @@ function rowLabel(row: PaletteRow): string {
 	return row.action.kind === "open-session" ? displayTitle(row.label) : row.label;
 }
 
-/** Mounted once in the AppShell; opens on ⌘K (open-omnibar) and ⇧⌘F
- *  (sessions-search). A start that isn't ready yet (no models, no key)
- *  opens setup instead — the pre-send guards — and the palette comes back
- *  with the learner's words still in it once setup is saved. */
 export function CommandPalette() {
 	const [open, setOpen] = useState(false);
 	const [setupOpen, setSetupOpen] = useState(false);
-	// Opened through lh:open-connect: setup starts on the connect screen
-	// even when a provider is already keyed.
 	const [connect, setConnect] = useState(false);
 	const [draft, setDraft] = useState<{ query: string; mode: PaletteMode }>({ query: "", mode: "teach" });
 	const readiness = useStartReadiness();
 	useEffect(() => {
-		// lh:open-omnibar may carry a starting query (the graph card's
-		// "Go deeper" opens the omnibar on the idea's name).
 		const onOpen = (e: Event) => {
 			const query = (e as CustomEvent<{ query?: string } | undefined>).detail?.query ?? "";
 			setDraft({ query, mode: "teach" });
@@ -217,7 +185,7 @@ export function CommandPalette() {
 				onDone={() => {
 					readiness.markConfigured();
 					setSetupOpen(false);
-					if (!connect) setOpen(true); // Save only saves: the words wait in the palette
+					if (!connect) setOpen(true);
 				}}
 			/>
 		</>
@@ -237,7 +205,6 @@ function PaletteDialog({
 }) {
 	const backdropDismiss = useBackdropDismiss(onClose);
 
-	// The surfaced layer claims Esc at the document level (THE ONE-ESC LAW).
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (e.key !== "Escape") return;
@@ -261,12 +228,6 @@ function PaletteDialog({
 	);
 }
 
-/**
- * The omnibar itself — the field, the Learn/Practice switch and the
- * grouped results. Two variants: "dialog" (⌘K, results always listed) and
- * "inline" (the home page: results drop down only once there is a query,
- * and Esc clears the field rather than closing anything).
- */
 export function Omnibar({
 	variant,
 	initial = { query: "", mode: "teach" },
@@ -278,10 +239,8 @@ export function Omnibar({
 	variant: "dialog" | "inline";
 	initial?: { query: string; mode: PaletteMode };
 	ready: boolean;
-	/** After a row ran (the dialog closes). */
 	onDone?: () => void;
 	onNeedSetup: (draft: { query: string; mode: PaletteMode }) => void;
-	/** Inline only: controls beside the mode switch (the home's import). */
 	extraActions?: React.ReactNode;
 }) {
 	const router = useRouter();
@@ -346,7 +305,6 @@ export function Omnibar({
 		[mode, onDone, onNeedSetup, openSettings, query, ready, router, starting],
 	);
 
-	// The primary action without walking: start in the chosen mode.
 	const submitLabel = mode === "teach" ? "Learn" : "Practice";
 	const startNow = () => {
 		const q = query.trim();
@@ -384,8 +342,6 @@ export function Omnibar({
 								aria-selected={i === active}
 								data-row-index={i}
 								onMouseMove={() => setWalk(i)}
-								// Keep focus in the field while clicking (the inline list
-								// closes on blur).
 								onMouseDown={(e) => e.preventDefault()}
 								onClick={() => void run(row)}
 								className="pal-row"
@@ -456,7 +412,6 @@ export function Omnibar({
 							if (showResults) void run(rows[active]);
 							else startNow();
 						} else if (e.key === "Escape" && inline) {
-							// A field-level claim: clear, then leave the field.
 							e.stopPropagation();
 							if (query) setQuery("");
 							else e.currentTarget.blur();
