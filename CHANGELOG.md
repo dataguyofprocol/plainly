@@ -4,6 +4,17 @@ Every Plainly release, newest first. Plainly is a fork of [LearnHarness](https:/
 
 Install or update with the command in the [README](README.md#get-started), or from Plainly → Check for Updates….
 
+## 0.1.7 — 2026-11-14
+
+Plainly 0.1.7 keeps lessons moving when the tutor forgets to ask the next question, and makes rating your confidence optional.
+
+- **Lessons no longer stall after an explanation.** Sometimes the tutor finished explaining without asking anything, so the lesson waited until you typed something like "got it". Now the tutor is prompted to carry on with the next question by itself. If it meant to stop, for example after answering a side question, nothing changes on your screen.
+- **A check always comes with text.** Sometimes the tutor posted a check with nothing written before it, so the chat showed nothing new and the lesson looked stuck. Now it always writes at least a sentence first.
+- **Confidence is optional.** "How sure are you?" is marked optional and starts unselected. Before, an answer you didn't rate was sent to the tutor as "Unsure". Now the tutor knows you didn't rate it.
+- **Name your custom models.** Each model on an OpenAI-compatible server can have its own display name. Without one, Plainly shows a tidied-up version of its id, like "GPT 6 Luna" instead of "GPT_6_LUNA".
+- **No duplicate "I don't know".** The tutor can no longer add its own "I don't know" option next to the built-in one.
+- **One more Qwen key.** You can add a key for Qwen Token Plan Individual (China).
+
 ## 0.1.6 — 2026-11-01
 
 Plainly 0.1.6 makes custom model servers work on the first try, and makes the opening check-in shorter and clearer.
