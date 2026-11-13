@@ -62,7 +62,7 @@ Plainly runs on your models. Connect OpenAI, Anthropic, OpenRouter, DeepSeek, Z.
 
 ## What's new
 
-**0.1.7:** lessons keep moving when the tutor forgets to ask the next question, and rating your confidence is optional.
+**0.1.8:** demos and figures arrive faster when you use your own model server.
 
 See [CHANGELOG.md](CHANGELOG.md) for every release.
 

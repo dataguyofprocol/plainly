@@ -4,6 +4,13 @@ Every Plainly release, newest first. Plainly is a fork of [LearnHarness](https:/
 
 Install or update with the command in the [README](README.md#get-started), or from Plainly → Check for Updates….
 
+## 0.1.8 — 2026-11-14
+
+Plainly 0.1.8 makes demos and figures arrive faster when you use your own model server.
+
+- **Faster demos and figures.** On an OpenAI-compatible server, building a demo could take several minutes. The model's reply was cut off by a small output limit, and it tried again at the same length. Now it's told its reply was cut off and writes a shorter version.
+- **A higher output limit for new custom models.** Models you add from now on start with a max output of 131,072 tokens (or their context window, if that's smaller), instead of 8,192. Models you've already added keep their setting. Raise "max output" on them in Settings if your server allows more.
+
 ## 0.1.7 — 2026-11-14
 
 Plainly 0.1.7 keeps lessons moving when the tutor forgets to ask the next question, and makes rating your confidence optional.
