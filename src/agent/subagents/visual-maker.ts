@@ -6,6 +6,7 @@ import { piEngineFor, type PiEngine, type ThinkingLevel } from "../models.ts";
 import { providerEventObserver, type ProviderEventObserver } from "../provider-events.ts";
 import type { VisualResult } from "../../core/contracts.ts";
 import { getHeadless, type HeadlessApi } from "./headless.ts";
+import { truncationNote } from "./pi-run.ts";
 
 export interface VisualMakerInput {
 	brief: string;
@@ -137,6 +138,13 @@ export async function runVisualMaker(input: VisualMakerInput, opts: VisualMakerO
 			messages = [...messages, result];
 
 			const toolCalls = result.content.filter((c): c is Extract<typeof c, { type: "toolCall" }> => c.type === "toolCall");
+			if (result.stopReason === "length") {
+				const note = truncationNote(result.usage.output);
+				messages = toolCalls.length > 0
+					? [...messages, ...toolCalls.map((call) => toolText(call.id, call.name, `ERROR: not executed. ${note}`))]
+					: [...messages, { role: "user", content: note, timestamp: Date.now() }];
+				continue;
+			}
 			if (toolCalls.length === 0) {
 				finalText = result.content
 					.filter((c): c is { type: "text"; text: string } => c.type === "text")

@@ -20,7 +20,16 @@ export interface SubagentRunOptions {
 	onToolStart?: (toolName: string, args: unknown) => void;
 	onAssistantMessage?: (message: AssistantMessage, step: number) => void;
 	shouldStop?: (message: AssistantMessage, toolResults: ToolResultMessage[]) => boolean;
+	/** Steer `truncationNote` after every length-stopped reply. */
+	noteTruncation?: boolean;
 	chatId?: string;
+}
+
+/** pi's own length-stop tool error only says to re-issue the call, so a
+ *  builder retries at the same size and is cut off again. */
+export function truncationNote(outputTokens: number): string {
+	const at = outputTokens > 0 ? ` at ${outputTokens} tokens` : "";
+	return `Your last reply was cut off${at} by the output limit, so none of it was used. Write a shorter, complete document that fits within that limit.`;
 }
 
 export interface SubagentRunResult {
@@ -79,6 +88,9 @@ export async function runSubagent(tools: AgentTool<any, any>[], opts: SubagentRu
 						opts.onUsage?.(m.usage);
 						opts.onAssistantMessage?.(m, step);
 						if (m.stopReason === "error") errorMessage = m.errorMessage;
+						if (m.stopReason === "length" && opts.noteTruncation) {
+							agent.steer({ role: "user", content: truncationNote(m.usage.output), timestamp: Date.now() });
+						}
 					}
 					break;
 				case "tool_execution_start":

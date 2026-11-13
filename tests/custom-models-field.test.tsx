@@ -55,8 +55,8 @@ afterEach(async () => {
 
 describe("modelWithDetected", () => {
 	it("applies what the server described over the defaults", () => {
-		assert.deepEqual(modelWithDetected("m", undefined), { id: "m", vision: true, thinking: true, thinkingFormat: "openai", contextWindow: 128_000, maxTokens: 8192 });
-		assert.deepEqual(modelWithDetected("t", { vision: false, thinking: false }), { id: "t", vision: false, thinking: false, contextWindow: 128_000, maxTokens: 8192 });
+		assert.deepEqual(modelWithDetected("m", undefined), { id: "m", vision: true, thinking: true, thinkingFormat: "openai", contextWindow: 128_000, maxTokens: 128_000 });
+		assert.deepEqual(modelWithDetected("t", { vision: false, thinking: false }), { id: "t", vision: false, thinking: false, contextWindow: 128_000, maxTokens: 128_000 });
 		assert.deepEqual(modelWithDetected("v", { vision: true, thinking: true, contextWindow: 4096 }), {
 			id: "v",
 			vision: true,

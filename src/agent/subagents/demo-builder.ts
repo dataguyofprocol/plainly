@@ -187,6 +187,7 @@ export async function runDemoBuilder(input: DemoBuilderInput, opts: DemoBuilderO
 			abortSignal: opts.abortSignal,
 			onUsage: (usage) => opts.onUsage?.(usage),
 			onToolStart: (toolName) => opts.onActivity?.(toolName),
+			noteTruncation: true,
 			chatId: opts.chatId,
 		});
 		finalText = result.text;

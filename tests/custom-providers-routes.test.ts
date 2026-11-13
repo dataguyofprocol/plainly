@@ -22,7 +22,7 @@ after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
 const json = (body: unknown) => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
-const bare = (id: string) => ({ id, vision: true, thinking: true, thinkingFormat: "openai", contextWindow: 128_000, maxTokens: 8192 });
+const bare = (id: string) => ({ id, vision: true, thinking: true, thinkingFormat: "openai", contextWindow: 128_000, maxTokens: 128_000 });
 const create = (body: unknown) => listRoute.POST(new Request("http://localhost/api/providers/custom", json(body)));
 const update = (id: string, body: unknown) =>
 	idRoute.PUT(new Request(`http://localhost/api/providers/custom/${id}`, { ...json(body), method: "PUT" }), params(id));
@@ -79,7 +79,7 @@ describe("the custom provider routes", () => {
 		assert.deepEqual(model.input, ["text", "image"]);
 		assert.equal(model.reasoning, true);
 		assert.equal(model.contextWindow, 128000);
-		assert.equal(model.maxTokens, 8192);
+		assert.equal(model.maxTokens, 128000);
 		assert.equal(piModels().getProvider("custom-local-ollama-2")?.name, "Gateway");
 		assert.deepEqual(validateModelsSettings({ strong: { model: { provider: "custom-local-ollama", id: "llama3" } } }), { ok: true });
 

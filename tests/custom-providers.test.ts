@@ -15,7 +15,7 @@ import {
 import { sanitizeUserSettings } from "../src/core/settings.ts";
 
 const valid = { id: "custom-vllm", name: "vLLM", baseUrl: "http://localhost:8000/v1", models: ["qwen"] };
-const bare = (id: string) => ({ id, vision: true, thinking: true, thinkingFormat: "openai", contextWindow: 128_000, maxTokens: 8192 });
+const bare = (id: string) => ({ id, vision: true, thinking: true, thinkingFormat: "openai", contextWindow: 128_000, maxTokens: 128_000 });
 
 describe("sanitizeCustomProviders", () => {
 	it("keeps a valid entry and normalizes its fields", () => {
@@ -79,8 +79,8 @@ describe("per-model capabilities", () => {
 		]);
 		assert.deepEqual(entry!.models, [
 			{ id: "vl", vision: true, thinking: true, thinkingFormat: "openai", contextWindow: 32_768, maxTokens: 4096 },
-			{ id: "qwq", vision: true, thinking: true, thinkingFormat: "qwen", contextWindow: 128_000, maxTokens: 8192 },
-			{ id: "plain", vision: true, thinking: false, contextWindow: 128_000, maxTokens: 8192 },
+			{ id: "qwq", vision: true, thinking: true, thinkingFormat: "qwen", contextWindow: 128_000, maxTokens: 128_000 },
+			{ id: "plain", vision: true, thinking: false, contextWindow: 128_000, maxTokens: 128_000 },
 		]);
 	});
 
@@ -89,6 +89,11 @@ describe("per-model capabilities", () => {
 			{ ...valid, models: [{ id: "m", vision: "yes", thinkingFormat: "nope", contextWindow: 10, maxTokens: -1 }, { id: "small", contextWindow: 4096 }] },
 		]);
 		assert.deepEqual(entry!.models, [bare("m"), { ...bare("small"), contextWindow: 4096, maxTokens: 4096 }]);
+	});
+
+	it("defaults max output to 131072 when the window is larger", () => {
+		const [entry] = sanitizeCustomProviders([{ ...valid, models: [{ id: "big", contextWindow: 1_000_000 }] }]);
+		assert.equal(entry!.models[0]!.maxTokens, 131_072);
 	});
 
 	it("parses model objects strictly, absent fields at their defaults", () => {

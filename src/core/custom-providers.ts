@@ -18,7 +18,7 @@ export interface CustomModelEntry {
 	maxTokens: number;
 }
 
-export const CUSTOM_MODEL_DEFAULTS = { vision: true, thinking: true, contextWindow: 128_000, maxTokens: 8192 } as const;
+export const CUSTOM_MODEL_DEFAULTS = { vision: true, thinking: true, contextWindow: 128_000, maxTokens: 131_072 } as const;
 export const CUSTOM_CONTEXT_MIN = 1_024;
 export const CUSTOM_CONTEXT_MAX = 10_000_000;
 

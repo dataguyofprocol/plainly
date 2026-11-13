@@ -101,7 +101,23 @@ function scriptedModel(turns: Array<{ toolCalls?: Array<{ toolCallId: string; to
 	return { model: faux.getModel(), streamFn: faux.streamSimple };
 }
 
-const CLEAN_RUN: DemoRunResult = { consoleErrors: [], pageErrors: [], failedRequests: [], ok: true };
+/** Each step's request is recorded (as JSON) before its reply; a step with
+ *  `cutOff` replies with stopReason "length". */
+function recordingModel(turns: Array<{ toolCalls?: Array<{ toolCallId: string; toolName: string; input: unknown }>; text?: string; cutOff?: boolean }>): PiEngine & { requests: string[] } {
+	const requests: string[] = [];
+	const steps: FauxResponseStep[] = turns.map((step) => (context) => {
+		requests.push(JSON.stringify(context));
+		const content = step.toolCalls
+			? step.toolCalls.map((c) => fauxToolCall(c.toolName, c.input as ToolCall["arguments"], { id: c.toolCallId }))
+			: (step.text ?? "");
+		return fauxAssistantMessage(content, { stopReason: step.cutOff ? "length" : step.toolCalls ? "toolUse" : "stop" });
+	});
+	const faux = createFauxCore({ tokenSize: { min: 64, max: 64 } });
+	faux.setResponses(steps);
+	return { model: faux.getModel(), streamFn: faux.streamSimple, requests };
+}
+
+const CLEAN_RUN: DemoRunResult ={ consoleErrors: [], pageErrors: [], failedRequests: [], ok: true };
 const BROKEN_RUN: DemoRunResult = {
 	consoleErrors: ["Uncaught ReferenceError: foo is not defined"],
 	pageErrors: [],
@@ -594,6 +610,34 @@ describe("demo builder (fake model + fake headless)", () => {
 		assert.match(result.notes ?? "", /^FAILED: .*Chrome/);
 	});
 
+	it("a cut-off write_demo is not saved, and the next request carries the shorter-document note", async () => {
+		const headless = fakeHeadless();
+		const model = recordingModel([
+			{ toolCalls: [{ toolCallId: "w1", toolName: "write_demo", input: { html: BROKEN_HTML } }], cutOff: true },
+			{ toolCalls: [{ toolCallId: "w2", toolName: "write_demo", input: { html: GOOD_HTML } }] },
+			{ toolCalls: [{ toolCallId: "r1", toolName: "run_demo", input: {} }] },
+			{ text: "Shorter version." },
+		]);
+		const result = await runDemoBuilder({ title: "T", brief: "b" }, { engine: model, headless });
+		assert.equal(result.html, GOOD_HTML);
+		assert.deepEqual(headless.demoRuns, [GOOD_HTML], "the cut-off document never ran");
+		assert.doesNotMatch(model.requests[0]!, /was cut off/);
+		assert.match(model.requests[1]!, /was cut off at \d+ tokens by the output limit/);
+	});
+
+	it("a cut-off reply with no tool call still gets the note and another attempt", async () => {
+		const headless = fakeHeadless();
+		const model = recordingModel([
+			{ text: "Let me think about the layout", cutOff: true },
+			{ toolCalls: [{ toolCallId: "w1", toolName: "write_demo", input: { html: GOOD_HTML } }] },
+			{ toolCalls: [{ toolCallId: "r1", toolName: "run_demo", input: {} }] },
+			{ text: "Done." },
+		]);
+		const result = await runDemoBuilder({ title: "T", brief: "b" }, { engine: model, headless });
+		assert.equal(result.html, GOOD_HTML);
+		assert.match(model.requests[1]!, /Write a shorter, complete document/);
+	});
+
 	it("fails when the model never writes a demo", async () => {
 		const model = scriptedModel([{ text: "I cannot build this." }]);
 		const result = await runDemoBuilder({ title: "T", brief: "b" }, { engine: model, headless: fakeHeadless() });
@@ -674,6 +718,33 @@ describe("visual maker (fake model + fake headless)", () => {
 		const result = await runVisualMaker({ brief: "b" }, { engine: model, headless });
 		assert.equal(result.svg, SVG_1);
 		assert.equal(result.notes, "Fixed and verified.");
+	});
+
+	it("a cut-off write_svg is not executed; its tool result carries the shorter-document note", async () => {
+		const headless = fakeHeadless();
+		const model = recordingModel([
+			{ toolCalls: [{ toolCallId: "w1", toolName: "write_svg", input: { svg: "<svg>truncated" } }], cutOff: true },
+			{ toolCalls: [{ toolCallId: "w2", toolName: "write_svg", input: { svg: SVG_1 } }] },
+			{ toolCalls: [{ toolCallId: "r1", toolName: "render_svg", input: {} }] },
+			{ text: "Shorter figure." },
+		]);
+		const result = await runVisualMaker({ brief: "b" }, { engine: model, headless });
+		assert.equal(result.svg, SVG_1);
+		assert.deepEqual(headless.svgRenders, [SVG_1], "the cut-off svg never rendered");
+		assert.match(model.requests[1]!, /ERROR: not executed\. Your last reply was cut off/);
+	});
+
+	it("a cut-off reply with no tool call gets the note instead of finishing", async () => {
+		const headless = fakeHeadless();
+		const model = recordingModel([
+			{ text: "Planning the coordinate", cutOff: true },
+			{ toolCalls: [{ toolCallId: "w1", toolName: "write_svg", input: { svg: SVG_1 } }] },
+			{ toolCalls: [{ toolCallId: "r1", toolName: "render_svg", input: {} }] },
+			{ text: "Done." },
+		]);
+		const result = await runVisualMaker({ brief: "b" }, { engine: model, headless });
+		assert.equal(result.svg, SVG_1);
+		assert.match(model.requests[1]!, /Write a shorter, complete document/);
 	});
 
 	it("fails when the model never writes an svg", async () => {
