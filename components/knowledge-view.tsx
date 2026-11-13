@@ -8,6 +8,7 @@ import { SetupDialog } from "@/components/setup-dialog";
 import { createSession, useStartReadiness, type StartPick } from "@/components/start-session";
 import { EmptyState } from "@/components/ui/empty-state";
 import { displayTitle, displayTopic } from "@/components/ui/format";
+import { CanvasHint, CanvasZoom } from "@/components/canvas-chrome";
 import { Hint } from "@/components/ui/hint";
 import { Icon } from "@/components/ui/icon";
 import { ago, chainNeighbourhood, topicColor, useGraphSnapshot, useTopics } from "@/components/v4/data";
@@ -349,45 +350,22 @@ export function KnowledgeView({ initialConfigured, focusIdeaId }: { initialConfi
 						)}
 
 						{!empty && snapshot && hintOpen && tray.length === 0 && (
-							<div className="khint pop hide-sm">
-								<Icon name="info" size="sm" className="khint-ic" />
-								<span>Click a topic to zoom in, an idea to see its chain</span>
-								<button type="button" className="ib sm" aria-label="Dismiss hint" onClick={closeHint}>
-									<Icon name="close" size="xs" />
-								</button>
-							</div>
+							<CanvasHint onDismiss={closeHint} className="hide-sm">
+								Click a topic to zoom in, an idea to see its chain
+							</CanvasHint>
 						)}
 
 						{!empty && snapshot && (
-							<div className="kctrl pop" role="group" aria-label="Zoom">
-								<Hint label="Zoom out" side="top">
-									<button type="button" className="ib sm" aria-label="Zoom out" onClick={() => api.current?.zoomOut()}>
-										<Icon name="minus" size="sm" />
-									</button>
-								</Hint>
-								<span className="kzoom mono num" aria-label={`Zoom ${zoomPct}%`}>
-									{zoomPct}%
-								</span>
-								<Hint label="Zoom in" side="top">
-									<button type="button" className="ib sm" aria-label="Zoom in" onClick={() => api.current?.zoomIn()}>
-										<Icon name="plus" size="sm" />
-									</button>
-								</Hint>
-								<span className="kctrl-sep" aria-hidden="true" />
-								<Hint label="Fit the whole graph" side="top">
-									<button
-										type="button"
-										className="ib sm"
-										aria-label="Fit"
-										onClick={() => {
-											setTopic(null);
-											api.current?.fit();
-										}}
-									>
-										<Icon name="fit" size="sm" />
-									</button>
-								</Hint>
-							</div>
+							<CanvasZoom
+								pct={zoomPct}
+								onZoomOut={() => api.current?.zoomOut()}
+								onZoomIn={() => api.current?.zoomIn()}
+								onFit={() => {
+									setTopic(null);
+									api.current?.fit();
+								}}
+								fitLabel="Fit the whole graph"
+							/>
 						)}
 
 						{tray.length > 0 && (

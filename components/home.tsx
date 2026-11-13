@@ -44,12 +44,12 @@ export function greeting(now: Date): string {
 
 const GREETINGS: Array<{ from: number; lines: Array<[string, string]> }> = [
 	{ from: 1, lines: [["Burning the midnight oil?", ""], ["Quiet hours.", "What shall we explore?"]] },
-	{ from: 5, lines: [["Early start.", "What's on your mind?"], ["Up with the sun.", "What shall we learn?"]] },
+	{ from: 5, lines: [["Early start.", "What’s on your mind?"], ["Up with the sun.", "What shall we learn?"]] },
 	{ from: 8, lines: [["Good morning.", "What shall we learn today?"], ["Morning.", "Fresh mind, fresh topic?"]] },
-	{ from: 12, lines: [["Good afternoon.", "Got a few minutes?"], ["Lunch break?", "Let's learn something."]] },
+	{ from: 12, lines: [["Good afternoon.", "Got a few minutes?"], ["Lunch break?", "Let’s learn something."]] },
 	{ from: 14, lines: [["Good afternoon.", "What are you curious about?"], ["Afternoon.", "What shall we dig into?"]] },
 	{ from: 18, lines: [["Good evening.", "What shall we dig into?"], ["Evening.", "Something new before the day ends?"]] },
-	{ from: 22, lines: [["Still up?", "Let's learn something."], ["Late one.", "What's keeping you curious?"]] },
+	{ from: 22, lines: [["Still up?", "Let’s learn something."], ["Late one.", "What’s keeping you curious?"]] },
 ];
 const PRACTICE_TAILS = ["What shall we sharpen?", "Ready for a few problems?"];
 
@@ -372,7 +372,7 @@ function LearnField({
 						type="submit"
 						className="hm-send tipb up mid"
 						aria-label={mode === "practice" ? "Start practice" : "Start lesson"}
-						data-tip={mode === "practice" ? "Start practice  ↵" : "Start lesson  ↵"}
+						data-tip={mode === "practice" ? "Start practice" : "Start lesson"}
 						data-testid={`home-start-${mode}`}
 						disabled={busy || !q.trim()}
 					>
@@ -597,7 +597,7 @@ function WeekStrip({ ideaCount }: { ideaCount: number | null }) {
 				<span className="hm-cell-l">Practice</span>
 				<span className="hm-cell-v num">{stats.practice.problems}</span>
 				<span className="hm-cell-s">
-					{stats.practice.problems > 0 ? `${stats.practice.solid} solid` : "Switch to Practice above"}
+					{stats.practice.problems > 0 ? `${stats.practice.solid} solid` : "Try Practice above"}
 				</span>
 			</div>
 		</section>

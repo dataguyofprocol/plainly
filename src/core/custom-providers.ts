@@ -8,6 +8,8 @@ export type CustomThinkingFormat = (typeof CUSTOM_THINKING_FORMATS)[number];
  *  take CUSTOM_MODEL_DEFAULTS. */
 export interface CustomModelEntry {
 	id: string;
+	/** Display name, 1..60 chars. Absent = `prettyCustomModelId(id)`. */
+	name?: string;
 	vision: boolean;
 	thinking: boolean;
 	/** Present exactly when `thinking`; defaults to "openai". */
@@ -46,6 +48,7 @@ export type CustomProviderProbeResult =
 export const CUSTOM_PROVIDER_PREFIX = "custom-";
 export const CUSTOM_PROVIDER_ID_RE = /^custom-[a-z0-9-]{1,40}$/;
 export const CUSTOM_PROVIDER_NAME_MAX = 60;
+export const CUSTOM_MODEL_NAME_MAX = 60;
 export const CUSTOM_PROVIDER_MODELS_MAX = 50;
 const SLUG_MAX = 40;
 
@@ -113,12 +116,31 @@ export function defaultCustomModel(id: string): CustomModelEntry {
 }
 
 function settleModel(m: CustomModelEntry): CustomModelEntry {
-	const { thinkingFormat, ...rest } = m;
+	const { thinkingFormat, name, ...rest } = m;
+	const label = name?.trim();
 	return {
 		...rest,
+		...(label ? { name: label } : {}),
 		maxTokens: Math.min(m.maxTokens, m.contextWindow),
 		...(m.thinking ? { thinkingFormat: thinkingFormat ?? "openai" } : {}),
 	};
+}
+
+/** The fallback display name: last path segment, `_`/`-` as spaces, short
+ *  all-caps words kept ("GPT"), other single-case words title-cased.
+ *  GPT_6_LUNA → "GPT 6 Luna"; meta-llama/llama-3-70b → "Llama 3 70b". */
+export function prettyCustomModelId(id: string): string {
+	const bare = id.slice(id.lastIndexOf("/") + 1);
+	const words = bare.split(/[_-]+/).filter(Boolean);
+	if (words.length === 0) return id;
+	return words
+		.map((w) => {
+			if (!/^[A-Za-z]+$/.test(w)) return w;
+			if (w === w.toUpperCase() && w.length <= 3) return w;
+			if (w === w.toUpperCase() || w === w.toLowerCase()) return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+			return w;
+		})
+		.join(" ");
 }
 
 function sanitizeModel(raw: unknown): CustomModelEntry | null {
@@ -127,8 +149,10 @@ function sanitizeModel(raw: unknown): CustomModelEntry | null {
 	const r = raw as Record<string, unknown>;
 	const id = typeof r.id === "string" ? r.id.trim() : "";
 	if (!id) return null;
+	const name = typeof r.name === "string" ? r.name.trim() : "";
 	return settleModel({
 		id,
+		...(name && name.length <= CUSTOM_MODEL_NAME_MAX ? { name } : {}),
 		vision: typeof r.vision === "boolean" ? r.vision : CUSTOM_MODEL_DEFAULTS.vision,
 		thinking: typeof r.thinking === "boolean" ? r.thinking : CUSTOM_MODEL_DEFAULTS.thinking,
 		...(isThinkingFormat(r.thinkingFormat) ? { thinkingFormat: r.thinkingFormat } : {}),
@@ -199,6 +223,11 @@ function parseModel(raw: unknown): CustomProviderParse<CustomModelEntry> {
 	if (r.thinkingFormat !== undefined && !isThinkingFormat(r.thinkingFormat)) {
 		return { ok: false, error: `${id}: unknown thinking format "${String(r.thinkingFormat)}"` };
 	}
+	if (r.name !== undefined && typeof r.name !== "string") return { ok: false, error: `${id}: the display name must be text` };
+	const name = typeof r.name === "string" ? r.name.trim() : "";
+	if (name.length > CUSTOM_MODEL_NAME_MAX) {
+		return { ok: false, error: `${id}: the display name can be at most ${CUSTOM_MODEL_NAME_MAX} characters` };
+	}
 	const contextWindow = r.contextWindow === undefined ? CUSTOM_MODEL_DEFAULTS.contextWindow : boundedInt(r.contextWindow, CUSTOM_CONTEXT_MIN, CUSTOM_CONTEXT_MAX);
 	if (contextWindow === null) {
 		return { ok: false, error: `${id}: the context window must be a whole number from ${CUSTOM_CONTEXT_MIN.toLocaleString("en-US")} to ${CUSTOM_CONTEXT_MAX.toLocaleString("en-US")} tokens` };
@@ -209,6 +238,7 @@ function parseModel(raw: unknown): CustomProviderParse<CustomModelEntry> {
 		ok: true,
 		value: settleModel({
 			id,
+			...(name ? { name } : {}),
 			vision: (r.vision as boolean | undefined) ?? CUSTOM_MODEL_DEFAULTS.vision,
 			thinking: (r.thinking as boolean | undefined) ?? CUSTOM_MODEL_DEFAULTS.thinking,
 			...(r.thinkingFormat !== undefined ? { thinkingFormat: r.thinkingFormat as CustomThinkingFormat } : {}),

@@ -42,6 +42,11 @@ import { PATHS } from "../config.ts";
 
 const createdChats: string[] = [];
 
+/** Faux reports a fresh conversation's whole prompt as cache writes, not input (pi-ai 1.5). */
+function billedPrompt(step: { inputTokens?: number; cacheWriteTokens?: number } | undefined): number | undefined {
+	return step ? (step.inputTokens ?? 0) + (step.cacheWriteTokens ?? 0) : undefined;
+}
+
 function fauxEngine(steps: FauxResponseStep[]): PiEngine {
 	const faux = createFauxCore({});
 	faux.setResponses(steps);
@@ -752,13 +757,13 @@ describe("the extraction pipeline (extractor → auditor → merger)", () => {
 			graphStore: ledgers,
 			extractor: recordUsage("extractor", submitModel("submit_findings", FINDINGS)),
 			auditor: recordUsage("auditor", submitModel("submit_review", verdict, () =>
-				usageSeen.push(extractionStatuses().find((r) => r.chatId === chatId)?.usage.extractor?.steps.at(-1)?.inputTokens),
+				usageSeen.push(billedPrompt(extractionStatuses().find((r) => r.chatId === chatId)?.usage.extractor?.steps.at(-1))),
 			)),
 		});
 		await pipeline.runExtraction(chatId);
 
 		assert.equal(usageSeen.length, 1);
-		assert.ok(typeof usageSeen[0] === "number" && usageSeen[0]! > 0, "the extractor's step billed input tokens");
+		assert.ok(typeof usageSeen[0] === "number" && usageSeen[0]! > 0, "the extractor's step billed prompt tokens (fresh or cache-written)");
 
 		const record = chatStore.getChat(chatId)!;
 		assert.equal(record.extractions?.length, 1);
@@ -767,7 +772,7 @@ describe("the extraction pipeline (extractor → auditor → merger)", () => {
 		assert.equal(run.stages.extractor.model, "faux:faux-1");
 		assert.equal(run.stages.extractor.steps.length, 1);
 		const step = run.stages.extractor.steps[0]!;
-		assert.ok(step.inputTokens! > 0 && step.outputTokens! > 0, "estimated usage captured");
+		assert.ok(billedPrompt(step)! > 0 && step.outputTokens! > 0, "estimated usage captured");
 		assert.equal(step.cacheReadTokens, 0);
 		assert.equal(nativeUsage.extractor.length, 1);
 		assert.ok(nativeUsage.extractor[0]!.cacheWrite > 0, "fresh native conversation writes its cached prefix");

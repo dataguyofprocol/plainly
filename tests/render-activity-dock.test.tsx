@@ -194,11 +194,11 @@ describe("activity section render", () => {
 		assert.match(html, /Chain-rule demo/);
 		assert.match(html, /building sandbox…/);
 		assert.match(html, /Extraction — merging/);
-		assert.match(html, /activity-blob-cost[^>]*>—</);
+		assert.match(html, /activity-blob-cost[^>]*>Not tracked</);
 		assert.match(html, /data-testid="activity-abort"/, "END on the blob face, popover-independent");
 		assert.match(html, /\bEnd\b/, "the explicit END button");
 		assert.match(html, /Background agents/);
-		assert.match(html, /activity-total-cost[^>]*>—</);
+		assert.match(html, /activity-total-cost[^>]*>Not tracked</);
 		assert.match(html, /title="building sandbox…"/);
 	});
 

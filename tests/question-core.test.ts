@@ -468,7 +468,7 @@ describe("compactAnswerForModel", () => {
 		const compact = compactAnswerForModel(ad);
 		assert.deepEqual(compact, {
 			kind: "quiz",
-			answers: [{ index: 1, label: "Mercury" }],
+			answers: [{ value: "mercury", label: "Mercury" }],
 			correct: true,
 			confidence: 70,
 			thinking: "guessed",
@@ -479,6 +479,22 @@ describe("compactAnswerForModel", () => {
 		assert.ok(!raw.includes("Mercury orbits closest"), "no explanation");
 		assert.ok(!("correctIndices" in compact), "correct is the verdict; indices are the call's");
 		assert.ok(!("questionId" in compact), "questionId was the toolCallId restated");
+	});
+
+	it("references the model's authored value, never the shuffled display index", () => {
+		// Authored order a, b, c; the dock shows c, b, a. The learner picks "A"
+		// at display position 3 — the model must hear "a", not 3 (its option "c").
+		const authored = normalizeOptions([
+			{ label: "A", value: "a" },
+			{ label: "B", value: "b" },
+			{ label: "C", value: "c" },
+		]);
+		const shown = [authored[2]!, authored[1]!, authored[0]!];
+		const ad = buildAnswer(quizData({ options: shown, correctIndices: [3] }), { values: ["a"] });
+		assert.equal(ad.answers[0]!.index, 3, "the record keeps the display index for the UI");
+		const compact = compactAnswerForModel(ad);
+		assert.deepEqual(compact.answers, [{ value: "a", label: "A" }]);
+		assert.ok(!JSON.stringify(compact).includes('"index"'), "no display index reaches the model");
 	});
 
 	it("dontKnow: the gap flag stands alone — no verdict, no confidence", () => {
@@ -502,6 +518,18 @@ describe("compactAnswerForModel", () => {
 		const ad = { ...buildAnswer(quizData(), { dontKnow: true }), dismissed: true };
 		const compact = compactAnswerForModel(ad);
 		assert.deepEqual(compact, { kind: "quiz", dismissed: true });
+	});
+});
+
+describe("stored questions with an authored don't-know option", () => {
+	it("still render: the rule gates new tool calls, not parseQuizInput", () => {
+		const stored = {
+			question: "What is the total pressure?",
+			options: [{ label: "Zero" }, { label: "2A" }, { label: "I don't know" }],
+			correctAnswer: "Zero",
+			explanation: "Opposite phases cancel.",
+		};
+		assert.ok(parseQuizInput(stored), "a pre-rule record must not turn malformed");
 	});
 });
 

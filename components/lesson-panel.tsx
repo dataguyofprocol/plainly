@@ -10,7 +10,7 @@ import { catalogLimits, useModelCatalog } from "@/components/model-picker";
 import { latestTree, type PopupMessage } from "@/components/plan-block";
 import { QuestionDock } from "@/components/question-dock";
 import { ReadingThinkingField } from "@/components/reading-thinking";
-import { formatTokens, planCostLabel } from "@/components/usage-format";
+import { COST_NOT_TRACKED, formatTokens, planCostLabel } from "@/components/usage-format";
 import { useChats } from "@/components/v4/data";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon, type IconName } from "@/components/ui/icon";
@@ -469,7 +469,7 @@ function LessonNumbers({ chatId, turns, contextTokens, pricing }: { chatId: stri
 									<i style={{ transform: `scaleX(${fill.toFixed(3)})` }} />
 								</span>
 							)}
-							<span className="mono num">{v}</span>
+							<span className={v === COST_NOT_TRACKED ? "faint" : "mono num"}>{v}</span>
 						</dd>
 					</div>
 				))}

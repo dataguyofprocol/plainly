@@ -1,3 +1,5 @@
+import { compile, type CoercingValidator } from "@earendil-works/pi-schema";
+import { formats } from "@earendil-works/pi-schema/formats";
 import { Value } from "typebox/value";
 import type { TSchema } from "typebox";
 import { quizDisplayInputSchema, askInputSchema, askOptionProblems, quizInputProblems, explainInputProblems, explainDisplayInputSchema, ASK_PROSE_FIELDS, EXPLAIN_PROSE_FIELDS, QUIZ_PROSE_FIELDS, type AskToolInput, type QuizToolInput, type ExplainToolInput } from "./question-core.ts";
@@ -5,16 +7,18 @@ import { repairMathForDisplay } from "./math-delims.ts";
 import { healEncodedArguments, healProseEscapes } from "./argument-heal.ts";
 import { probeDoneInputSchema, type ProbeDoneInput } from "./contracts/probe.ts";
 
-/** Mirrors pi-ai's validateToolArguments, which runs Value.Convert before
- *  Value.Check: records keep the RAW arguments, so skipping Convert here
- *  would reject input the boundary accepted. Convert mutates, hence the
- *  clone. */
+const validators = new WeakMap<TSchema, CoercingValidator<unknown>>();
+
+/** Mirrors pi-ai's validateToolArguments (same pi-schema compile options):
+ *  records keep the RAW arguments, so a stricter parse here would reject
+ *  input the boundary accepted. */
 function boundaryParse<T>(schema: TSchema, input: unknown): T | undefined {
 	if (typeof input !== "object" || input === null) return undefined;
-	const converted = structuredClone(input);
-	Value.Convert(schema, converted);
-	if (!Value.Check(schema, converted)) return undefined;
-	return Value.Clean(schema, converted) as T;
+	let validator = validators.get(schema);
+	if (!validator) validators.set(schema, (validator = compile(schema, { formats, coerce: true, unresolvedRefs: "reject" })));
+	const result = validator.parse(structuredClone(input));
+	if (!result.ok) return undefined;
+	return Value.Clean(schema, result.value) as T;
 }
 
 function restoreMathEscapesDeep(value: unknown): unknown {

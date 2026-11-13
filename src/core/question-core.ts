@@ -95,6 +95,29 @@ export function quizInputProblems(input: {
 	return problems;
 }
 
+const DONT_KNOW_LABELS = new Set(["i dont know", "i do not know", "dont know", "not sure", "im not sure", "unsure", "no idea"]);
+
+function normalizeDontKnow(label: string): string {
+	return label
+		.toLowerCase()
+		.replace(/[’‘`']/g, "")
+		.replace(/[^a-z ]+/g, " ")
+		.replace(/\s+/g, " ")
+		.trim()
+		.replace(/ yet$/, "");
+}
+
+/** New tool calls only — never `quizInputProblems`, which also gates
+ *  rendering stored questions that may predate this rule. The dock always
+ *  appends its own "I don't know yet", so an authored one duplicates it. */
+export function dontKnowOptionProblems(options: Array<{ label: string }>): string[] {
+	return options.flatMap((option, i) =>
+		DONT_KNOW_LABELS.has(normalizeDontKnow(option.label))
+			? [`options[${i}] "${option.label.trim()}" is a don't-know option — remove it; the learner always gets a built-in "I don't know" choice.`]
+			: [],
+	);
+}
+
 // Models emit tool args in schema order, so `explanation` sits before
 // `correctAnswer` to make the model reason before committing.
 export const quizInputBase = Type.Object({
@@ -587,13 +610,16 @@ export function dismissedAnswer(kind: QuestionKind, questionText: string): Quest
 }
 
 /** The model-visible answer: only what the learner added, since the tool
- *  call already carries everything the model authored. */
+ *  call already carries everything the model authored. Options are
+ *  referenced by the model's own `value`, never the display index: the dock
+ *  shuffles quiz options, so a display index points at the wrong option in
+ *  the model's authored order. */
 export function compactAnswerForModel(ad: QuestionAnswerData): Record<string, unknown> {
 	if (ad.dismissed) return { kind: ad.kind, dismissed: true };
 	const out: Record<string, unknown> = { kind: ad.kind };
 	if (ad.dontKnow) out.dontKnow = true;
 	if (Array.isArray(ad.answers) && ad.answers.length > 0)
-		out.answers = ad.answers.map((a) => ({ index: a.index, label: a.label }));
+		out.answers = ad.answers.map((a) => ({ value: a.value, label: a.label }));
 	if (ad.text) out.text = ad.text;
 	if (ad.other) out.other = ad.other;
 	if (ad.correct !== undefined && !ad.dontKnow) out.correct = ad.correct;

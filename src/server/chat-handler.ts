@@ -44,7 +44,7 @@ import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, triggerExtraction } from "./turn-service.ts";
-import { hasProbeDone, danglingQuestionOf } from "../core/native-messages.ts";
+import { hasProbeDone, danglingQuestionOf, bareStopReply, newQuestionNudge } from "../core/native-messages.ts";
 import { composeInstructions } from "../agent/teacher-agent.ts";
 import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./compaction.ts";
 import { catalogContextLimits, refreshConnectionCatalog } from "./model-catalog.ts";
@@ -334,6 +334,12 @@ export async function handleChatInput(
 				unregisterLiveAgent(chatId);
 				settleSteers(chatId, stamped);
 				reconcileUserSteers(chatId, stamped);
+				const nudged = input.type === "steers" && input.steers.some((m) => (m as { customType?: string }).customType === "question-nudge");
+				if (teaching && record.kind !== "practice" && !isAborted && !nudged) {
+					const after = stores.chatStore.getChat(chatId)?.messages ?? [];
+					const reply = bareStopReply(after, stamped);
+					if (reply) void deliverJobResult(newQuestionNudge(chatId, reply.id)).catch((err) => console.error(`[chat ${chatId}] question nudge failed:`, err));
+				}
 				if (process.env.NODE_ENV !== "test" && (!requestCycle || requestCycle.dispatched))
 					kickCompaction(() => {
 						const fresh = effectiveSettings();

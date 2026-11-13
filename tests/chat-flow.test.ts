@@ -17,6 +17,7 @@ import { effectiveSettings } from "../src/server/stores.ts";
 import { isTurnRunning } from "../src/server/turn-liveness.ts";
 import { deliverJobResult, setTurnRunner } from "../src/server/jobs.ts";
 import { buildSubagentSteer } from "../src/core/contracts.ts";
+import { bareCheckRejectionText } from "../src/core/contracts/chat.ts";
 import { abortTurn, runningTurn, settledTurnResponse } from "../src/server/turn-runs.ts";
 import { chatStore } from "../src/store/chats.ts";
 import { jobStore } from "../src/store/jobs.ts";
@@ -60,7 +61,7 @@ function defaultLesson(calls: string[][]): FauxResponseStep[] {
 		(context) => {
 			calls.push(context.messages.map((m) => JSON.stringify((m as { content: unknown }).content)));
 			return fauxAssistantMessage(
-				[fauxThinking("Probe the basics first."), fauxToolCall("quiz", QUIZ_INPUT, { id: "call-1" })],
+				[fauxThinking("Probe the basics first."), fauxText("A step of teaching."), fauxToolCall("quiz", QUIZ_INPUT, { id: "call-1" })],
 				{ stopReason: "toolUse" },
 			);
 		},
@@ -253,7 +254,7 @@ describe("teacher chat flow (scripted model)", () => {
 		const view2 = projectView(saved2.messages);
 		assert.equal(view2.length, 2, "the reaction continues the same assistant message (one group)");
 		const finalParts = view2[1]!.parts;
-		const textPart = finalParts.find((p) => p.type === "text");
+		const textPart = finalParts.findLast((p) => p.type === "text");
 		assert.ok(textPart && textPart.type === "text", "reaction text appended after the tool part");
 		assert.match((textPart as { text?: string }).text!, /Mercury it is/);
 		const answeredQuiz = finalParts.find((p) => p.type === "tool-quiz");
@@ -513,14 +514,14 @@ describe("teacher chat flow (scripted model)", () => {
 			(context) => {
 				calls.push(context.messages.map((m) => JSON.stringify((m as { content: unknown }).content)));
 				return fauxAssistantMessage(
-					[fauxToolCall("quiz", BAD_QUIZ_INPUT, { id: "call-bad" })],
+					[fauxText("A step of teaching."), fauxToolCall("quiz", BAD_QUIZ_INPUT, { id: "call-bad" })],
 					{ stopReason: "toolUse" },
 				);
 			},
 			(context) => {
 				calls.push(context.messages.map((m) => JSON.stringify((m as { content: unknown }).content)));
 				return fauxAssistantMessage(
-					[fauxToolCall("quiz", QUIZ_INPUT, { id: "call-good" })],
+					[fauxText("A step of teaching."), fauxToolCall("quiz", QUIZ_INPUT, { id: "call-good" })],
 					{ stopReason: "toolUse" },
 				);
 			},
@@ -574,8 +575,8 @@ describe("teacher chat flow (scripted model)", () => {
 		};
 
 		const steps: FauxResponseStep[] = [
-			() => fauxAssistantMessage([fauxToolCall("quiz", STRINGY_QUIZ_INPUT, { id: "call-stringy" })], { stopReason: "toolUse" }),
-			() => fauxAssistantMessage([fauxToolCall("quiz", QUIZ_INPUT, { id: "call-clean" })], { stopReason: "toolUse" }),
+			() => fauxAssistantMessage([fauxText("A step of teaching."), fauxToolCall("quiz", STRINGY_QUIZ_INPUT, { id: "call-stringy" })], { stopReason: "toolUse" }),
+			() => fauxAssistantMessage([fauxText("A step of teaching."), fauxToolCall("quiz", QUIZ_INPUT, { id: "call-clean" })], { stopReason: "toolUse" }),
 		];
 		const { engine } = scriptedTeacher(() => steps);
 
@@ -607,7 +608,7 @@ describe("teacher chat flow (scripted model)", () => {
 		const { engine } = scriptedTeacher(() => [
 			() =>
 				fauxAssistantMessage(
-					[fauxToolCall("quiz", QUIZ_A, { id: "call-a" }), fauxToolCall("quiz", QUIZ_B, { id: "call-b" })],
+					[fauxText("A step of teaching."), fauxToolCall("quiz", QUIZ_A, { id: "call-a" }), fauxToolCall("quiz", QUIZ_B, { id: "call-b" })],
 					{ stopReason: "toolUse" },
 			),
 		]);
@@ -966,7 +967,7 @@ it("explain tool call persists as a pending part; the free-text answer reveals t
 		(context) => {
 			cs.push(context.messages.map((m) => JSON.stringify((m as { content: unknown }).content)));
 			return fauxAssistantMessage(
-				[fauxThinking("Free recall this time."), fauxToolCall("explain", EXPLAIN_INPUT, { id: "call-1" })],
+				[fauxThinking("Free recall this time."), fauxText("A step of teaching."), fauxToolCall("explain", EXPLAIN_INPUT, { id: "call-1" })],
 				{ stopReason: "toolUse" },
 			);
 		},
@@ -1109,6 +1110,7 @@ describe("parallel question calls: the answer defers its wake while a sibling da
 				return fauxAssistantMessage(
 					[
 						fauxThinking("Batch a graded and a non-graded check."),
+						fauxText("A step of teaching."),
 						fauxToolCall("quiz", QUIZ_INPUT, { id: "call-1" }),
 						fauxToolCall("ask_user_question", ASK_INPUT, { id: "call-2" }),
 					],
@@ -1168,6 +1170,7 @@ describe("parallel rounds: the LAST resolution decides the wake (owner ruling 20
 				return fauxAssistantMessage(
 					[
 						fauxThinking("Batch again."),
+						fauxText("A step of teaching."),
 						fauxToolCall("quiz", QUIZ_INPUT, { id: "call-1" }),
 						fauxToolCall("ask_user_question", { question: "Next topic?", options: [{ label: "Chemistry" }, { label: "History" }] }, { id: "call-2" }),
 					],
@@ -1340,5 +1343,141 @@ describe("duplicate provider tool-call ids (the Lacan fix)", () => {
 		assert.equal(askPart?.output?.kind, "ask", "the ask card keeps its own answer");
 		assert.equal(quizPart?.state, "output-available");
 		assert.equal(quizPart?.output?.kind, "quiz", "the quiz card got ITS answer (the pre-fix bug: it landed on the ask card)");
+	});
+});
+
+describe("question nudge after a bare teaching stop (backlog item 10)", () => {
+	function teachingChat(title: string) {
+		const chat = createConfiguredChat(title);
+		createdChats.push(chat.id);
+		const probeDone = { ...fauxAssistantMessage([fauxToolCall("probe_done", {}, { id: "pd-1" })], { stopReason: "toolUse" }), id: "seed-a" };
+		chatStore.saveMessages(chat.id, [
+			{ id: "seed-u", role: "user", content: "teach me", timestamp: 1 },
+			probeDone,
+			{ id: "seed-r", role: "toolResult", toolCallId: "pd-1", toolName: "probe_done", content: [{ type: "text", text: "ok" }], isError: false, timestamp: 2 },
+		] as LhMessage[]);
+		return chat;
+	}
+	const nudgesIn = (chatId: string) =>
+		chatStore.getChat(chatId)!.messages.filter((m) => (m as { customType?: string }).customType === "question-nudge");
+	const settle = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+	it("fires once after a bare stop, and the nudge-started turn never nudges again", { timeout: 15000 }, async () => {
+		const chat = teachingChat("Test: nudge once");
+		const wakes: string[][] = [];
+		const wake = scriptedTeacher(() => [() => fauxAssistantMessage([fauxText("Still nothing to ask.")])]);
+		setTurnRunner(async (chatId, input) => {
+			if (input.type === "steers") wakes.push(input.steers.map((s) => s.id));
+			const res = await handleChatInput(chatId, input, agentFactory(wake.engine));
+			await res.arrayBuffer().catch(() => undefined);
+			return res.status;
+		});
+
+		const seed = scriptedTeacher(() => [() => fauxAssistantMessage([fauxText("A subscription records a delivery relationship.")])]);
+		await drainTurn(post(chat.id, { type: "text", text: "got it!" }), agentFactory(seed.engine));
+		const bareStop = chatStore.getChat(chat.id)!.messages.at(-1)!;
+
+		await waitFor(() => {
+			const rec = chatStore.getChat(chat.id)!;
+			const at = rec.messages.findIndex((m) => m.id === `nudge_${bareStop.id}`);
+			return at !== -1 && rec.messages[at + 1]?.role === "assistant" && !isTurnRunning(chat.id);
+		}, 8000, "the nudge turn to persist");
+		await settle(2000);
+
+		assert.deepEqual(wakes, [[`nudge_${bareStop.id}`]], "exactly one nudge turn");
+		assert.equal(nudgesIn(chat.id).length, 1, "one nudge marker in the record");
+		const view = projectView(chatStore.getChat(chat.id)!.messages);
+		assert.equal(view.filter((m) => m.role === "user").length, 2, "the nudge renders nothing for the learner");
+	});
+
+	it("an empty reply to the nudge shows nothing and never nudges again", { timeout: 15000 }, async () => {
+		const chat = teachingChat("Test: empty nudge reply");
+		const wakes: string[][] = [];
+		const wake = scriptedTeacher(() => [() => fauxAssistantMessage([])]);
+		setTurnRunner(async (chatId, input) => {
+			if (input.type === "steers") wakes.push(input.steers.map((s) => s.id));
+			const res = await handleChatInput(chatId, input, agentFactory(wake.engine));
+			await res.arrayBuffer().catch(() => undefined);
+			return res.status;
+		});
+
+		const seed = scriptedTeacher(() => [() => fauxAssistantMessage([fauxText("You answered the aside; over to you.")])]);
+		await drainTurn(post(chat.id, { type: "text", text: "quick aside?" }), agentFactory(seed.engine));
+		const before = projectView(chatStore.getChat(chat.id)!.messages);
+
+		await waitFor(() => {
+			const rec = chatStore.getChat(chat.id)!;
+			return rec.messages.at(-1)?.role === "assistant" && (rec.messages.at(-2) as { customType?: string } | undefined)?.customType === "question-nudge" && !isTurnRunning(chat.id);
+		}, 8000, "the empty nudge reply to persist");
+		await settle(2000);
+
+		assert.equal(wakes.length, 1, "one nudge, no second one after the empty reply");
+		const after = projectView(chatStore.getChat(chat.id)!.messages);
+		assert.deepEqual(
+			after.map((m) => [m.role, m.parts.filter((p) => p.type === "text").length]),
+			before.map((m) => [m.role, m.parts.filter((p) => p.type === "text").length]),
+			"the learner sees exactly what they saw before the nudge",
+		);
+	});
+
+	it("drops a nudge that is stale because the learner spoke first", { timeout: 15000 }, async () => {
+		const chat = teachingChat("Test: stale nudge");
+		const wakes: string[][] = [];
+		const wake = scriptedTeacher(() => [() => fauxAssistantMessage([fauxText("Nudge reply.")])]);
+		setTurnRunner(async (chatId, input) => {
+			if (input.type === "steers") wakes.push(input.steers.map((s) => s.id));
+			const res = await handleChatInput(chatId, input, agentFactory(wake.engine));
+			await res.arrayBuffer().catch(() => undefined);
+			return res.status;
+		});
+
+		const first = scriptedTeacher(() => [() => fauxAssistantMessage([fauxText("First prose-only reply.")])]);
+		await drainTurn(post(chat.id, { type: "text", text: "go on" }), agentFactory(first.engine));
+		const firstStop = chatStore.getChat(chat.id)!.messages.at(-1)!;
+
+		const second = scriptedTeacher(() => [() => fauxAssistantMessage([fauxText("Second prose-only reply.")])]);
+		await drainTurn(post(chat.id, { type: "text", text: "and then?" }), agentFactory(second.engine));
+		const secondStop = chatStore.getChat(chat.id)!.messages.at(-1)!;
+
+		await waitFor(() => wakes.length > 0 && !isTurnRunning(chat.id), 8000, "a nudge turn");
+		await settle(2000);
+
+		assert.deepEqual(wakes, [[`nudge_${secondStop.id}`]], "only the fresh nudge fires");
+		assert.ok(!chatStore.getChat(chat.id)!.messages.some((m) => m.id === `nudge_${firstStop.id}`), "the stale nudge never lands");
+	});
+});
+
+describe("bare check rejection (backlog item 12)", () => {
+	it("a check with no text is sent back, and the model's retry with text is the pending question", async () => {
+		const steps = (calls: string[][]): FauxResponseStep[] => [
+			(context) => {
+				calls.push(context.messages.map((m) => JSON.stringify((m as { content: unknown }).content)));
+				return fauxAssistantMessage([fauxThinking("next check"), fauxToolCall("quiz", QUIZ_INPUT, { id: "call-bare" })], { stopReason: "toolUse" });
+			},
+			(context) => {
+				calls.push(context.messages.map((m) => JSON.stringify((m as { content: unknown }).content)));
+				return fauxAssistantMessage([fauxText("Mercury orbits closest."), fauxToolCall("quiz", QUIZ_INPUT, { id: "call-led" })], { stopReason: "toolUse" });
+			},
+		];
+		const { engine, calls } = scriptedTeacher(steps);
+		const chat = createConfiguredChat("Test: bare check");
+		createdChats.push(chat.id);
+		const body = await drainTurn(post(chat.id, { type: "text", text: "got it!" }), agentFactory(engine));
+
+		const events = eventsOf(body);
+		const bareEnd = events.find((e) => e.type === "tool_execution_end" && e.toolCallId === "call-bare");
+		assert.equal(bareEnd?.isError, true, "the bare check ends as an error");
+		assert.equal(bareEnd?.result?.content?.[0]?.text, bareCheckRejectionText("quiz"));
+		assert.equal(calls.length, 2, "the rejection prompted a retry");
+		assert.ok(calls[1]!.join(" ").includes(JSON.stringify(bareCheckRejectionText("quiz")).slice(1, -1)), "the rejection reached the model");
+
+		const saved = chatStore.getChat(chat.id)!;
+		assert.equal(danglingQuestionOf(saved.messages)?.toolCallId, "call-led", "the retried check is the pending one");
+		const quizParts = projectView(saved.messages).flatMap((m) => m.parts).filter((p) => p.type === "tool-quiz") as Array<{ toolCallId?: string; state?: string }>;
+		assert.deepEqual(
+			quizParts.map((p) => [p.toolCallId, p.state]),
+			[["call-bare", "output-error"], ["call-led", "input-available"]],
+			"the rejected call projects as an error part, like any rejected quiz",
+		);
 	});
 });

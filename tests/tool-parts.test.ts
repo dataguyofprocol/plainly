@@ -9,7 +9,8 @@ import {
 	parseQuizInput,
 	parseExplainInput,
 } from "../src/core/tool-parts.ts";
-import { quizInputSchema, probeQuizInputSchema } from "../src/core/question-core.ts";
+import { quizDisplayInputSchema, quizInputSchema, probeQuizInputSchema } from "../src/core/question-core.ts";
+import { validateToolArguments } from "@earendil-works/pi-ai";
 import { probeDoneInputSchema } from "../src/core/contracts/probe.ts";
 
 const TEACHER_QUIZ = {
@@ -431,5 +432,35 @@ describe("over-escaped command heal at the parse seam (owner ruling 2026-10-15)"
 		const parsed = parseQuizInput({ ...BASE, question: matrix });
 		assert.ok(parsed, "parses");
 		assert.equal(parsed.question, matrix);
+	});
+});
+
+describe("card parsing accepts exactly what pi-ai's tool validator accepts", () => {
+	const piAccepts = (name: string, parameters: object, args: unknown): boolean => {
+		try {
+			validateToolArguments({ name, description: "", parameters } as never, { type: "toolCall", id: "c", name, arguments: args as never });
+			return true;
+		} catch {
+			return false;
+		}
+	};
+	const quiz = { question: "Which?", options: [{ label: "A", value: "a" }, { label: "B", value: "b" }], correctAnswer: "a", explanation: "Because." };
+	const quizCases: Record<string, unknown> = {
+		"as authored": quiz,
+		"null optional": { ...quiz, details: null },
+		"number for a string": { ...quiz, details: 5 },
+		"string for a boolean": { ...quiz, multiSelect: "true" },
+		"unparseable boolean": { ...quiz, multiSelect: "yes" },
+		"missing required": { question: "Which?", options: quiz.options, correctAnswer: "a" },
+	};
+	for (const [name, args] of Object.entries(quizCases)) {
+		it(`quiz: ${name}`, () => {
+			assert.equal(parseQuizInput(args) !== undefined, piAccepts("quiz", quizDisplayInputSchema, args));
+		});
+	}
+	it("probe_done: a single strand is wrapped into the array, as pi-ai does", () => {
+		const args = { assessment: { strands: { strand: "limits", assessment: "solid on limits" } } };
+		assert.equal(piAccepts("probe_done", probeDoneInputSchema, args), true);
+		assert.deepEqual(parseProbeDoneInput(args)?.assessment.strands, [{ strand: "limits", assessment: "solid on limits" }]);
 	});
 });

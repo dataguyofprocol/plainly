@@ -25,7 +25,7 @@ describe("resolveAttachments", () => {
 		const r = resolveAttachments([{ name: "web-image.png" }], pathFor, []);
 		assert.deepEqual(r.paths, []);
 		assert.equal(r.errors.length, 1);
-		assert.match(r.errors[0]!, /web-image\.png isn't a file on disk/);
+		assert.match(r.errors[0]!, /web-image\.png isn’t a file on disk/);
 	});
 
 	it("no duplicates — against the existing list and within the batch", () => {

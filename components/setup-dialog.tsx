@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import type React from "react";
-import { type ModelCatalogEntry, type ModelSlotName, type ModelsSettings } from "@/src/core";
-import { prettyModel } from "@/components/usage-format";
+import { type CatalogProvider, type ModelCatalogEntry, type ModelSlotName, type ModelsSettings } from "@/src/core";
+import { modelLabel } from "@/components/usage-format";
 import { ModelMenuList } from "@/components/settings/model-menu";
 import { MenuShell } from "@/components/menu-shell";
 import { notifySettingsSaved, useSettingsSaved } from "@/components/settings-signal";
@@ -30,7 +30,7 @@ const SLOT_ORDER: readonly ModelSlotName[] = ["strong", "cheap", "vision"];
 
 interface ModelsBody {
 	models: ModelCatalogEntry[];
-	providers: { id: string; keyPresent: boolean }[];
+	providers: CatalogProvider[];
 	slots?: Record<ModelSlotName, { model: { provider: string; id: string }; thinkingLevel?: ThinkingLevel } | null>;
 }
 
@@ -294,7 +294,7 @@ export function SetupDialog({
 													{slot !== "strong" && <><ChatGPTBackgroundAccess provider={entry?.provider} /><NativeSubscriptionBackgroundAccess provider={entry?.provider} /></>}
 												</span>
 												<SelectTrigger
-													value={entry ? prettyModel(entry.id) : ""}
+													value={entry ? modelLabel(entry.id, entry.provider, body?.models) : ""}
 													emptyLabel="Choose…"
 													ariaLabel={`${SLOT_META[slot].label}`}
 													testid={`setup-trigger-${slot}`}
@@ -316,6 +316,7 @@ export function SetupDialog({
 													>
 														<ModelMenuList
 															models={catalog}
+															providers={body?.providers}
 															effectiveId={entry?.id}
 															effectiveProvider={entry?.provider}
 															onPick={(m) => {

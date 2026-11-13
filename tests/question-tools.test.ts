@@ -410,3 +410,40 @@ describe("tool descriptions carry mechanics only, no question-craft", () => {
 		assert.ok(shared.includes("TRANSCRIBED SPEECH"), "the dictation-leniency note lives here");
 	});
 });
+
+describe("don't-know options: rejected on new calls (the dock appends its own)", () => {
+	const probeWith = (label: string) => ({
+		question: "What is 2 + 2?",
+		options: [
+			{ label: "3", value: "3" },
+			{ label: "4", value: "4" },
+			{ label, value: "x" },
+		],
+		correctAnswer: "4",
+		explanation: "Arithmetic.",
+	});
+
+	for (const label of ["I don't know", "I don’t know yet", "Not sure.", "No idea", "Unsure"]) {
+		it(`probe rejects "${label}", naming the built-in choice`, async () => {
+			const res = await boundaryParse(probeQuizTool, probeWith(label));
+			assert.equal(res.success, false);
+			assert.match(problemLines(res.error).join("\n"), /don't-know option — remove it/);
+		});
+	}
+
+	it("a real option that merely starts with the words stays legal", async () => {
+		const res = await boundaryParse(probeQuizTool, probeWith("Not sure the server is authentic"));
+		assert.equal(res.success, true);
+	});
+
+	it("the teach-phase quiz rejects one too", async () => {
+		const chatId = newChat("Don't-know: teach quiz");
+		chatStore.saveTree(chatId, { nodes: [{ id: "arith", title: "Arithmetic" }], edges: [], version: 1 });
+		const res = await boundaryParse(teachQuizToolFor({ chatId, chatStore }), {
+			...validQuiz,
+			options: [...validQuiz.options, { label: "I don't know", value: "idk" }],
+		});
+		assert.equal(res.success, false);
+		assert.match(problemLines(res.error).join("\n"), /don't-know option/);
+	});
+});

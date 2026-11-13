@@ -240,6 +240,17 @@ function MetadataPopover({
 	);
 }
 
+/** With a hint rung it is the working sent along with a hint request;
+ *  without one it is the submitted answer. */
 export function ThinkingCard({ data }: { data: PracticeThinkingData }) {
-	return <ThinkingBlock testId="thinking-card" label="Your thinking" tag={isHintRung(data.hint) ? hintTag(data.hint) : undefined} text={data.text} defaultOpen />;
+	const hint = isHintRung(data.hint) ? data.hint : undefined;
+	return (
+		<ThinkingBlock
+			testId="thinking-card"
+			label={hint ? "Your working" : "Your answer"}
+			tag={hint ? hintTag(hint) : undefined}
+			text={data.text}
+			defaultOpen
+		/>
+	);
 }

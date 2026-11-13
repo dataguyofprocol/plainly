@@ -95,6 +95,17 @@ export const HANDOFF_TEXT =
 	"Take your time here and really think this through. " +
 	"When it's genuinely reasoned out, call plan_init and present the plan; I'll accept it or ask for changes.";
 
+export const QUESTION_NUDGE_TEXT =
+	"Your last turn ended without a question for the learner. If the lesson should continue, pose the next predict or check now. " +
+	"If stopping was intended (the lesson is finished, or you answered an aside and are waiting on them), end your turn without output.";
+
+export function bareCheckRejectionText(tool: string): string {
+	return (
+		"A check is shown collapsed after the teaching it tests, but you have written no text this turn, so the learner sees nothing new. " +
+		`Write the teaching, or at least one sentence that sets up this check, as text, then call ${tool} again.`
+	);
+}
+
 export const THINKING_LABEL = "Your thinking";
 
 /** 1 = Nudge, 2 = Bigger hint, 3 = First step. Bounds what the learner asks for;

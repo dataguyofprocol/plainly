@@ -86,7 +86,8 @@
 .v4 .ls-row .ls-arg { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-jetbrains), monospace; font-size: 12px; color: var(--faint); }
 .v4 .ls-row .ls-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--faint); }
 .v4 .ls-row.failed .ls-label { color: var(--danger); opacity: 1; }
-.v4 .ls-row .ls-chev { flex: none; color: var(--faint); opacity: 0.8; transition: transform var(--dur-2) var(--ease-out); }
+.v4 .ls-row .ls-chev { flex: none; color: var(--faint); opacity: 0; transition: transform var(--dur-2) var(--ease-out), opacity var(--dur-1); }
+.v4 .ls-row:hover .ls-chev, .v4 .ls-row:focus-visible .ls-chev, .v4 .ls-tool[open] > .ls-row .ls-chev { opacity: 0.8; }
 .v4 .ls-tool[open] > .ls-row .ls-chev { transform: rotate(90deg); }
 .v4 .ls-row .ls-time { flex: none; font-family: var(--font-jetbrains), monospace; font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
 .v4 .ls-row .ls-mini { flex: none; height: 24px; margin-left: 4px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong) inset; color: var(--ink); font-size: 12px; font-weight: 600; transition: box-shadow var(--dur-1); }

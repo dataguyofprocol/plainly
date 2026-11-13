@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { topicColor } from "@/components/v4/data";
 import { displayTopic } from "@/components/ui/format";
 import { Icon } from "@/components/ui/icon";
-import { planCostLabel } from "@/components/usage-format";
+import { COST_NOT_TRACKED, planCostLabel } from "@/components/usage-format";
 import { GraphCanvasRenderer, type CanvasColors, type GraphRenderSettings } from "./graph-canvas.ts";
 import { useResolvedTheme } from "@/components/theme";
 import { usePopoverDismiss } from "@/components/popover-dismiss";
@@ -229,6 +229,9 @@ function timeAgo(startedAt: number): string {
 function fmtRunCost(dollars: number | null, providers: readonly string[] = []): string {
 	return planCostLabel(dollars, providers, (value) => `$${value.toFixed(3)}`);
 }
+function CostText({ label }: { label: string }) {
+	return label === COST_NOT_TRACKED ? <span className="text-faint">{label}</span> : <>{label}</>;
+}
 function graphProviders(value: { subscriptionRuns?: number; subscriptionProviders?: string[] }): string[] {
 	return value.subscriptionProviders ?? ((value.subscriptionRuns ?? 0) > 0 ? ["ChatGPT"] : []);
 }
@@ -286,14 +289,15 @@ function GraphCostPanel({ costs }: { costs: GraphCostSummary }) {
 		["Audit", costs.stages.audit],
 	];
 	const { unpricedRuns } = displayCostTotals(costs);
+	const totalLabel = graphUsageLabel(costs);
 	return (
 		<div className="w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border bg-card/95 p-3 text-xs shadow-lg backdrop-blur">
 			<div className="mb-2 flex items-baseline justify-between">
 				<span className="text-[10px] font-medium text-muted-foreground">
 					Graph pipeline costs
 				</span>
-				<span className="text-foreground tabular-nums">
-					{graphUsageLabel(costs)}
+				<span className={cn("tabular-nums", totalLabel === COST_NOT_TRACKED ? "text-faint" : "text-foreground")}>
+					{totalLabel}
 					{unpricedRuns > 0 && (
 						<span className="text-muted-foreground"> · {unpricedRuns} unpriced</span>
 					)}
@@ -304,7 +308,7 @@ function GraphCostPanel({ costs }: { costs: GraphCostSummary }) {
 					<div key={label} className="flex items-baseline justify-between gap-2 text-[11px]">
 						<span className="shrink-0 text-muted-foreground">{label}</span>
 						<span className="min-w-0 text-right tabular-nums">
-							{fmtRunCost(stage.runs - stage.unpricedRuns - (stage.subscriptionRuns ?? 0) <= 0 ? null : stage.dollars, graphProviders(stage))}
+							<CostText label={fmtRunCost(stage.runs - stage.unpricedRuns - (stage.subscriptionRuns ?? 0) <= 0 ? null : stage.dollars, graphProviders(stage))} />
 							{stage.unpricedRuns > 0 && (stage.runs - stage.unpricedRuns - (stage.subscriptionRuns ?? 0) > 0 || (stage.subscriptionRuns ?? 0) > 0) && (
 								<span className="text-muted-foreground"> +{stage.unpricedRuns} unpriced</span>
 							)}
@@ -329,7 +333,7 @@ function GraphCostPanel({ costs }: { costs: GraphCostSummary }) {
 									</span>
 								)}
 							</span>
-							<span className="shrink-0 tabular-nums">{fmtRunCost(run.dollars, graphProviders(run))}{run.dollars === null && run.subscriptionRuns === 1 ? " +1 unpriced" : ""}</span>
+							<span className="shrink-0 tabular-nums"><CostText label={fmtRunCost(run.dollars, graphProviders(run))} />{run.dollars === null && run.subscriptionRuns === 1 ? " +1 unpriced" : ""}</span>
 						</div>
 					))}
 			</div>

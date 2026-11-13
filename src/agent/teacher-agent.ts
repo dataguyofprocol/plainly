@@ -1,5 +1,5 @@
 import { Agent } from "@earendil-works/pi-agent-core";
-import type { AgentEvent, AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
+import type { AgentEvent, AgentMessage, AgentTool, BeforeToolCallContext, BeforeToolCallResult } from "@earendil-works/pi-agent-core";
 import { invalidInputResult, questionResult } from "./tool-execute.ts";
 import { providerEventObserver } from "./provider-events.ts";
 import type { Usage } from "@earendil-works/pi-ai";
@@ -16,9 +16,10 @@ import {
 } from "./tools.ts";
 import { practiceTools, type PracticeToolContext } from "./tools/practice.ts";
 import { healToolRecord } from "./tools/heal.ts";
-import { quizInputObject, quizInputProblems } from "../core/question-core.ts";
+import { dontKnowOptionProblems, questionNeedsReveal, quizInputObject, quizInputProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS, type EnabledTools } from "../core/pending.ts";
-import { toLlmMessages, nativeInputCause } from "../core/native-messages.ts";
+import { toLlmMessages, nativeInputCause, teacherTextSinceLearner } from "../core/native-messages.ts";
+import { bareCheckRejectionText } from "../core/contracts/chat.ts";
 import type { ChatGPTRequestCycle } from "./chatgpt-request-cycle.ts";
 import { usageWasAdmitted } from "./subscription-request-cycle.ts";
 
@@ -74,6 +75,15 @@ function makeQuestionStopper() {
 	};
 }
 
+/** A check arrives collapsed, so one posed with no text since the learner's
+ *  last input leaves the chat looking stopped; send it back for text. */
+export async function rejectBareCheck(context: BeforeToolCallContext): Promise<BeforeToolCallResult | undefined> {
+	const tool = context.toolCall.name;
+	if (!questionNeedsReveal(tool, context.args, "teach")) return undefined;
+	if (teacherTextSinceLearner(context.context.messages, context.assistantMessage)) return undefined;
+	return { block: true, reason: bareCheckRejectionText(tool) };
+}
+
 function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: AgentTool<any, any>[]) {
 	const engine = opts.engine ?? piEngineFor(kind as "prober" | "teacher");
 	const stopper = makeQuestionStopper();
@@ -95,6 +105,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 		streamFn: engine.streamFn,
 		...(providerEvents ? { onProviderStreamEvent: providerEvents } : {}),
 		finishTurn: (turn) => (stopper(turn) ? { action: "end" } : undefined),
+		...(kind === "teacher" ? { beforeToolCall: rejectBareCheck } : {}),
 		steeringMode: "all",
 		// must never throw (pi's convertToLlm contract).
 		convertToLlm: toLlmMessages,
@@ -148,7 +159,7 @@ export function bareQuestionTools(): Record<string, AgentTool<any>> {
 		parameters: quizInputObject,
 		executionMode: "sequential",
 		execute: async (_toolCallId, input) => {
-			const problems = quizInputProblems(input);
+			const problems = [...quizInputProblems(input), ...dontKnowOptionProblems(input.options)];
 			if (problems.length > 0) return invalidInputResult("quiz", problems);
 			return questionResult();
 		},

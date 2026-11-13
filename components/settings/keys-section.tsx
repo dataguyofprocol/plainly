@@ -294,7 +294,6 @@ function AddProviderRow({
 				<Icon name="link" size="sm" />
 				Connect an OpenAI-compatible endpoint
 			</button>
-			{addable.length > 0 && <span className="meta">{addable.length} more providers available</span>}
 			{open && (
 				<MenuShell
 					anchorRef={anchorRef}

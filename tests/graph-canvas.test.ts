@@ -3,6 +3,9 @@ import { describe, it, it as test } from "node:test";
 import {
 	applyClusterLabels,
 	arrowGeometry,
+	backingSize,
+	backingStale,
+	chainEdgeShown,
 	isImpNodeId,
 	boxBlurRound,
 	fitTransform,
@@ -20,6 +23,35 @@ import {
 	REGION_BITMAP_OPTIONS,
 	REGION_BLUR_LADDER,
 } from "../src/core/render-settings.ts";
+
+describe("backingStale (DPR changes fire no ResizeObserver)", () => {
+	test("a store sized at 2x is stale once the display drops to 1x, at the same CSS size", () => {
+		const { w, h } = backingSize(1164, 810, 2);
+		const canvas = { clientWidth: 1164, clientHeight: 810, width: w, height: h };
+		assert.deepEqual([canvas.width, canvas.height], [2328, 1620]);
+		assert.equal(backingStale(canvas, 2), false);
+		assert.equal(backingStale(canvas, 1), true, "the audit's half-size corner render");
+	});
+
+	test("never sizes below 1px", () => {
+		assert.deepEqual(backingSize(0, 0, 2), { w: 1, h: 1 });
+	});
+});
+
+describe("chainEdgeShown (a search hides the selected chain too)", () => {
+	const chain = new Set(["a", "arg_1", "b"]);
+	it("no search: every chain edge draws", () => {
+		assert.equal(chainEdgeShown({ from: "a", to: "arg_1" }, chain, null), true);
+	});
+	it("an edge leaving the chain never draws", () => {
+		assert.equal(chainEdgeShown({ from: "a", to: "c" }, chain, null), false);
+	});
+	it("a search that hides either end drops the edge", () => {
+		assert.equal(chainEdgeShown({ from: "a", to: "arg_1" }, chain, new Set()), false);
+		assert.equal(chainEdgeShown({ from: "a", to: "arg_1" }, chain, new Set(["a"])), false);
+		assert.equal(chainEdgeShown({ from: "a", to: "arg_1" }, chain, new Set(["a", "arg_1"])), true);
+	});
+});
 
 describe("zoomRatioOf (the sigma-compatible camera ratio)", () => {
 	test("1 at fit zoom, smaller when zoomed in, larger when zoomed out", () => {

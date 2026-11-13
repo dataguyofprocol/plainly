@@ -433,7 +433,7 @@ export class SessionModel {
 		const optimistic: LhMessage[] = [];
 		if (input.type === "text") optimistic.push({ ...newUserMessage(input.text), id: localId() });
 		else if (input.type === "thinking") {
-			optimistic.push({ ...newThinkingMessage(input.problemCallId, input.text), id: localId() });
+			optimistic.push({ ...newThinkingMessage(input.problemCallId, input.text, input.hint), id: localId() });
 		} else if (input.type === "next") {
 			optimistic.push({ ...newNextMessage(), id: localId() });
 		} else if (input.type === "answer") {

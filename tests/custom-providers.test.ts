@@ -8,6 +8,7 @@ import {
 	parseCustomProviderCreate,
 	parseCustomProviderProbe,
 	parseCustomProviderUpdate,
+	prettyCustomModelId,
 	sanitizeCustomProviders,
 	slugifyProviderName,
 } from "../src/core/custom-providers.ts";
@@ -111,6 +112,37 @@ describe("per-model capabilities", () => {
 			const result = parseCustomProviderCreate({ name: "x", baseUrl: "http://x/v1", models: [model] });
 			assert.ok(!result.ok && result.error.length > 0, JSON.stringify(model));
 		}
+	});
+});
+
+describe("model display names", () => {
+	it("round-trip trimmed through the parser and the sanitizer; empty means unset", () => {
+		const ok = parseCustomProviderCreate({ name: "x", baseUrl: "http://x/v1", models: [{ id: "GPT_6_LUNA", name: "  Luna  " }, { id: "b", name: "  " }] });
+		assert.ok(ok.ok);
+		assert.deepEqual(ok.value.models, [{ ...bare("GPT_6_LUNA"), name: "Luna" }, bare("b")]);
+		const [entry] = sanitizeCustomProviders([{ ...valid, models: [{ id: "q", name: " Qwen " }, { id: "r", name: 5 }] }]);
+		assert.deepEqual(entry!.models, [{ ...bare("q"), name: "Qwen" }, bare("r")]);
+	});
+
+	it("rejects names over 60 characters or not text on write; drops them on read", () => {
+		for (const name of ["x".repeat(61), 42]) {
+			const result = parseCustomProviderCreate({ name: "x", baseUrl: "http://x/v1", models: [{ id: "m", name }] });
+			assert.ok(!result.ok && /display name/.test(result.error), String(name));
+		}
+		const [entry] = sanitizeCustomProviders([{ ...valid, models: [{ id: "m", name: "x".repeat(61) }] }]);
+		assert.deepEqual(entry!.models, [bare("m")]);
+	});
+
+	it("prettyCustomModelId: the fallback name", () => {
+		const table: Array<[string, string]> = [
+			["GPT_6_LUNA", "GPT 6 Luna"],
+			["meta-llama/llama-3-70b", "Llama 3 70b"],
+			["qwen2.5-coder", "qwen2.5 Coder"],
+			["DeepSeek-R1", "DeepSeek R1"],
+			["mistral", "Mistral"],
+			["___", "___"],
+		];
+		for (const [id, want] of table) assert.equal(prettyCustomModelId(id), want, id);
 	});
 });
 

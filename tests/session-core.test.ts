@@ -1076,7 +1076,7 @@ describe("newAnswerResult two audiences", () => {
 		const modelSees = JSON.parse((msg.content as { type: "text"; text: string }[])[0]!.text);
 		assert.deepEqual(modelSees, {
 			kind: "quiz",
-			answers: [{ index: 1, label: "Mercury" }],
+			answers: [{ value: "mercury", label: "Mercury" }],
 			correct: true,
 			confidence: 70,
 			thinking: "guessed",
@@ -1154,6 +1154,12 @@ describe("absorbed — the custom role (the doubled thinking card)", () => {
 		const other = { ...newThinkingMessage("call-p1", "a later, different trace"), id: "srv_2" } as LhMessage;
 		assert.ok(!absorbed(optimistic, [...poseRecord(), other]), "different details → not the same submission");
 		assert.ok(!absorbed(serverCopy, [optimistic]), "server ids never drop");
+	});
+
+	it("a hint request's optimistic marker carries the hint, so the server copy absorbs it", () => {
+		const optimistic = { ...newThinkingMessage("call-p1", "stuck here", 1), id: "c_opt1" } as LhMessage;
+		const serverCopy = { ...newThinkingMessage("call-p1", "stuck here", 1), id: "srv_1" } as LhMessage;
+		assert.ok(absorbed(optimistic, [...poseRecord(), serverCopy]));
 	});
 
 	it("the adoption window cannot double the card (model-level end-to-end)", () => {

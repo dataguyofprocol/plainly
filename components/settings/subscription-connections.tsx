@@ -7,7 +7,7 @@ import { ConnectionDialog, ConnectionFooter, ConnectionRow, ProviderMark } from 
 import { ChatGPTConnection } from "./chatgpt-connection";
 import { Toggle } from "./controls";
 
-export const COPILOT_POLICY_NOTICE = "Pi's native Copilot sign-in may enable additional models whose policy is not yet configured. Models explicitly disabled by policy are not enabled. Organization restrictions still apply.";
+export const COPILOT_POLICY_NOTICE = "Pi’s native Copilot sign-in may enable additional models whose policy is not yet configured. Models explicitly disabled by policy are not enabled. Organization restrictions still apply.";
 export const SUBSCRIPTION_BACKGROUND_HINT = "Allow Plainly helper agents and automatic follow-ups to use this connection.";
 export function subscriptionNotice(label: string): string { return `Your prompts, tool results, and relevant session context are sent to ${label} to run the work you select. Credentials are stored locally in an owner-only plaintext file. Provider terms, data-use policies, and plan limits apply. This connection never falls back to an API key.`; }
 export function subscriptionDisconnectCopy(label: string): string { return `Disconnect ${label} from Plainly? This stops work using this connection and removes its saved credentials from this device. It does not cancel your subscription or revoke access at the provider. Saved model choices will remain unavailable until you reconnect or change them.`; }
@@ -94,7 +94,7 @@ export function NativeSubscriptionUIProvider({ children }: { children: React.Rea
 					<Toggle label="Allow background use" checked={management ? status.allowBackgroundUse : background} disabled={busy || !!operation || status.pending || !status.available} onChange={(enabled) => { setBackground(enabled); if (management && bridge) void control(() => bridge.consent(dialog, enabled)); else setBackgroundDirty(true); }} />
 					<span><span className="inset-t">Allow background use</span><span className="inset-d">{SUBSCRIPTION_BACKGROUND_HINT}</span></span>
 				</div>
-				{!status.available && <p className="dlg-note">Subscription sign-in requires the desktop app's private server connection. API-key connections remain available here.</p>}
+				{!status.available && <p className="dlg-note">Subscription sign-in requires the desktop app’s private server connection. API-key connections remain available here.</p>}
 				{view === "connection" && interaction && <div className="dlg-flow" data-testid="subscription-login-interaction">
 					{interaction.progress && <p role="status" className="dlg-status">{interaction.progress}</p>}
 					{interaction.userCode && <p className="dlg-code">Device code <code className="mono">{interaction.userCode}</code></p>}

@@ -5,7 +5,7 @@ import { ActivityIcon, BotIcon, FileTextIcon, PenToolIcon, PlayIcon, SearchIcon,
 import { cn } from "@/lib/utils";
 import type { CallUsage, JobKind, JobRecord } from "@/src/core";
 import { isModelsRefusal, isProviderKeyRefusal, subscriptionLabel, subscriptionLabels } from "@/src/core";
-import { formatTokens, planCostLabel } from "@/components/usage-format";
+import { COST_NOT_TRACKED, formatTokens, planCostLabel } from "@/components/usage-format";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 
 interface FeedUsage extends NonNullable<JobRecord["usage"]> {
@@ -208,6 +208,7 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 		const priced = blobs.map((b) => b.cost).filter((c): c is number => c !== null);
 		return priced.length === 0 ? null : priced.reduce((a, c) => a + c, 0);
 	}, [blobs]);
+	const totalCostLabel = planCostLabel(totalCost, subscriptionLabels(blobs.map((blob) => blob.model)));
 
 	const abort = useCallback(async (blob: ActivityBlob) => {
 		const { setAbortStates: set } = abortRef.current;
@@ -244,8 +245,12 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 				<ActivityIcon className="size-3.5" />
 				Background agents
 				{blobs.length > 0 && (
-					<span className="ml-auto tabular-nums" data-testid="activity-total-cost" title="Total running cost (inferred)">
-						{planCostLabel(totalCost, subscriptionLabels(blobs.map((blob) => blob.model)))}
+					<span
+						className={cn("ml-auto tabular-nums", totalCostLabel === COST_NOT_TRACKED && "text-faint")}
+						data-testid="activity-total-cost"
+						title="Total running cost (inferred)"
+					>
+						{totalCostLabel}
 				</span>
 				)}
 			</div>
@@ -284,6 +289,7 @@ function ActivityBlobRow({
 	onAbort: () => void;
 }) {
 	const Icon = blob.process === "extraction" ? WaypointsIcon : (blob.jobKind && KIND_ICON[blob.jobKind]) || BotIcon;
+	const costLabel = planCostLabel(blob.cost, subscriptionLabel(blob.model));
 	const label =
 		blob.process === "extraction"
 			? `Extraction — ${blob.phase ?? "running"}`
@@ -319,7 +325,7 @@ function ActivityBlobRow({
 					)}
 				</span>
 				<span className="flex shrink-0 items-center gap-2 tabular-nums text-muted-foreground">
-					<span data-testid="activity-blob-cost">{planCostLabel(blob.cost, subscriptionLabel(blob.model))}</span>
+					<span data-testid="activity-blob-cost" className={cn(costLabel === COST_NOT_TRACKED && "text-faint")}>{costLabel}</span>
 					<span data-testid="activity-blob-elapsed">{formatElapsed(now - blob.startedAt)}</span>
 				</span>
 			</button>
@@ -354,8 +360,8 @@ function ActivityBlobRow({
 						{blob.activity && <div className="break-words">{blob.activity}</div>}
 						<div className="flex justify-between gap-2">
 							<span>Cost</span>
-							<span className="tabular-nums text-card-foreground">
-								{planCostLabel(blob.cost, subscriptionLabel(blob.model))}
+							<span className={cn("tabular-nums", costLabel === COST_NOT_TRACKED ? "text-faint" : "text-card-foreground")}>
+								{costLabel}
 							</span>
 						</div>
 						<div className="flex justify-between gap-2">

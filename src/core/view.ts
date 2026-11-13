@@ -286,6 +286,7 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			return;
 		}
 		case "problem-dismissed":
+		case "question-nudge":
 			return;
 		case "compaction": {
 			out.push({

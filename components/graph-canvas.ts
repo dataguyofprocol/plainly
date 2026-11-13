@@ -300,6 +300,23 @@ export function labelAlpha(
 	return clamp01(1 - (ratio - labelZoom) / span);
 }
 
+/** The backing-store size for a CSS size at a device pixel ratio. */
+export function backingSize(cssW: number, cssH: number, dpr: number): { w: number; h: number } {
+	return { w: Math.max(1, Math.round(cssW * dpr)), h: Math.max(1, Math.round(cssH * dpr)) };
+}
+
+/** True when the backing store no longer matches the CSS size × DPR — a DPR
+ *  change (window moved between displays) fires no ResizeObserver, and
+ *  drawing at the new DPR into the old store paints one corner over a stale
+ *  frame. */
+export function backingStale(
+	canvas: { width: number; height: number; clientWidth: number; clientHeight: number },
+	dpr: number,
+): boolean {
+	const { w, h } = backingSize(canvas.clientWidth, canvas.clientHeight, dpr);
+	return canvas.width !== w || canvas.height !== h;
+}
+
 export function fitTransform(
 	bbox: { minX: number; maxX: number; minY: number; maxY: number },
 	w: number,
@@ -368,6 +385,10 @@ export function pickNearest<T extends { id: string; x: number; y: number }>(
 
 function isVisibleId(visible: ReadonlySet<string> | null | undefined, id: string): boolean {
 	return !visible || visible.has(id);
+}
+
+export function chainEdgeShown(e: CanvasEdge, chain: ReadonlySet<string>, visible: ReadonlySet<string> | null | undefined): boolean {
+	return chain.has(e.from) && chain.has(e.to) && isVisibleId(visible, e.from) && isVisibleId(visible, e.to);
 }
 
 function rgbaFromHex(hex: string, alpha: number): string {
@@ -469,6 +490,9 @@ export class GraphCanvasRenderer {
 	private animating = false;
 
 	private resizeObserver: ResizeObserver;
+	/** Matches only the current DPR, so it fires on the next DPR change;
+	 *  re-armed for the new value each time. */
+	private dprQuery: MediaQueryList | null = null;
 	private downPos: Pt | null = null;
 
 	private geoVersion = 0;
@@ -565,7 +589,23 @@ export class GraphCanvasRenderer {
 		});
 		this.resizeObserver.observe(canvas);
 		this.syncSize();
+		this.watchDpr();
 	}
+
+	private watchDpr(): void {
+		this.dprQuery?.removeEventListener("change", this.onDprChange);
+		this.dprQuery =
+			typeof window.matchMedia === "function"
+				? window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`)
+				: null;
+		this.dprQuery?.addEventListener("change", this.onDprChange);
+	}
+
+	private onDprChange = (): void => {
+		this.watchDpr();
+		this.syncSize();
+		this.markDirty();
+	};
 
 	setColors(colors: CanvasColors, edgeColor: string | undefined): void {
 		if (!this.data) return;
@@ -758,6 +798,8 @@ export class GraphCanvasRenderer {
 		this.simActive = false;
 		this.dragId = null;
 		this.resizeObserver.disconnect();
+		this.dprQuery?.removeEventListener("change", this.onDprChange);
+		this.dprQuery = null;
 		select(this.canvas).on(".zoom", null);
 		this.canvas.removeEventListener("wheel", this.onWheel);
 		this.canvas.removeEventListener("pointermove", this.onPointerMove);
@@ -1013,8 +1055,7 @@ export class GraphCanvasRenderer {
 		const w = this.canvas.clientWidth;
 		const h = this.canvas.clientHeight;
 		const dpr = window.devicePixelRatio || 1;
-		const bw = Math.max(1, Math.round(w * dpr));
-		const bh = Math.max(1, Math.round(h * dpr));
+		const { w: bw, h: bh } = backingSize(w, h, dpr);
 		if (this.canvas.width !== bw || this.canvas.height !== bh) {
 			this.canvas.width = bw;
 			this.canvas.height = bh;
@@ -1365,6 +1406,7 @@ export class GraphCanvasRenderer {
 		const h = this.canvas.clientHeight;
 		const dpr = window.devicePixelRatio || 1;
 		const ctx = this.ctx;
+		if (backingStale(this.canvas, dpr)) this.syncSize();
 
 		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 		ctx.clearRect(0, 0, w, h);
@@ -1423,7 +1465,7 @@ export class GraphCanvasRenderer {
 			const hl = this.highlight;
 			const hot = new Path2D();
 			for (const e of data.edges) {
-				if (!hl.ids.has(e.from) || !hl.ids.has(e.to)) continue;
+				if (!chainEdgeShown(e, hl.ids, this.visible)) continue;
 				const a = this.nodeById.get(e.from);
 				const b = this.nodeById.get(e.to);
 				if (!a || !b) continue;
@@ -1571,7 +1613,7 @@ export class GraphCanvasRenderer {
 		if (hl) {
 			const hot = new Path2D();
 			for (const e of data.edges) {
-				if (!hl.ids.has(e.from) || !hl.ids.has(e.to)) continue;
+				if (!chainEdgeShown(e, hl.ids, this.visible)) continue;
 				const a = this.nodeById.get(e.from);
 				const b = this.nodeById.get(e.to);
 				if (!a || !b) continue;
@@ -1584,7 +1626,7 @@ export class GraphCanvasRenderer {
 			ctx.stroke(hot);
 			ctx.fillStyle = hl.accent;
 			for (const id of hl.ids) {
-				if (!isImpNodeId(id)) continue;
+				if (!isImpNodeId(id) || !isVisibleId(this.visible, id)) continue;
 				const n = this.nodeById.get(id);
 				if (!n) continue;
 				ctx.beginPath();

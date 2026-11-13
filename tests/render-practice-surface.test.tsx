@@ -145,21 +145,24 @@ describe("the practice transcript cards", () => {
 		assert.doesNotMatch(html, /The solution/);
 	});
 
-	it("ThinkingCard: one label, right side, expanded arrival (owner round, 2026-10-07)", () => {
+	it("ThinkingCard: the submitted answer, right side, expanded arrival (owner, 2026-11-13: \"Your answer\")", () => {
 		const trace = renderToStaticMarkup(<ThinkingCard data={{ problemCallId: "c", commit: false, text: "stuck at step two" }} />);
-		assert.match(trace, /Your thinking/);
+		assert.match(trace, /Your answer/);
+		assert.doesNotMatch(trace, /Your thinking/);
 		assert.match(trace, /aria-expanded="true"/);
 		assert.ok(trace.includes("stuck at step two"), "the text is visible on arrival");
 		assert.ok(trace.includes("ls-uthink"), "the user-thinking row");
 		assert.ok(trace.includes("ls-well mine"), "the expanded well");
 		const legacy = renderToStaticMarkup(<ThinkingCard data={{ problemCallId: "c", commit: true, text: "It is 42." }} />);
-		assert.match(legacy, /Your thinking/);
+		assert.match(legacy, /Your answer/);
 		assert.doesNotMatch(legacy, /Your solution/);
 	});
 
 	it("ThinkingCard: working sent with a hint carries the hint as a chip (owner, 2026-10-27)", () => {
 		const html = renderToStaticMarkup(<ThinkingCard data={{ problemCallId: "c", text: "(b) fails?", hint: 1 }} />);
 		assert.ok(html.includes('class="pill practice">with a nudge<'));
+		assert.match(html, /Your working/, "hint-request working is labelled apart from the submitted answer");
+		assert.doesNotMatch(html, /Your answer/);
 		assert.doesNotMatch(renderToStaticMarkup(<ThinkingCard data={{ problemCallId: "c", text: "(b) fails?" }} />), /pill practice/);
 	});
 

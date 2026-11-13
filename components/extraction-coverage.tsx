@@ -201,7 +201,7 @@ export function CoverageRing({ chatId, refreshKey = 0 }: { chatId: string; refre
 	return (
 		<div ref={rootRef} className="lh-no-drag relative shrink-0">
 			<Hint
-				label="How much of this session isn't mapped yet"
+				label="How much of this session isn’t mapped yet"
 				side="bottom"
 			>
 				<button

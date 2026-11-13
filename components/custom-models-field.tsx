@@ -4,9 +4,11 @@ import { useState } from "react";
 import {
 	CUSTOM_CONTEXT_MAX,
 	CUSTOM_CONTEXT_MIN,
+	CUSTOM_MODEL_NAME_MAX,
 	CUSTOM_PROVIDER_MODELS_MAX,
 	CUSTOM_THINKING_FORMATS,
 	defaultCustomModel,
+	prettyCustomModelId,
 	type CustomModelDetected,
 	type CustomModelEntry,
 	type CustomThinkingFormat,
@@ -149,7 +151,7 @@ export function CustomModelsField({
 			)}
 			{models.length > 0 && (
 				<span className="fhint">
-					Vision and Thinking start on. Turn off Vision for models that can't read images, and Thinking for models that don't reason. A model with Vision on can fill the vision slot.
+					Vision and Thinking start on. Turn off Vision for models that can’t read images, and Thinking for models that don’t reason. A model with Vision on can fill the vision slot.
 				</span>
 			)}
 		</div>
@@ -171,6 +173,7 @@ function CustomModelRow({
 	return (
 		<div className="cm-row" data-testid={`custom-model-${slug}`}>
 			<div className="cm-head">
+				<NameInput model={model} onCommit={(name) => onPatch({ name })} testid={`custom-model-${slug}-name`} />
 				<span className="cm-id" title={model.id}>
 					{model.id}
 				</span>
@@ -226,6 +229,37 @@ function CustomModelRow({
 				</span>
 			</div>
 		</div>
+	);
+}
+
+/** Empty commits `undefined`: the model then shows its prettified id,
+ *  which the placeholder previews. */
+function NameInput({ model, onCommit, testid }: { model: CustomModelEntry; onCommit: (name: string | undefined) => void; testid: string }) {
+	const [draft, setDraft] = useState<string | null>(null);
+	const commit = () => {
+		if (draft === null) return;
+		onCommit(draft.trim() || undefined);
+		setDraft(null);
+	};
+	return (
+		<input
+			className="finput sm cm-name"
+			value={draft ?? model.name ?? ""}
+			placeholder={prettyCustomModelId(model.id)}
+			maxLength={CUSTOM_MODEL_NAME_MAX}
+			aria-label={`${model.id} display name`}
+			title="Display name"
+			spellCheck={false}
+			data-testid={testid}
+			onChange={(e) => setDraft(e.target.value)}
+			onBlur={commit}
+			onKeyDown={(e) => {
+				if (e.key === "Enter") {
+					e.preventDefault();
+					commit();
+				}
+			}}
+		/>
 	);
 }
 

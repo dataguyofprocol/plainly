@@ -132,9 +132,10 @@ describe("render smoke tests", () => {
 		assert.ok(html.includes('data-testid="thinking-field"'), "thinking field present");
 		assert.match(html, /Your thinking/, "labeled as the learner's voice (v4: sentence case)");
 		assert.match(html, /Why this answer\? Whatever comes to mind/, "placeholder invites, not apologizes (owner, placeholder round 2026-10-07)");
-		assert.ok(!html.includes("optional"), "the field is never called optional");
+		const thinkingField = html.slice(html.indexOf('data-testid="thinking-field"'));
+		assert.ok(!thinkingField.includes("optional"), "the thinking field is never called optional");
 		assert.match(html, />Submit</, "send becomes Submit (v4)");
-		assert.match(html, /↵ submits · ⇧↵ newline/, "the standard chord is discoverable (owner round 5)");
+		assert.match(html, /<span class="kbd">↵<\/span> submits · <span class="kbd">⇧↵<\/span> newline/, "the standard chord is discoverable, in key chips (owner round 5)");
 		assert.ok(!html.includes('type="radio"'), "no native radio inputs");
 		assert.ok(html.includes('role="radio"'), "button-based radio role present");
 	});

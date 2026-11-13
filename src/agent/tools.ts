@@ -7,6 +7,7 @@ import {
 	QUIZ_PROSE_FIELDS,
 	askInputSchema,
 	askOptionProblems,
+	dontKnowOptionProblems,
 	explainInputBase,
 	explainInputObject,
 	explainInputProblems,
@@ -136,7 +137,7 @@ export const probeQuizTool: AgentTool<typeof probeQuizInputSchema> = {
 	prepareArguments: prepareQuestionArguments(QUIZ_PROSE_FIELDS),
 	executionMode: "sequential",
 	execute: async (_toolCallId, input) => {
-		const problems = quizInputProblems(input);
+		const problems = [...quizInputProblems(input), ...dontKnowOptionProblems(input.options)];
 		if (problems.length > 0) return invalidInputResult("probe", problems);
 		return questionResult();
 	},
@@ -242,7 +243,7 @@ export function teachQuizToolFor(ctx: Pick<PlanToolContext, "chatId" | "chatStor
 		prepareArguments: prepareQuestionArguments(QUIZ_PROSE_FIELDS),
 		executionMode: "sequential",
 		execute: async (_toolCallId, input) => {
-			const problems = [...quizInputProblems(input)];
+			const problems = [...quizInputProblems(input), ...dontKnowOptionProblems(input.options)];
 			const nodeIdProblemText = nodeIdProblem(ctx, input.nodeId);
 			if (nodeIdProblemText) problems.push(nodeIdProblemText);
 			if (problems.length > 0) return invalidInputResult("quiz", problems);

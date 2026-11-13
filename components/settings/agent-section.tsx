@@ -10,6 +10,7 @@ import {
 	MODEL_SLOTS,
 	resolveSettings,
 	type AgentSettings,
+	type CatalogProvider,
 	type CompactionSettings,
 	type GraphSettings,
 	type ModelCatalogEntry,
@@ -17,10 +18,10 @@ import {
 	type ModelsSettings,
 } from "@/src/core";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
-import { prettyModel } from "@/components/usage-format";
+import { modelLabel } from "@/components/usage-format";
 import { SettingsGroup, SettingsRow, Toggle, CommitInput, SelectTrigger } from "./controls.tsx";
 import { Icon } from "@/components/ui/icon";
-import { ModelMenuList, ThinkingMenuList } from "./model-menu";
+import { levelName, ModelMenuList, ThinkingMenuList } from "./model-menu";
 import { ChatGPTBackgroundAccess } from "./chatgpt-connection";
 import { NativeSubscriptionBackgroundAccess } from "./subscription-connections";
 
@@ -53,6 +54,7 @@ interface SegmentInfo {
 
 interface ModelsBody {
 	models: ModelCatalogEntry[];
+	providers: CatalogProvider[];
 	slots: Record<ModelSlotName, { model: { provider: string; id: string }; thinkingLevel?: string } | null>;
 }
 
@@ -148,6 +150,7 @@ export function AgentSection({
 	onCompactionChange: (next: CompactionSettings) => void;
 }) {
 	const [catalog, setCatalog] = useState<ModelCatalogEntry[] | null>(null);
+	const [catalogProviders, setCatalogProviders] = useState<CatalogProvider[] | undefined>(undefined);
 	const [slots, setSlots] = useState<ModelsBody["slots"] | null>(null);
 	const [search, setSearch] = useState<{ available: boolean; engine: string | null; reason: string } | null>(null);
 	const [engineKeys, setEngineKeys] = useState<Partial<Record<(typeof SEARCH_ENGINES)[number], boolean>>>({});
@@ -181,6 +184,7 @@ export function AgentSection({
 			.then((body: ModelsBody) => {
 				if (!modelsMounted.current || request !== modelsRequest.current) return;
 				setCatalog(body.models);
+				setCatalogProviders(body.providers);
 				setSlots(body.slots);
 			})
 			.catch(() => { if (modelsMounted.current && request === modelsRequest.current) setCatalog(null); });
@@ -393,7 +397,7 @@ export function AgentSection({
 					const thisMenuOpen = openMenu?.target === slot ? openMenu.kind : null;
 					const slotCatalog =
 						slot === "vision" ? catalog?.filter((m) => m.input.includes("image")) : catalog;
-					const shown = modelId ? prettyModel(modelId) : "";
+					const shown = modelId ? modelLabel(modelId, provider, catalog) : "";
 					return (
 						<SettingsRow
 							key={slot}
@@ -413,7 +417,7 @@ export function AgentSection({
 									onClick={() => setOpenMenu(thisMenuOpen === "model" ? null : { target: slot, kind: "model" })}
 								/>
 								<SelectTrigger
-									value={thinkingDisplay(thinking || (chosen ? defaultOrderLevel(levels) : ""))}
+									value={levelName(thinking || (chosen ? defaultOrderLevel(levels) : ""))}
 									emptyLabel="—"
 									ariaLabel={`${SLOT_META[slot].label} thinking`}
 									testid={`slot-thinking-${slot}`}
@@ -430,6 +434,7 @@ export function AgentSection({
 									>
 										<ModelMenuList
 											models={slotCatalog ?? undefined}
+											providers={catalogProviders}
 											effectiveId={modelId}
 											effectiveProvider={provider}
 											onPick={(entry) => {
@@ -622,8 +627,3 @@ export function AgentSection({
 	);
 }
 
-function thinkingDisplay(level: string): string {
-	if (!level) return "";
-	if (level === "xhigh") return "Extra high";
-	return level.charAt(0).toUpperCase() + level.slice(1);
-}

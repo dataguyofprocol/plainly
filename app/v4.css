@@ -234,3 +234,11 @@
 	.v4 * { animation: none !important; transition: none !important; }
 	.v4 .rise { opacity: 1; }
 }
+
+.v4 .cv-ctrl { position: absolute; right: 12px; bottom: 12px; z-index: 5; display: flex; align-items: center; gap: 2px; height: 36px; padding: 0 4px; border-radius: 12px; }
+.v4 .cv-zoom { min-width: 44px; text-align: center; font-size: 12px; line-height: 16px; color: var(--muted-foreground); }
+.v4 .cv-sep { width: 1px; height: 16px; margin: 0 4px; background: var(--line-strong); }
+.v4 .cv-hint { position: absolute; left: 12px; bottom: 12px; z-index: 5; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 200px); height: 36px; padding: 0 12px; border-radius: 12px; font-size: 12px; line-height: 16px; color: var(--muted-foreground); }
+.v4 .cv-hint:has(> button) { padding-right: 4px; }
+.v4 .cv-hint > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v4 .cv-hint-ic { flex: none; color: var(--faint); }

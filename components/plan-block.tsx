@@ -13,6 +13,7 @@ import { curveBasis, line } from "d3-shape";
 import { fitGraphView, fitZoomFor, zoomedGraphView, type Viewport } from "@/components/pan-zoom";
 import type { PlanBlockData, PlanNodeStatus, PlanTree } from "@/src/core";
 import { derivedNodeStatus, derivePlanStatuses } from "@/src/core";
+import { CanvasHint, CanvasZoom } from "@/components/canvas-chrome";
 import { Hint } from "@/components/ui/hint";
 
 export const PAD_X = 16;
@@ -668,42 +669,15 @@ export function PlanPopup({ messages, onClose }: { messages: readonly PopupMessa
 								naturalSize
 							/>
 						</div>
-						<div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between p-2">
-							<span className="text-xs text-muted-foreground/60">Drag to pan · scroll to zoom</span>
-							<div className="flex gap-1">
-								<Hint label="Zoom out" side="bottom">
-<button
-									type="button"
-									aria-label="Zoom out"
-									onClick={() => stepZoom(1 / 1.25)}
-									className="ib sm pop pointer-events-auto"
-								>
-									<Icon name="minus" size="sm" />
-								</button>
-</Hint>
-								<Hint label="Fit plan to screen" side="bottom">
-<button
-									type="button"
-									aria-label="Fit plan to screen"
-									onClick={fitView}
-									data-testid="plan-popup-fit"
-									className="ib sm pop pointer-events-auto"
-								>
-									<Icon name="expand" size="sm" />
-								</button>
-</Hint>
-								<Hint label="Zoom in" side="bottom">
-<button
-									type="button"
-									aria-label="Zoom in"
-									onClick={() => stepZoom(1.25)}
-									className="ib sm pop pointer-events-auto"
-								>
-									<Icon name="plus" size="sm" />
-								</button>
-</Hint>
-							</div>
-						</div>
+						<CanvasHint>Drag to pan · scroll to zoom</CanvasHint>
+						<CanvasZoom
+							pct={fitZoom > 0 ? Math.round((view.zoom / fitZoom) * 100) : 100}
+							onZoomOut={() => stepZoom(1 / 1.25)}
+							onZoomIn={() => stepZoom(1.25)}
+							onFit={fitView}
+							fitLabel="Fit plan to screen"
+							fitTestId="plan-popup-fit"
+						/>
 					</>
 				) : (
 					<div className="flex h-full items-center justify-center text-sm text-muted-foreground">

@@ -124,4 +124,31 @@ describe("confidence levels", () => {
 		assert.doesNotThrow(() => parseChatInput(answer()));
 		assert.throws(() => parseChatInput(answer(42)), ChatInputError);
 	});
+
+	it("an unrated, shuffled answer reaches the model by authored value, with no confidence or display index", () => {
+		const record: LhMessage[] = [
+			{
+				...posed()[0],
+				content: [{
+					type: "toolCall",
+					id: "call_q1",
+					name: "quiz",
+					arguments: { question: "?", options: [{ label: "A", value: "a" }, { label: "B", value: "b" }], correctAnswer: "a", explanation: "." },
+				}],
+			} as LhMessage,
+		];
+		// The dock showed B, A; the learner picked "A" at display position 2 and left confidence unrated.
+		const answer = {
+			kind: "quiz",
+			questionText: "?",
+			dontKnow: false,
+			answers: [{ label: "A", value: "a", index: 2 }],
+			correct: true,
+			answeredAt: "x",
+		};
+		const input = parseChatInput({ type: "answer", toolCallId: "call_q1", answer });
+		const [result] = inputAppends({ messages: record }, input);
+		const modelSees = JSON.parse((result as { content: { text: string }[] }).content[0]!.text);
+		assert.deepEqual(modelSees, { kind: "quiz", answers: [{ value: "a", label: "A" }], correct: true });
+	});
 });

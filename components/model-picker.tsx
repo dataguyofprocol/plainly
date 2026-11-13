@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatSettings, ModelCatalogEntry, ModelCatalogResponse, ModelsSettings, UserSettings } from "@/src/core";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
-import { prettyModel } from "@/components/usage-format";
+import { modelLabel } from "@/components/usage-format";
 import { levelName, ModelMenuList, ThinkingMenuList } from "@/components/settings/model-menu";
 import { Icon } from "@/components/ui/icon";
 import { composeSlotModel } from "@/components/settings/agent-section";
@@ -12,7 +12,6 @@ import { Hint } from "@/components/ui/hint";
 import { notifySettingsSaved, onSettingsSaved, useSettingsSaved } from "@/components/settings-signal";
 import { defaultOrderLevel, populateLevel, THINKING_LABEL } from "@/components/thinking-default";
 
-const SHORT_LEVEL: Record<string, string> = { minimal: "Min", medium: "Med", xhigh: "X-high" };
 
 let catalogCache: ModelCatalogResponse | undefined;
 let catalogInflight: Promise<void> | undefined;
@@ -247,7 +246,7 @@ export function ModelControl({
 
 	if (variant === "chip") {
 		const levelLabel = effectiveLevel === undefined ? null : levelName(THINKING_LABEL[effectiveLevel] ?? effectiveLevel);
-		const name = effectiveId ? prettyModel(effectiveId) : "Choose a model";
+		const name = effectiveId ? modelLabel(effectiveId, effectiveProvider, catalog?.models) : "Choose a model";
 		return (
 			<div ref={containerRef} className="relative" data-testid="model-control">
 				<Hint
@@ -274,6 +273,7 @@ export function ModelControl({
 						{error && <div className="mm-err">{error}</div>}
 						<ModelMenuList
 							models={catalog?.models}
+							providers={catalog?.providers}
 							effectiveId={effectiveId}
 							effectiveProvider={effectiveProvider}
 							onPick={pickModel}
@@ -288,10 +288,9 @@ export function ModelControl({
 											key={level}
 											type="button"
 											className={level === effectiveLevel ? "on" : ""}
-											title={levelName(level)}
 											onClick={() => apply(effectiveProvider ?? "", effectiveId ?? "", level as ThinkingLevel)}
 										>
-											{SHORT_LEVEL[level] ?? levelName(level)}
+											{levelName(level)}
 										</button>
 									))}
 								</div>
@@ -319,7 +318,7 @@ export function ModelControl({
 				title={effectiveId ? `${effectiveProvider} · ${effectiveId}` : undefined}
 				className="flex h-7 max-w-56 items-center gap-1.5 rounded-full bg-surface/90 px-2.5 text-xs font-semibold whitespace-nowrap text-foreground shadow-[inset_0_0_0_1px_var(--line-strong),var(--e1)] backdrop-blur transition-shadow hover:shadow-[inset_0_0_0_1px_var(--line-hover),var(--e1)]"
 			>
-				<span className="truncate">{effectiveId ? prettyModel(effectiveId) : "—"}</span>
+				<span className="truncate">{effectiveId ? modelLabel(effectiveId, effectiveProvider, catalog?.models) : "—"}</span>
 				<Icon name="chevron-down" size="xs" className="text-faint" />
 			</button>
 			</Hint>
@@ -353,6 +352,7 @@ export function ModelControl({
 					{error && <div className="mm-err">{error}</div>}
 					<ModelMenuList
 						models={catalog?.models}
+						providers={catalog?.providers}
 						effectiveId={effectiveId}
 						effectiveProvider={effectiveProvider}
 						onPick={pickModel}
@@ -372,7 +372,7 @@ export function ModelControl({
 						levels={catalog ? levels : []}
 						effectiveLevel={effectiveLevel}
 						onPick={(level) => apply(effectiveProvider ?? "", effectiveId ?? "", level as ThinkingLevel)}
-						empty={catalog ? (effectiveId ? `${prettyModel(effectiveId)} has no thinking levels.` : "Pick a model first.") : "Loading…"}
+						empty={catalog ? (effectiveId ? `${modelLabel(effectiveId, effectiveProvider, catalog?.models)} has no thinking levels.` : "Pick a model first.") : "Loading…"}
 						footer="Levels this model supports"
 					/>
 					{error && <div className="mm-err">{error}</div>}

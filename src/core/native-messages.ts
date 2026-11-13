@@ -10,6 +10,7 @@ import { QUESTION_TOOLS } from "./pending.ts";
 import {
 	CONCLUDE_ACK_TEXT,
 	HANDOFF_TEXT,
+	QUESTION_NUDGE_TEXT,
 	hintRequestText,
 	type HintRung,
 	NEXT_PROBLEM_TEXT,
@@ -28,6 +29,7 @@ export interface LhMarkerMessage {
 	customType:
 		| "graph-context"
 		| "probe-handoff"
+		| "question-nudge"
 		| "subagent-steer"
 		| "subagent-abort"
 		| "plan-block"
@@ -104,6 +106,52 @@ export function newHandoffMessage(chatId: string): LhMarkerMessage {
 		details: { chatId },
 		timestamp: Date.now(),
 	};
+}
+
+/** Model-only. The id keys one nudge per bare stop; `afterMessageId` is the
+ *  bare-stop reply, so the nudge is stale once anything follows it. */
+export function newQuestionNudge(chatId: string, afterMessageId: string): LhMarkerMessage {
+	return {
+		id: `nudge_${afterMessageId}`,
+		role: "custom",
+		customType: "question-nudge",
+		content: QUESTION_NUDGE_TEXT,
+		display: false,
+		details: { chatId, afterMessageId },
+		timestamp: Date.now(),
+	};
+}
+
+export function questionNudgeStale(nudge: LhMarkerMessage, messages: readonly LhMessage[]): boolean {
+	const { afterMessageId } = nudge.details as { afterMessageId: string };
+	return messages[messages.length - 1]?.id !== afterMessageId;
+}
+
+/** The reply to nudge after a teaching turn: it ended with `stop` and no
+ *  question waits on the learner. Null when the turn was a plan turn. */
+export function bareStopReply(messages: readonly LhMessage[], turn: readonly LhMessage[]): (AssistantMessage & { id: string }) | null {
+	const last = messages[messages.length - 1];
+	if (!last || last.role !== "assistant" || last.stopReason !== "stop") return null;
+	if (danglingQuestionOf(messages) !== null) return null;
+	const planned = turn.some((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.name === "plan_init"));
+	return planned ? null : (last as AssistantMessage & { id: string });
+}
+
+/** True when the teacher has written visible text since the learner's last
+ *  input, counting `current` (the message being executed). */
+export function teacherTextSinceLearner(messages: readonly AgentMessage[], current: AssistantMessage): boolean {
+	const hasText = (m: AssistantMessage) => m.content.some((b) => b.type === "text" && b.text.trim().length > 0);
+	if (hasText(current)) return true;
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m === current) continue;
+		if (m.role === "assistant") {
+			if (hasText(m)) return true;
+			continue;
+		}
+		if (nativeInputCause(m, messages.slice(0, i)) === "learner") return false;
+	}
+	return false;
 }
 
 /** UI-only. `planCallId` keys idempotent emission. */
@@ -493,7 +541,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "user") return "learner";
 	if (message.role === "system" || message.role === "assistant") return "neutral";
 	if (message.role === "custom") {
-		if (["probe-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
+		if (["probe-handoff", "question-nudge", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
 		if (["practice-thinking", "practice-next"].includes(message.customType)) return "learner";
 		return ["graph-context", "plan-block", "problem-dismissed", "compaction"].includes(message.customType) ? "neutral" : "unrecognizable";
 	}

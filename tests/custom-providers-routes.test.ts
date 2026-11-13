@@ -93,6 +93,7 @@ describe("the custom provider routes", () => {
 		const llama = catalog.models.find((m) => m.provider === "custom-local-ollama" && m.id === "llama3");
 		assert.ok(llama, "custom models federate into the pickers");
 		assert.equal(llama.unpriced, true);
+		assert.equal(llama.name, "llama3", "no display name set: the prettified id (words with digits stay as typed)");
 	});
 
 	it("carries each model's capabilities into the engine and the vision picker", async () => {

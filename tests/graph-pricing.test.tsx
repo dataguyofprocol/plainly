@@ -20,7 +20,7 @@ test("wholly unpriced historical graph costs render unknown, not known-zero doll
 	assert.equal(costs.unpricedRuns, 1);
 	assert.equal(costs.stages.extraction.unpricedRuns, 1);
 	const html = headline([historical]);
-	assert.match(html, />—<\/button>/);
+	assert.match(html, />Not tracked<\/button>/);
 	assert.doesNotMatch(html, /\$0\.00/);
 });
 

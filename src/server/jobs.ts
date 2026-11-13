@@ -12,7 +12,7 @@ import {
 	type SteerMessage,
 } from "../core/contracts.ts";
 import type { TurnInput } from "../core/input-events.ts";
-import { danglingQuestionOf, endsInDismissal, type LhMessage } from "../core/native-messages.ts";
+import { danglingQuestionOf, endsInDismissal, questionNudgeStale, type LhMessage } from "../core/native-messages.ts";
 import { fireJobAbort, isJobLive } from "../agent/subagents/aborts.ts";
 import { stores, effectiveSettings } from "./stores.ts";
 import { resolveConversationSpec } from "../core/settings-resolution.ts";
@@ -111,7 +111,7 @@ function handOffEligible(chatId: string, agent: Agent): void {
 	const queue = state().queues.get(chatId);
 	if (automaticFollowUpAllowed(chatId, agent) && queue && queue.length > 0) {
 		for (const entry of queue) {
-			if (entry.handedTo !== agent && entry.steer.customType !== "probe-handoff") {
+			if (entry.handedTo !== agent && entry.steer.customType !== "probe-handoff" && entry.steer.customType !== "question-nudge") {
 				agent.steer(entry.steer);
 				entry.handedTo = agent;
 			}
@@ -240,7 +240,7 @@ export function abortJob(jobId: string): AbortOutcome {
 }
 
 function chatIdOf(steer: SteerMessage): string {
-	if (steer.customType === "probe-handoff") {
+	if (steer.customType === "probe-handoff" || steer.customType === "question-nudge") {
 		return (steer.details as { chatId: string }).chatId;
 	}
 	const jobId = jobIdOf(steer);
@@ -320,7 +320,11 @@ async function pump(chatId: string): Promise<void> {
 			}
 
 			const current = s.queues.get(chatId) ?? [];
-			const fire = current.filter((e) => !steerDelivered(fresh.messages, e.steer.id));
+			const fire = current.filter(
+				(e) =>
+					!steerDelivered(fresh.messages, e.steer.id) &&
+					!(e.steer.customType === "question-nudge" && questionNudgeStale(e.steer, fresh.messages)),
+			);
 			for (const entry of current) {
 				if (!fire.includes(entry)) {
 					finalizeSteer(entry.steer);

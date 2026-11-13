@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ModelCatalogEntry } from "@/src/core";
+import type { CatalogProvider, ModelCatalogEntry } from "@/src/core";
 import { fuzzyScore, subscriptionLabel } from "@/src/core";
 import { formatTokens } from "@/components/usage-format";
 import { Icon } from "@/components/ui/icon";
@@ -42,12 +42,15 @@ export function ModelMenuList({
 	effectiveProvider,
 	onPick,
 	footer,
+	providers,
 }: {
 	models: ModelCatalogEntry[] | undefined;
 	effectiveId: string | undefined;
 	effectiveProvider?: string;
 	onPick: (entry: ModelCatalogEntry) => void;
 	footer?: string;
+	/** Carries the saved names of custom providers for the group headers. */
+	providers?: CatalogProvider[];
 }) {
 	const [query, setQuery] = useState("");
 	const [menuIdx, setMenuIdx] = useState<number | null>(null);
@@ -115,7 +118,11 @@ export function ModelMenuList({
 					const head = i === 0 || results[i - 1]!.provider !== m.provider;
 					return (
 						<li key={`${m.provider}/${m.id}`}>
-							{head && <div className="over mm-group">{sub ? `${sub} (subscription)` : providerName(m.provider)}</div>}
+							{head && (
+								<div className="over mm-group">
+									{sub ? `${sub} (subscription)` : providers?.find((p) => p.id === m.provider)?.name ?? providerName(m.provider)}
+								</div>
+							)}
 							<button
 								type="button"
 								data-testid={`model-option-${m.id.replace(/[^a-z0-9-]/gi, "_")}`}
@@ -128,9 +135,11 @@ export function ModelMenuList({
 										<span>{m.name}</span>
 										{on && <Icon name="check" size="sm" className="tick" />}
 									</span>
-									<span className="mm-meta" title={sub ? "Included in your subscription" : "USD per 1M tokens, in / out"}>
-										{sub ?? (m.unpriced ? "Price unknown" : priceLabel(m.cost))}
-									</span>
+									{(sub || !m.unpriced) && (
+										<span className="mm-meta" title={sub ? "Included in your subscription" : "USD per 1M tokens, in / out"}>
+											{sub ?? priceLabel(m.cost)}
+										</span>
+									)}
 								</span>
 								<span className="mm-line">
 									<span className="mm-id">{m.id}</span>

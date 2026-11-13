@@ -23,6 +23,7 @@ test("only explicit subscription route IDs count as subscription use; names stay
 	assert.equal(planCostLabel(0.12, ["Grok"], (n) => `$${n.toFixed(2)}`), "$0.12 + Grok");
 	assert.equal(planCostLabel(0.67, ["ChatGPT"], (n) => `$${n.toFixed(2)}`), "$0.67 + ChatGPT");
 	assert.equal(planCostLabel(null, ["ChatGPT", "GitHub Copilot", "Grok"]), "ChatGPT + GitHub Copilot + Grok");
+	assert.equal(planCostLabel(null, undefined), "Not tracked", "no price and no plan reads as untracked, not a bare dash");
 });
 test("mixed session pricing sums only API dollars and retains all subscription providers, not unpriced errors", () => {
 	const turns = [turn("github-copilot-subscription:gpt-5", "copilot"), turn("xai-subscription:grok", "grok"), turn("chatgpt:gpt-5", "chatgpt"), turn("openai:gpt-5", "api")];

@@ -26,7 +26,7 @@ export function resolveAttachments(
 		}
 		const path = pathFor(file);
 		if (!path) {
-			errors.push(`${file.name} isn't a file on disk, so it can't be attached.`);
+			errors.push(`${file.name} isn’t a file on disk, so it can’t be attached.`);
 			continue;
 		}
 		if (!existing.includes(path) && !paths.includes(path)) paths.push(path);

@@ -6,6 +6,7 @@ import { fitGraphView, fitZoomFor, zoomedGraphView, type Viewport } from "@/comp
 import { renderMermaid } from "@/components/mermaid-render";
 import { useResolvedTheme } from "@/components/theme";
 import { MermaidError } from "@/components/mermaid-error";
+import { CanvasHint, CanvasZoom } from "@/components/canvas-chrome";
 import { Hint } from "@/components/ui/hint";
 import { Icon } from "@/components/ui/icon";
 
@@ -231,41 +232,14 @@ export function MermaidOverlay({
 								dangerouslySetInnerHTML={{ __html: svg }}
 							/>
 						</div>
-						<div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between p-2">
-							<span className="text-xs text-faint">Drag to pan · scroll to zoom</span>
-							<div className="pointer-events-auto flex gap-0.5 rounded-[10px] bg-surface/90 p-0.5 shadow-[inset_0_0_0_1px_var(--line-strong),var(--e2)] backdrop-blur">
-								<Hint label="Zoom out" side="bottom">
-<button
-									type="button"
-									aria-label="Zoom out"
-									onClick={() => stepZoom(1 / 1.25)}
-									className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-hover hover:text-foreground active:scale-95"
-								>
-									<Icon name="minus" size="sm" />
-								</button>
-</Hint>
-								<Hint label="Fit diagram to view" side="bottom">
-<button
-									type="button"
-									aria-label="Fit diagram to view"
-									onClick={fitView}
-									className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-hover hover:text-foreground active:scale-95"
-								>
-									<Icon name="expand" size="sm" />
-								</button>
-</Hint>
-								<Hint label="Zoom in" side="bottom">
-<button
-									type="button"
-									aria-label="Zoom in"
-									onClick={() => stepZoom(1.25)}
-									className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-hover hover:text-foreground active:scale-95"
-								>
-									<Icon name="plus" size="sm" />
-								</button>
-</Hint>
-							</div>
-						</div>
+						<CanvasHint>Drag to pan · scroll to zoom</CanvasHint>
+						<CanvasZoom
+							pct={fitZoom > 0 ? Math.round((view.zoom / fitZoom) * 100) : 100}
+							onZoomOut={() => stepZoom(1 / 1.25)}
+							onZoomIn={() => stepZoom(1.25)}
+							onFit={fitView}
+							fitLabel="Fit diagram to view"
+						/>
 					</>
 				) : (
 					<div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">

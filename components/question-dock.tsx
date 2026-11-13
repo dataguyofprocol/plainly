@@ -119,6 +119,14 @@ export function QuestionDock({
 	);
 }
 
+function EnterKeys() {
+	return (
+		<>
+			<span className="kbd">↵</span> submits · <span className="kbd">⇧↵</span> newline
+		</>
+	);
+}
+
 function teaserText(q: string): string {
 	return plainText(q, Infinity) ?? "";
 }
@@ -227,7 +235,9 @@ function QuestionDockForm({
 	const [text, setText] = useState("");
 	const thinkingTextRef = useRef("");
 	const answerTextRef = useRef("");
-	const [confIdx, setConfIdx] = useState<number>(1);
+	// Null until the learner rates it: an untouched default would reach the
+	// tutor as a self-assessment nobody made.
+	const [confIdx, setConfIdx] = useState<number | null>(null);
 	const selectMode: SelectMode = qd.mode === "multi-select" ? "multi-select" : "single-select";
 
 	const isTarget = useDictationTarget(
@@ -273,7 +283,7 @@ function QuestionDockForm({
 			other: sel.otherSelected ? other : undefined,
 			text: qd.mode === "text" ? answerTextRef.current : undefined,
 			thinking: qd.mode !== "text" ? thinkingTextRef.current.trim() || undefined : undefined,
-			confidence: kind === "quiz" ? CONFIDENCE_LEVELS[confIdx]!.value : undefined,
+			confidence: kind === "quiz" && confIdx !== null ? CONFIDENCE_LEVELS[confIdx]!.value : undefined,
 		};
 		onSubmit(buildAnswer(qd, req, toolName));
 	};
@@ -353,11 +363,11 @@ function QuestionDockForm({
 			} else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
 				if (kind !== "quiz" || sel.dontKnow) return;
 				e.preventDefault();
+				const right = e.key === "ArrowRight";
 				setConfIdx((i) =>
-					Math.min(
-						CONFIDENCE_LEVELS.length - 1,
-						Math.max(0, i + (e.key === "ArrowRight" ? 1 : -1)),
-					),
+					i === null
+						? right ? 0 : CONFIDENCE_LEVELS.length - 1
+						: Math.min(CONFIDENCE_LEVELS.length - 1, Math.max(0, i + (right ? 1 : -1))),
 				);
 			} else if (e.key === " ") {
 				if (kbdIdx === null) return;
@@ -496,11 +506,14 @@ function QuestionDockForm({
 
 			{kind === "quiz" && (
 				<div className="qfield">
-					<span id={`${toolCallId}-confidence`} className={cn("flabel", sel.dontKnow && "off")}>
-						How sure are you?
+					<span className="qfield-h">
+						<span id={`${toolCallId}-confidence`} className={cn("flabel", sel.dontKnow && "off")}>
+							How sure are you?
+						</span>
+						<span className="t-meta faint">optional</span>
 					</span>
 					<ConfidenceLadder
-						value={CONFIDENCE_LEVELS[confIdx]!.value}
+						value={confIdx === null ? null : CONFIDENCE_LEVELS[confIdx]!.value}
 						onChange={(v) => setConfIdx(CONFIDENCE_LEVELS.findIndex((l) => l.value === v))}
 						disabled={sel.dontKnow}
 						labelledBy={`${toolCallId}-confidence`}
@@ -586,10 +599,10 @@ function QuestionDockForm({
 					{compactionRunning ? (
 						"Compacting the session…"
 					) : qd.mode === "text" ? (
-						"↵ submits · ⇧↵ newline"
+						<EnterKeys />
 					) : (
 						<>
-							<span className="kbd">1</span>–<span className="kbd">{rowCount}</span> pick · {"↵ submits · ⇧↵ newline"}
+							<span className="kbd">1</span>–<span className="kbd">{rowCount}</span> pick · <EnterKeys />
 						</>
 					)}
 				</span>

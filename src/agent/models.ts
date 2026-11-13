@@ -13,7 +13,7 @@ import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completio
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { type ModelRole } from "../../config.ts";
 import { DEFAULT_THINKING_ORDER } from "../core/settings.ts";
-import { customProviderEnvVar, type CustomProviderEntry } from "../core/custom-providers.ts";
+import { customProviderEnvVar, prettyCustomModelId, type CustomProviderEntry } from "../core/custom-providers.ts";
 import packageMetadata from "../../package.json" with { type: "json" };
 import { chatGPTModel } from "./chatgpt-bridge.ts";
 import { chatGPTStream } from "./chatgpt-stream.ts";
@@ -78,7 +78,7 @@ export function customProvider(entry: CustomProviderEntry) {
 	const envVar = customProviderEnvVar(entry.id);
 	const models: Model<"openai-completions">[] = entry.models.map((m) => ({
 		id: m.id,
-		name: m.id,
+		name: m.name ?? prettyCustomModelId(m.id),
 		api: "openai-completions",
 		provider: entry.id,
 		baseUrl: entry.baseUrl,
